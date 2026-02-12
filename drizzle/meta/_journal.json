@@ -22,6 +22,13 @@
       "when": 1770889370541,
       "tag": "0002_amusing_lyja",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1770896557329,
+      "tag": "0003_gigantic_moon_knight",
+      "breakpoints": true
     }
   ]
 }

@@ -228,6 +228,25 @@ export const files = mysqlTable("files", {
 });
 
 /**
+ * 景點資源表 - 存儲景點信息和可用時間
+ */
+export const attractions = mysqlTable("attractions", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address"),
+  description: text("description"),
+  // 可用時間段（JSON格式），例如：[{"day": "monday", "startTime": "09:00", "endTime": "17:00"}]
+  availableTimeSlots: json("availableTimeSlots"),
+  // 是否全天可用
+  isAllDayAvailable: boolean("isAllDayAvailable").default(false).notNull(),
+  // 備註
+  notes: text("notes"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
  * 通知表 - 存儲系統通知
  */
 export const notifications = mysqlTable("notifications", {
@@ -265,3 +284,5 @@ export type File = typeof files.$inferSelect;
 export type InsertFile = typeof files.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+export type Attraction = typeof attractions.$inferSelect;
+export type InsertAttraction = typeof attractions.$inferInsert;

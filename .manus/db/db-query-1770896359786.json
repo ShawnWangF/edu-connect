@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, name, url, mimeType FROM files LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, url, mimeType FROM files LIMIT 5;",
+  "rows": [
+    {
+      "id": "30002",
+      "name": "測試文件.pdf",
+      "url": "https://storage.example.com/test-file.pdf",
+      "mimeType": "application/pdf"
+    },
+    {
+      "id": "30003",
+      "name": "測試文件.pdf",
+      "url": "https://storage.example.com/test-file.pdf",
+      "mimeType": "application/pdf"
+    },
+    {
+      "id": "30004",
+      "name": "測試文件.pdf",
+      "url": "https://storage.example.com/test-file.pdf",
+      "mimeType": "application/pdf"
+    },
+    {
+      "id": "30005",
+      "name": "“鲲鹏计划”境外课程项目方案V2.pdf",
+      "url": "https://storage.example.com/group-1/1770890590194-“鲲鹏计划”境外课程项目方案V2.pdf",
+      "mimeType": "application/pdf"
+    },
+    {
+      "id": "30006",
+      "name": "測試文件.pdf",
+      "url": "https://storage.example.com/test-file.pdf",
+      "mimeType": "application/pdf"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\turl\tmimeType\n30002\t測試文件.pdf\thttps://storage.example.com/test-file.pdf\tapplication/pdf\n30003\t測試文件.pdf\thttps://storage.example.com/test-file.pdf\tapplication/pdf\n30004\t測試文件.pdf\thttps://storage.example.com/test-file.pdf\tapplication/pdf\n30005\t“鲲鹏计划”境外课程项目方案V2.pdf\thttps://storage.example.com/group-1/1770890590194-“鲲鹏计划”境外课程项目方案V2.pdf\tapplication/pdf\n30006\t測試文件.pdf\thttps://storage.example.com/test-file.pdf\tapplication/pdf\n",
+  "stderr": "",
+  "execution_time_ms": 1670
+}

@@ -1212,6 +1212,18 @@ function FilesTab({ groupId, files, utils }: any) {
       toast.error(error.message || "刪除失敗");
     },
   });
+  
+  const uploadFileMutation = trpc.files.upload.useMutation({
+    onSuccess: () => {
+      toast.success("文件上傳成功");
+      utils.files.listByGroup.invalidate({ groupId });
+      setIsUploading(false);
+    },
+    onError: (error) => {
+      toast.error("文件上傳失敗: " + error.message);
+      setIsUploading(false);
+    },
+  });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1233,16 +1245,11 @@ function FilesTab({ groupId, files, utils }: any) {
         try {
           const base64Data = event.target?.result as string;
           
-          // 使用 tRPC mutation 上傳文件（需要在 server 端處理）
-          // 這裡我們直接使用模擬的 URL，實際應該通過 API 上傳
-          const mockUrl = `https://storage.example.com/group-${groupId}/${Date.now()}-${file.name}`;
-          const fileKey = `group-${groupId}/${Date.now()}-${file.name}`;
-          
-          createFileMutation.mutate({
+          // 使用真實的S3上傳API
+          uploadFileMutation.mutate({
             groupId,
-            name: file.name,
-            fileKey,
-            url: mockUrl,
+            fileName: file.name,
+            fileData: base64Data,
             mimeType: file.type,
             size: file.size,
           });

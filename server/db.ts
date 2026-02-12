@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications } from "../drizzle/schema";
+import { InsertUser, users, groups, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 
@@ -414,4 +414,42 @@ export async function deleteFile(id: number) {
   if (!db) throw new Error("Database not available");
 
   await db.delete(files).where(eq(files.id, id));
+}
+
+// 景點資源管理
+export async function getAllAttractions() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(attractions);
+}
+
+export async function getAttractionById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(attractions).where(eq(attractions.id, id));
+  return result[0] || null;
+}
+
+export async function createAttraction(attractionData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(attractions).values(attractionData);
+  return result;
+}
+
+export async function updateAttraction(id: number, attractionData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(attractions).set(attractionData).where(eq(attractions.id, id));
+}
+
+export async function deleteAttraction(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(attractions).where(eq(attractions.id, id));
 }

@@ -557,6 +557,51 @@ export const appRouter = router({
         return await db.getFilesByGroupId(input.groupId);
       }),
     
+    // 上傳文件到S3
+    upload: editorProcedure
+      .input(z.object({
+        groupId: z.number().optional(),
+        fileName: z.string(),
+        fileData: z.string(), // Base64編碼的文件數據
+        mimeType: z.string(),
+        size: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { storagePut } = await import('./storage');
+        
+        // 將Base64轉換為Buffer
+        const base64Data = input.fileData.split(',')[1] || input.fileData;
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        // 生成文件鍵
+        const fileKey = `group-${input.groupId || 'common'}/${Date.now()}-${input.fileName}`;
+        
+        // 上傳到S3
+        const { url } = await storagePut(fileKey, buffer, input.mimeType);
+        
+        // 保存到數據庫
+        await db.createFile({
+          groupId: input.groupId,
+          name: input.fileName,
+          fileKey,
+          url,
+          mimeType: input.mimeType,
+          size: input.size,
+          uploadedBy: ctx.user.id,
+        });
+        
+        // 如果文件關聯到團組，發送通知
+        if (input.groupId) {
+          notificationService.notifyFileUploaded(
+            input.groupId,
+            input.fileName,
+            ctx.user.name || ctx.user.username || '某用戶'
+          ).catch(console.error);
+        }
+        
+        return { success: true, url, fileKey };
+      }),
+    
     create: editorProcedure
       .input(z.object({
         groupId: z.number().optional(),
