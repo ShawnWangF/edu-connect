@@ -782,9 +782,10 @@ function MembersTab({ groupId, members, utils }: any) {
   });
 
   const batchCreateMutation = trpc.members.batchCreate.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("批量導入成功！");
-      utils.members.listByGroup.invalidate({ groupId });
+      // 強制重新獲取成員列表
+      await utils.members.listByGroup.refetch({ groupId });
       setIsBatchImportOpen(false);
       setImportData([]);
     },
