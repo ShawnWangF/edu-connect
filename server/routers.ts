@@ -6,6 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
 import { nanoid } from "nanoid";
+import * as notificationService from "./notificationService";
 
 // 權限檢查中間件
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -169,10 +170,20 @@ export const appRouter = router({
         notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await db.createGroup({
+        const result = await db.createGroup({
           ...input,
           createdBy: ctx.user.id,
         });
+        
+        // 獲取創建的團組信息
+        const groups = await db.getAllGroups();
+        const newGroup = groups[groups.length - 1]; // 最新創建的團組
+        
+        // 發送通知給全體成員
+        if (newGroup) {
+          notificationService.notifyGroupCreated(newGroup).catch(console.error);
+        }
+        
         return { success: true };
       }),
     
@@ -199,7 +210,39 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const { id, ...updateData } = input;
+        
+        // 獲取更新前的團組信息
+        const oldGroup = await db.getGroupById(id);
+        
         await db.updateGroup(id, updateData);
+        
+        // 獲取更新後的團組信息
+        const newGroup = await db.getGroupById(id);
+        
+        if (oldGroup && newGroup) {
+          // 檢查重大變更
+          const changes: string[] = [];
+          if (updateData.startDate && oldGroup.startDate !== newGroup.startDate) {
+            changes.push(`出發日期變更為 ${newGroup.startDate}`);
+          }
+          if (updateData.endDate && oldGroup.endDate !== newGroup.endDate) {
+            changes.push(`結束日期變更為 ${newGroup.endDate}`);
+          }
+          if (updateData.hotel && oldGroup.hotel !== newGroup.hotel) {
+            changes.push(`住宿酒店變更為 ${newGroup.hotel}`);
+          }
+          
+          // 如果有重大變更，發送通知
+          if (changes.length > 0) {
+            notificationService.notifyGroupUpdated(newGroup, changes.join('；')).catch(console.error);
+          }
+          
+          // 檢查狀態變更
+          if (updateData.status && oldGroup.status !== newGroup.status) {
+            notificationService.notifyGroupStatusChanged(newGroup, oldGroup.status, newGroup.status).catch(console.error);
+          }
+        }
+        
         return { success: true };
       }),
     
@@ -239,6 +282,15 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         await db.createItinerary(input);
+        
+        // 發送行程變更通知
+        const locationName = input.locationName || '未指定地點';
+        const timeInfo = input.startTime ? ` (${input.startTime})` : '';
+        notificationService.notifyItineraryChange(
+          input.groupId,
+          `新增行程：${locationName}${timeInfo}`
+        ).catch(console.error);
+        
         return { success: true };
       }),
     
@@ -519,6 +571,16 @@ export const appRouter = router({
           ...input,
           uploadedBy: ctx.user.id,
         });
+        
+        // 如果文件關聯到團組，發送通知
+        if (input.groupId) {
+          notificationService.notifyFileUploaded(
+            input.groupId,
+            input.name,
+            ctx.user.name || ctx.user.username || '某用戶'
+          ).catch(console.error);
+        }
+        
         return { success: true };
       }),
     

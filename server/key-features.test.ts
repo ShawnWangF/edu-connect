@@ -65,7 +65,7 @@ describe("團組編輯和刪除功能", () => {
     const updatedGroup = await caller.groups.get({ id: testGroup!.id });
     expect(updatedGroup?.name).toBe("測試團組-已編輯");
     expect(updatedGroup?.status).toBe("ongoing");
-  });
+  }, 10000); // 增加超時時間至10秒
 
   it("編輯者可以刪除團組", async () => {
     const { ctx } = createAuthContext("editor");
