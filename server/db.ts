@@ -378,3 +378,33 @@ export async function markNotificationAsRead(id: number) {
 
   await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
 }
+
+// 文件管理
+export async function getFilesByGroupId(groupId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(files).where(eq(files.groupId, groupId));
+}
+
+export async function getAllFiles() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(files);
+}
+
+export async function createFile(fileData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(files).values(fileData);
+  return result;
+}
+
+export async function deleteFile(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(files).where(eq(files.id, id));
+}

@@ -417,6 +417,43 @@ export const appRouter = router({
       }),
   }),
   
+  // 文件管理
+  files: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllFiles();
+    }),
+    
+    listByGroup: protectedProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getFilesByGroupId(input.groupId);
+      }),
+    
+    create: editorProcedure
+      .input(z.object({
+        groupId: z.number().optional(),
+        name: z.string(),
+        fileKey: z.string(),
+        url: z.string(),
+        mimeType: z.string().optional(),
+        size: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await db.createFile({
+          ...input,
+          uploadedBy: ctx.user.id,
+        });
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteFile(input.id);
+        return { success: true };
+      }),
+  }),
+  
   // 快照管理（版本控制）
   snapshots: router({
     list: adminProcedure.query(async () => {
