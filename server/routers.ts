@@ -422,18 +422,33 @@ export const appRouter = router({
         for (const memberData of input.members) {
           try {
             // 分離標準字段和自定義字段
-            // 身份映射
+            // 身份映射（支持繁體和簡體中文）
             const identityMapping: Record<string, string> = {
+              // 繁體中文
               '學生': 'student',
               '教師': 'teacher',
               '工作人員': 'staff',
+              '領隊': 'staff',  // 領隊映射為 staff
               '其他': 'other',
+              // 簡體中文
+              '学生': 'student',
+              '教师': 'teacher',
+              '工作人员': 'staff',
+              '领队': 'staff',  // 领队映射為 staff
+              // 英文
+              'student': 'student',
+              'teacher': 'teacher',
+              'staff': 'staff',
+              'other': 'other',
             };
-            // 性別映射
+            // 性別映射（支持繁體和簡體中文）
             const genderMapping: Record<string, string> = {
               '男': 'male',
               '女': 'female',
               '其他': 'other',
+              'male': 'male',
+              'female': 'female',
+              'other': 'other',
             };
             
             const rawIdentity = memberData.identity || memberData['身份'] || 'other';
