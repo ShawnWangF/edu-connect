@@ -787,13 +787,29 @@ function MembersTab({ groupId, members, utils }: any) {
 
   const batchCreateMutation = trpc.members.batchCreate.useMutation({
     onSuccess: async (data) => {
+      console.log('Batch import response:', data);
+      
+      if (!data || !data.results) {
+        toast.error("批量導入失敗：無效的響應數據");
+        return;
+      }
+      
       const successCount = data.results.filter((r: any) => r.success).length;
-      toast.success(`批量導入成功！共導入 ${successCount} 條記錄`);
+      const totalCount = data.results.length;
+      const failedCount = totalCount - successCount;
+      
+      if (failedCount > 0) {
+        toast.warning(`批量導入完成！成功 ${successCount} 條，失敗 ${failedCount} 條，共 ${totalCount} 條記錄`);
+      } else {
+        toast.success(`批量導入成功！共導入 ${successCount} 條記錄`);
+      }
+      
       await utils.members.listByGroup.refetch({ groupId });
       setIsBatchImportOpen(false);
       setImportData([]);
     },
     onError: (error) => {
+      console.error('Batch import error:', error);
       toast.error(error.message || "批量導入失敗");
     },
   });
