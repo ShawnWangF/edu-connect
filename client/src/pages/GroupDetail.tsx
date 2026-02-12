@@ -1006,7 +1006,8 @@ function MembersTab({ groupId, members, utils }: any) {
                     members.forEach((m: any) => {
                       if (m.customFields) {
                         try {
-                          const fields = JSON.parse(m.customFields);
+                          // customFields可能已經是對象（Drizzle自動解析）或字符串
+                          const fields = typeof m.customFields === 'string' ? JSON.parse(m.customFields) : m.customFields;
                           Object.keys(fields).forEach(k => allCustomFieldKeys.add(k));
                         } catch (e) {
                           console.error('Failed to parse customFields:', e);
@@ -1028,7 +1029,8 @@ function MembersTab({ groupId, members, utils }: any) {
                   members.forEach((m: any) => {
                     if (m.customFields) {
                       try {
-                        const fields = JSON.parse(m.customFields);
+                        // customFields可能已經是對象（Drizzle自動解析）或字符串
+                        const fields = typeof m.customFields === 'string' ? JSON.parse(m.customFields) : m.customFields;
                         Object.keys(fields).forEach(k => allCustomFieldKeys.add(k));
                       } catch (e) {}
                     }
@@ -1036,7 +1038,10 @@ function MembersTab({ groupId, members, utils }: any) {
                   const customFieldKeysArray = Array.from(allCustomFieldKeys);
 
                   return members.map((member: any) => {
-                    const customFields = member.customFields ? JSON.parse(member.customFields) : {};
+                    // customFields可能已經是對象（Drizzle自動解析）或字符串
+                    const customFields = member.customFields 
+                      ? (typeof member.customFields === 'string' ? JSON.parse(member.customFields) : member.customFields)
+                      : {};
                     
                     return (
                       <tr key={member.id} className="border-t hover:bg-accent/50">

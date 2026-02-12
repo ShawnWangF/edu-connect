@@ -277,3 +277,9 @@
 - [x] 使用API上傳人員清單到第一個團組
 - [x] 檢查數據庫確認數據已保存
 - [x] 檢查前端顯示邏輯並修復問題
+
+## Bug修復 - GroupDetail頁面JSON解析錯誤
+- [x] 檢查錯誤日誌並定位問題根源
+- [x] 修復customFields的JSON處理邏輯
+- [x] 確保數據庫中的customFields正確存儲為JSON字符串
+- [x] 測試GroupDetail頁面的成員列表顯示
