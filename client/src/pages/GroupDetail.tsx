@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -404,35 +404,135 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                     {format(new Date(card.date), "yyyy-MM-dd EEEE", { locale: zhCN })}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {card.hotelName && (
-                    <div>
-                      <p className="text-sm font-medium">住宿</p>
-                      <p className="text-sm text-muted-foreground">{card.hotelName}</p>
-                    </div>
-                  )}
-                  {(card.vehiclePlate || card.driverName) && (
-                    <div>
-                      <p className="text-sm font-medium">車輛</p>
-                      <p className="text-sm text-muted-foreground">
-                        {card.vehiclePlate} {card.driverName && `· ${card.driverName}`}
-                      </p>
-                    </div>
-                  )}
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 住宿信息 */}
+                    {card.hotelName && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <Hotel className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">住宿</p>
+                          <p className="text-sm text-blue-700 dark:text-blue-300">{card.hotelName}</p>
+                          {card.hotelAddress && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{card.hotelAddress}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 車輛信息 */}
+                    {(card.vehiclePlate || card.driverName) && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <Car className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-1">車輛</p>
+                          <p className="text-sm text-purple-700 dark:text-purple-300">
+                            {card.vehiclePlate || "未指定"}
+                          </p>
+                          {card.driverName && (
+                            <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                              司機: {card.driverName} {card.driverPhone && `· ${card.driverPhone}`}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 導遊信息 */}
+                    {card.guideName && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">導遊</p>
+                          <p className="text-sm text-green-700 dark:text-green-300">{card.guideName}</p>
+                          {card.guidePhone && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">{card.guidePhone}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 安保信息 */}
+                    {card.securityName && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">安保</p>
+                          <p className="text-sm text-red-700 dark:text-red-300">{card.securityName}</p>
+                          {card.securityPhone && (
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">{card.securityPhone}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 餐飲信息 */}
                   {(card.breakfastRestaurant || card.lunchRestaurant || card.dinnerRestaurant) && (
-                    <div>
-                      <p className="text-sm font-medium">餐飲</p>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        {card.breakfastRestaurant && <p>早餐: {card.breakfastRestaurant}</p>}
-                        {card.lunchRestaurant && <p>午餐: {card.lunchRestaurant}</p>}
-                        {card.dinnerRestaurant && <p>晚餐: {card.dinnerRestaurant}</p>}
+                    <div className="mt-4 p-4 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Utensils className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                        <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">餐飲</p>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {card.breakfastRestaurant && (
+                          <div className="flex items-start gap-2">
+                            <Coffee className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-orange-800 dark:text-orange-200">早餐</p>
+                              <p className="text-sm text-orange-700 dark:text-orange-300">{card.breakfastRestaurant}</p>
+                              {card.breakfastAddress && (
+                                <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5 truncate">{card.breakfastAddress}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {card.lunchRestaurant && (
+                          <div className="flex items-start gap-2">
+                            <UtensilsCrossed className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-orange-800 dark:text-orange-200">午餐</p>
+                              <p className="text-sm text-orange-700 dark:text-orange-300">{card.lunchRestaurant}</p>
+                              {card.lunchAddress && (
+                                <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5 truncate">{card.lunchAddress}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {card.dinnerRestaurant && (
+                          <div className="flex items-start gap-2">
+                            <Soup className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-orange-800 dark:text-orange-200">晚餐</p>
+                              <p className="text-sm text-orange-700 dark:text-orange-300">{card.dinnerRestaurant}</p>
+                              {card.dinnerAddress && (
+                                <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5 truncate">{card.dinnerAddress}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
+
+                  {/* 特殊備註 */}
                   {card.specialNotes && (
-                    <div>
-                      <p className="text-sm font-medium">特殊備註</p>
-                      <p className="text-sm text-muted-foreground">{card.specialNotes}</p>
+                    <div className="mt-4 flex items-start gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">特殊備註</p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap">{card.specialNotes}</p>
+                      </div>
                     </div>
                   )}
                 </CardContent>
