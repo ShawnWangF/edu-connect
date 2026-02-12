@@ -248,22 +248,25 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="date">日期 *</Label>
-                  <Select name="date" defaultValue={selectedItem?.date || dateList[0]?.toISOString().split('T')[0]} required>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dateList.map((date, index) => (
-                        <SelectItem key={date.toISOString()} value={date.toISOString().split('T')[0]}>
-                          {format(date, "yyyy-MM-dd EEEE", { locale: zhCN })} (第{index + 1}天)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input 
+                    id="date" 
+                    name="date" 
+                    type="date" 
+                    defaultValue={selectedItem?.date || dateList[0]?.toISOString().split('T')[0]} 
+                    min={group.startDate}
+                    max={group.endDate}
+                    required 
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    團組日期範圍：{format(new Date(group.startDate), "yyyy-MM-dd")} 至 {format(new Date(group.endDate), "yyyy-MM-dd")}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dayNumber">天數 *</Label>
-                  <Input id="dayNumber" name="dayNumber" type="number" min="1" defaultValue={selectedItem?.dayNumber || 1} required />
+                  <Input id="dayNumber" name="dayNumber" type="number" min="1" max={group.days} defaultValue={selectedItem?.dayNumber || 1} required />
+                  <p className="text-xs text-muted-foreground">
+                    總共 {group.days} 天
+                  </p>
                 </div>
               </div>
 
