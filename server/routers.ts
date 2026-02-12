@@ -358,26 +358,56 @@ export const appRouter = router({
     batchCreate: editorProcedure
       .input(z.object({
         groupId: z.number(),
-        members: z.array(z.object({
-          name: z.string(),
-          identity: z.enum(['student', 'teacher', 'staff', 'other']),
-          gender: z.enum(['male', 'female', 'other']).optional(),
-          phone: z.string().optional(),
-          idCard: z.string().optional(),
-          notes: z.string().optional(),
-        })),
+        members: z.array(z.record(z.string(), z.any())), // 接受任意字段的對象數組
       }))
       .mutation(async ({ input }) => {
         const results = [];
-        for (const member of input.members) {
+        for (const memberData of input.members) {
           try {
-            await db.createMember({
+            // 分離標準字段和自定義字段
+            // 身份映射
+            const identityMapping: Record<string, string> = {
+              '學生': 'student',
+              '教師': 'teacher',
+              '工作人員': 'staff',
+              '其他': 'other',
+            };
+            // 性別映射
+            const genderMapping: Record<string, string> = {
+              '男': 'male',
+              '女': 'female',
+              '其他': 'other',
+            };
+            
+            const rawIdentity = memberData.identity || memberData['身份'] || 'other';
+            const rawGender = memberData.gender || memberData['性別'];
+            
+            const standardFields = {
               groupId: input.groupId,
-              ...member,
+              name: memberData.name || memberData['姓名'] || '',
+              identity: identityMapping[rawIdentity] || rawIdentity,
+              gender: rawGender ? (genderMapping[rawGender] || rawGender) : undefined,
+              phone: memberData.phone || memberData['聯系電話'] || memberData['電話'] || undefined,
+              idCard: memberData.idCard || memberData['身份證'] || memberData['身份證號'] || undefined,
+              notes: memberData.notes || memberData['備註'] || undefined,
+            };
+            
+            // 所有其他字段存入customFields
+            const customFields: Record<string, any> = {};
+            const standardKeys = ['name', '姓名', 'identity', '身份', 'gender', '性別', 'phone', '聯系電話', '電話', 'idCard', '身份證', '身份證號', 'notes', '備註'];
+            Object.keys(memberData).forEach((key) => {
+              if (!standardKeys.includes(key) && memberData[key] !== null && memberData[key] !== undefined) {
+                customFields[key] = memberData[key];
+              }
             });
-            results.push({ success: true, member });
+            
+            await db.createMember({
+              ...standardFields,
+              customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
+            });
+            results.push({ success: true, member: memberData });
           } catch (error) {
-            results.push({ success: false, member, error: String(error) });
+            results.push({ success: false, member: memberData, error: String(error) });
           }
         }
         return { success: true, results };

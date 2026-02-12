@@ -133,6 +133,7 @@ export const members = mysqlTable("members", {
   phone: varchar("phone", { length: 50 }),
   idCard: varchar("idCard", { length: 50 }), // 身份證號
   notes: text("notes"),
+  customFields: json("customFields"), // 存儲自定義字段（Excel導入的額外字段）
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

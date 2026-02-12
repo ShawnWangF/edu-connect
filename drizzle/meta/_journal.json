@@ -15,6 +15,13 @@
       "when": 1770883887086,
       "tag": "0001_ambitious_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1770889370541,
+      "tag": "0002_amusing_lyja",
+      "breakpoints": true
     }
   ]
 }

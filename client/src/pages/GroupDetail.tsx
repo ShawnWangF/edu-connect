@@ -805,46 +805,13 @@ function MembersTab({ groupId, members, utils }: any) {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // 映射表頭到字段
-      const fieldMapping: Record<string, string> = {
-        '姓名': 'name',
-        '名字': 'name',
-        '身份': 'identity',
-        '性別': 'gender',
-        '聯系電話': 'phone',
-        '電話': 'phone',
-        '身份證': 'idCard',
-        '身份證號': 'idCard',
-        '備註': 'notes',
-      };
-
-      const identityMapping: Record<string, string> = {
-        '學生': 'student',
-        '教師': 'teacher',
-        '工作人員': 'staff',
-        '其他': 'other',
-      };
-
-      const genderMapping: Record<string, string> = {
-        '男': 'male',
-        '女': 'female',
-        '其他': 'other',
-      };
-
+      // 直接使用表頭作為字段名，不做任何映射
       const mapped = jsonData.map((row: any) => {
-        const member: any = {};
+        const member: Record<string, any> = {};
         Object.keys(row).forEach((key) => {
-          const field = fieldMapping[key] || key.toLowerCase();
-          let value = row[key];
-
-          if (field === 'identity' && value) {
-            value = identityMapping[value] || value;
-          }
-          if (field === 'gender' && value) {
-            value = genderMapping[value] || value;
-          }
-
-          member[field] = value || null;
+          const value = row[key];
+          // 保留原始表頭作為字段名，只處理空值
+          member[key] = value !== undefined && value !== null && value !== '' ? value : null;
         });
         return member;
       });
@@ -861,22 +828,15 @@ function MembersTab({ groupId, members, utils }: any) {
   };
 
   const handleBatchImport = () => {
-    const validMembers = importData.filter((m) => m.name && m.identity);
-    if (validMembers.length === 0) {
+    if (importData.length === 0) {
       toast.error("沒有有效的成員數據");
       return;
     }
 
+    // 直接傳遞所有字段，不做任何過濾
     batchCreateMutation.mutate({
       groupId,
-      members: validMembers.map((m) => ({
-        name: m.name,
-        identity: m.identity,
-        gender: m.gender || undefined,
-        phone: m.phone || undefined,
-        idCard: m.idCard || undefined,
-        notes: m.notes || undefined,
-      })),
+      members: importData,
     });
   };
 
@@ -1055,48 +1015,32 @@ function MembersTab({ groupId, members, utils }: any) {
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              請檢查導入數據，空值字段將以黃色高亮顯示。只有包含「姓名」和「身份」的記錄才會被導入。
+              請檢查導入數據，空值字段將以黃色高亮顯示。所有Excel表頭將直接作為字段名導入。
             </div>
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="px-3 py-2 text-left">姓名</th>
-                    <th className="px-3 py-2 text-left">身份</th>
-                    <th className="px-3 py-2 text-left">性別</th>
-                    <th className="px-3 py-2 text-left">聯系電話</th>
-                    <th className="px-3 py-2 text-left">身份證</th>
-                    <th className="px-3 py-2 text-left">備註</th>
+                    {importData.length > 0 && Object.keys(importData[0]).map((key) => (
+                      <th key={key} className="px-3 py-2 text-left whitespace-nowrap">{key}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {importData.map((member, index) => (
                     <tr key={index} className="border-t">
-                      <td className={`px-3 py-2 ${!member.name ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
-                        {member.name || '空值'}
-                      </td>
-                      <td className={`px-3 py-2 ${!member.identity ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
-                        {member.identity ? (
-                          member.identity === 'student' ? '學生' :
-                          member.identity === 'teacher' ? '教師' :
-                          member.identity === 'staff' ? '工作人員' : '其他'
-                        ) : '空值'}
-                      </td>
-                      <td className={`px-3 py-2 ${!member.gender ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
-                        {member.gender ? (
-                          member.gender === 'male' ? '男' :
-                          member.gender === 'female' ? '女' : '其他'
-                        ) : '空值'}
-                      </td>
-                      <td className={`px-3 py-2 ${!member.phone ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
-                        {member.phone || '空值'}
-                      </td>
-                      <td className={`px-3 py-2 ${!member.idCard ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
-                        {member.idCard || '空值'}
-                      </td>
-                      <td className={`px-3 py-2 ${!member.notes ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
-                        {member.notes || '空值'}
-                      </td>
+                      {Object.keys(member).map((key) => {
+                        const value = member[key];
+                        const isEmpty = value === null || value === undefined || value === '';
+                        return (
+                          <td 
+                            key={key} 
+                            className={`px-3 py-2 whitespace-nowrap ${isEmpty ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
+                          >
+                            {isEmpty ? '空值' : String(value)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
@@ -1116,9 +1060,9 @@ function MembersTab({ groupId, members, utils }: any) {
               <Button
                 type="button"
                 onClick={handleBatchImport}
-                disabled={batchCreateMutation.isPending || importData.filter(m => m.name && m.identity).length === 0}
+                disabled={batchCreateMutation.isPending || importData.length === 0}
               >
-                {batchCreateMutation.isPending ? "導入中..." : `確認導入 (${importData.filter(m => m.name && m.identity).length} 條)`}
+                {batchCreateMutation.isPending ? "導入中..." : `確認導入 (${importData.length} 條)`}
               </Button>
             </div>
           </div>
