@@ -1,11 +1,11 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, groups, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { createHash } from 'crypto';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -16,6 +16,53 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+// 密碼哈希函數
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
+}
+
+// 驗證密碼
+export function verifyPassword(password: string, hashedPassword: string): boolean {
+  return hashPassword(password) === hashedPassword;
+}
+
+// 本地登錄驗證
+export async function authenticateLocal(username: string, password: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot authenticate: database not available");
+    return null;
+  }
+
+  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  
+  if (result.length === 0) {
+    return null;
+  }
+
+  const user = result[0];
+  if (!user.password || !verifyPassword(password, user.password)) {
+    return null;
+  }
+
+  // 更新最後登錄時間和在線狀態
+  await db.update(users)
+    .set({ lastSignedIn: new Date(), isOnline: true })
+    .where(eq(users.id, user.id));
+
+  return user;
+}
+
+// 更新用戶在線狀態
+export async function updateUserOnlineStatus(userId: number, isOnline: boolean) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(users)
+    .set({ isOnline })
+    .where(eq(users.id, userId));
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -35,7 +82,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "username"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -47,6 +94,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
 
     textFields.forEach(assignNullable);
+
+    if (user.password !== undefined) {
+      values.password = user.password;
+      updateSet.password = user.password;
+    }
 
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
@@ -89,4 +141,240 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// 用戶管理
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(users);
+}
+
+export async function createUser(userData: InsertUser) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(users).values(userData);
+  return result;
+}
+
+export async function updateUser(id: number, userData: Partial<InsertUser>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users).set(userData).where(eq(users.id, id));
+}
+
+export async function deleteUser(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(users).where(eq(users.id, id));
+}
+
+// 團組管理
+export async function getAllGroups() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(groups);
+}
+
+export async function getGroupById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(groups).where(eq(groups.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createGroup(groupData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(groups).values(groupData);
+  return result;
+}
+
+export async function updateGroup(id: number, groupData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(groups).set(groupData).where(eq(groups.id, id));
+}
+
+export async function deleteGroup(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(groups).where(eq(groups.id, id));
+}
+
+// 行程管理
+export async function getItinerariesByGroupId(groupId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(itineraries).where(eq(itineraries.groupId, groupId));
+}
+
+export async function createItinerary(itineraryData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(itineraries).values(itineraryData);
+  return result;
+}
+
+export async function updateItinerary(id: number, itineraryData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(itineraries).set(itineraryData).where(eq(itineraries.id, id));
+}
+
+export async function deleteItinerary(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(itineraries).where(eq(itineraries.id, id));
+}
+
+// 食行卡片管理
+export async function getDailyCardsByGroupId(groupId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(dailyCards).where(eq(dailyCards.groupId, groupId));
+}
+
+export async function getDailyCardByGroupAndDate(groupId: number, date: Date) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(dailyCards)
+    .where(and(eq(dailyCards.groupId, groupId), eq(dailyCards.date, date)))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertDailyCard(cardData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getDailyCardByGroupAndDate(cardData.groupId, cardData.date);
+  
+  if (existing) {
+    await db.update(dailyCards).set(cardData).where(eq(dailyCards.id, existing.id));
+    return existing.id;
+  } else {
+    const result = await db.insert(dailyCards).values(cardData);
+    return result;
+  }
+}
+
+// 人員管理
+export async function getMembersByGroupId(groupId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(members).where(eq(members.groupId, groupId));
+}
+
+export async function createMember(memberData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(members).values(memberData);
+  return result;
+}
+
+export async function updateMember(id: number, memberData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(members).set(memberData).where(eq(members.id, id));
+}
+
+export async function deleteMember(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(members).where(eq(members.id, id));
+}
+
+// 景點資源管理
+export async function getAllLocations() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(locations);
+}
+
+export async function createLocation(locationData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(locations).values(locationData);
+  return result;
+}
+
+export async function updateLocation(id: number, locationData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(locations).set(locationData).where(eq(locations.id, id));
+}
+
+export async function deleteLocation(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(locations).where(eq(locations.id, id));
+}
+
+// 快照管理
+export async function getAllSnapshots() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(snapshots);
+}
+
+export async function createSnapshot(snapshotData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(snapshots).values(snapshotData);
+  return result;
+}
+
+// 通知管理
+export async function getNotificationsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(notifications).where(eq(notifications.userId, userId));
+}
+
+export async function createNotification(notificationData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(notifications).values(notificationData);
+  return result;
+}
+
+export async function markNotificationAsRead(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+}
