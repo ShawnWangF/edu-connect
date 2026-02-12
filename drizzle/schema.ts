@@ -228,17 +228,22 @@ export const files = mysqlTable("files", {
 });
 
 /**
- * 景點資源表 - 存儲景點信息和可用時間
+ * 景點資源表 - 存儲景點信息和不可用時間
  */
 export const attractions = mysqlTable("attractions", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
+  // 地點（用於Google Maps自動補全）
+  location: text("location"),
+  // 詳細地址
   address: text("address"),
   description: text("description"),
-  // 可用時間段（JSON格式），例如：[{"day": "monday", "startTime": "09:00", "endTime": "17:00"}]
-  availableTimeSlots: json("availableTimeSlots"),
-  // 是否全天可用
-  isAllDayAvailable: boolean("isAllDayAvailable").default(false).notNull(),
+  // 可容納人數
+  capacity: int("capacity"),
+  // 不可用時間段（JSON格式），例如：[{"day": "monday", "startTime": "09:00", "endTime": "17:00"}]
+  unavailableTimeSlots: json("unavailableTimeSlots"),
+  // 是否全天不可用（例如永久關閉的景點）
+  isAlwaysUnavailable: boolean("isAlwaysUnavailable").default(false).notNull(),
   // 備註
   notes: text("notes"),
   createdBy: int("createdBy").notNull(),

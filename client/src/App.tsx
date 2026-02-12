@@ -11,7 +11,7 @@ import Groups from "./pages/Groups";
 import GroupNew from "./pages/GroupNew";
 import GroupDetail from "./pages/GroupDetail";
 import GroupEdit from "./pages/GroupEdit";
-import Locations from "./pages/Locations";
+import Attractions from "./pages/Attractions";
 import Users from "./pages/Users";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -50,7 +50,7 @@ function Router() {
       </Route>
       <Route path="/resources">
         <DashboardLayout>
-          <Locations />
+          <Attractions />
         </DashboardLayout>
       </Route>
       <Route path="/users">

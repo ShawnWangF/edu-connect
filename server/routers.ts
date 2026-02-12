@@ -652,6 +652,62 @@ export const appRouter = router({
       }),
   }),
   
+  // 景點資源管理
+  attractions: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllAttractions();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        location: z.string().optional(),
+        address: z.string().optional(),
+        description: z.string().optional(),
+        capacity: z.number().optional(),
+        isAlwaysUnavailable: z.boolean(),
+        unavailableTimeSlots: z.array(z.object({
+          dayOfWeek: z.number(),
+          startTime: z.string(),
+          endTime: z.string(),
+        })),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createAttraction(input);
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string(),
+        location: z.string().optional(),
+        address: z.string().optional(),
+        description: z.string().optional(),
+        capacity: z.number().optional(),
+        isAlwaysUnavailable: z.boolean(),
+        unavailableTimeSlots: z.array(z.object({
+          dayOfWeek: z.number(),
+          startTime: z.string(),
+          endTime: z.string(),
+        })),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await db.updateAttraction(id, data);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteAttraction(input.id);
+        return { success: true };
+      }),
+  }),
+  
   // 快照管理（版本控制）
   snapshots: router({
     list: adminProcedure.query(async () => {

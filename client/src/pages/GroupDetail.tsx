@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -163,6 +163,10 @@ export default function GroupDetail() {
 function ItineraryTab({ groupId, itineraries, utils, group }: any) {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
+  const [conflictWarning, setConflictWarning] = useState<string>("");
+  
+  const { data: attractions = [] } = trpc.attractions.list.useQuery();
 
   const createMutation = trpc.itineraries.create.useMutation({
     onSuccess: () => {
@@ -282,9 +286,59 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="locationName">地點名稱</Label>
-                <Input id="locationName" name="locationName" defaultValue={selectedItem?.locationName || ""} />
+                <Label htmlFor="attractionSelect">景點選擇</Label>
+                <Select
+                  value={selectedAttractionId}
+                  onValueChange={(value) => {
+                    setSelectedAttractionId(value);
+                    if (value === "manual") {
+                      setConflictWarning("");
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇景點或手動輸入" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        手動輸入地點
+                      </div>
+                    </SelectItem>
+                    {attractions.map((attraction: any) => (
+                      <SelectItem key={attraction.id} value={attraction.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          {attraction.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="locationName">地點名稱</Label>
+                <Input 
+                  id="locationName" 
+                  name="locationName" 
+                  defaultValue={selectedItem?.locationName || ""}
+                  value={selectedAttractionId && selectedAttractionId !== "manual" 
+                    ? attractions.find((a: any) => a.id.toString() === selectedAttractionId)?.name || ""
+                    : undefined
+                  }
+                  disabled={!!(selectedAttractionId && selectedAttractionId !== "manual")}
+                  placeholder="已自動填充"
+                />
+              </div>
+
+              {conflictWarning && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-yellow-800">{conflictWarning}</p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="description">活動描述</Label>
