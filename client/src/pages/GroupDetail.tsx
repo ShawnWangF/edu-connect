@@ -1009,62 +1009,60 @@ function MembersTab({ groupId, members, utils }: any) {
 
       {/* 批量導入預覽對話框 */}
       <Dialog open={isBatchImportOpen} onOpenChange={setIsBatchImportOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>批量導入預覽（共 {importData.length} 條記錄）</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              請檢查導入數據，空值字段將以黃色高亮顯示。所有Excel表頭將直接作為字段名導入。
-            </div>
-            <div className="border rounded-lg overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    {importData.length > 0 && Object.keys(importData[0]).map((key) => (
-                      <th key={key} className="px-3 py-2 text-left whitespace-nowrap">{key}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {importData.map((member, index) => (
-                    <tr key={index} className="border-t">
-                      {Object.keys(member).map((key) => {
-                        const value = member[key];
-                        const isEmpty = value === null || value === undefined || value === '';
-                        return (
-                          <td 
-                            key={key} 
-                            className={`px-3 py-2 whitespace-nowrap ${isEmpty ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
-                          >
-                            {isEmpty ? '空值' : String(value)}
-                          </td>
-                        );
-                      })}
-                    </tr>
+          <div className="text-sm text-muted-foreground mb-4">
+            請檢查導入數據，空值字段將以黃色高亮顯示。所有Excel表頭將直接作為字段名導入。
+          </div>
+          <div className="border rounded-lg overflow-auto flex-1 min-h-0">
+            <table className="w-full text-sm">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  {importData.length > 0 && Object.keys(importData[0]).map((key) => (
+                    <th key={key} className="px-3 py-2 text-left whitespace-nowrap">{key}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsBatchImportOpen(false);
-                  setImportData([]);
-                }}
-              >
-                取消
-              </Button>
-              <Button
-                type="button"
-                onClick={handleBatchImport}
-                disabled={batchCreateMutation.isPending || importData.length === 0}
-              >
-                {batchCreateMutation.isPending ? "導入中..." : `確認導入 (${importData.length} 條)`}
-              </Button>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {importData.map((member, index) => (
+                  <tr key={index} className="border-t">
+                    {Object.keys(member).map((key) => {
+                      const value = member[key];
+                      const isEmpty = value === null || value === undefined || value === '';
+                      return (
+                        <td 
+                          key={key} 
+                          className={`px-3 py-2 whitespace-nowrap ${isEmpty ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
+                        >
+                          {isEmpty ? '空值' : String(value)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsBatchImportOpen(false);
+                setImportData([]);
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={handleBatchImport}
+              disabled={batchCreateMutation.isPending || importData.length === 0}
+            >
+              {batchCreateMutation.isPending ? "導入中..." : `確認導入 (${importData.length} 條)`}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
