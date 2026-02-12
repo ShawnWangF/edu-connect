@@ -5,6 +5,19 @@ import { Users, Calendar, MapPin, TrendingUp } from "lucide-react";
 export default function Home() {
   const { data: groups } = trpc.groups.list.useQuery();
   const { data: locations } = trpc.locations.list.useQuery();
+  const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
+  
+  // 獲取本週關注事項（本週的行程）
+  const thisWeekItineraries = allItineraries?.filter((item: any) => {
+    const itemDate = new Date(item.date);
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay() + 1); // 週一
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    return itemDate >= weekStart && itemDate < weekEnd;
+  }) || [];
 
   const stats = {
     totalGroups: groups?.length || 0,
@@ -78,6 +91,41 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 本週關注事項 */}
+      {thisWeekItineraries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>本週關注事項</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {thisWeekItineraries.slice(0, 5).map((item: any) => {
+                const group = groups?.find((g) => g.id === item.groupId);
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{item.locationName || '未指定地點'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {group?.name || '未知團組'} · {new Date(item.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}
+                        {item.startTime && ` · ${item.startTime}`}
+                      </p>
+                      {item.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

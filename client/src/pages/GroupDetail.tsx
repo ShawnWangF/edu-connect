@@ -750,6 +750,7 @@ function MembersTab({ groupId, members, utils }: any) {
   const [isBatchImportOpen, setIsBatchImportOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState<Set<number>>(new Set());
 
   const createMutation = trpc.members.create.useMutation({
     onSuccess: () => {
@@ -785,9 +786,9 @@ function MembersTab({ groupId, members, utils }: any) {
   });
 
   const batchCreateMutation = trpc.members.batchCreate.useMutation({
-    onSuccess: async () => {
-      toast.success("批量導入成功！");
-      // 強制重新獲取成員列表
+    onSuccess: async (data) => {
+      const successCount = data.results.filter((r: any) => r.success).length;
+      toast.success(`批量導入成功！共導入 ${successCount} 條記錄`);
       await utils.members.listByGroup.refetch({ groupId });
       setIsBatchImportOpen(false);
       setImportData([]);
@@ -868,8 +869,28 @@ function MembersTab({ groupId, members, utils }: any) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>團組成員</CardTitle>
+        <CardTitle>團組成員 {selectedMembers.size > 0 && `(已選中 ${selectedMembers.size} 項)`}</CardTitle>
         <div className="flex gap-2">
+          {selectedMembers.size > 0 && (
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!confirm(`確定要刪除選中的 ${selectedMembers.size} 名成員嗎？`)) return;
+                try {
+                  for (const id of Array.from(selectedMembers)) {
+                    await deleteMutation.mutateAsync({ id });
+                  }
+                  toast.success(`已刪除 ${selectedMembers.size} 名成員`);
+                  setSelectedMembers(new Set());
+                } catch (error) {
+                  toast.error("批量刪除失敗");
+                }
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              批量刪除
+            </Button>
+          )}
           <input
             type="file"
             accept=".xlsx,.xls"
@@ -959,6 +980,20 @@ function MembersTab({ groupId, members, utils }: any) {
             <table className="w-full text-sm">
               <thead className="bg-muted">
                 <tr>
+                  <th className="px-3 py-2 text-center whitespace-nowrap w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedMembers.size === members?.length && members?.length > 0}
+                      onChange={() => {
+                        if (selectedMembers.size === members?.length) {
+                          setSelectedMembers(new Set());
+                        } else {
+                          setSelectedMembers(new Set(members?.map((m: any) => m.id) || []));
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                  </th>
                   <th className="px-3 py-2 text-left whitespace-nowrap">姓名</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap">身份</th>
                   <th className="px-3 py-2 text-left whitespace-nowrap">性別</th>
@@ -1005,6 +1040,22 @@ function MembersTab({ groupId, members, utils }: any) {
                     
                     return (
                       <tr key={member.id} className="border-t hover:bg-accent/50">
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedMembers.has(member.id)}
+                            onChange={() => {
+                              const newSelected = new Set(selectedMembers);
+                              if (newSelected.has(member.id)) {
+                                newSelected.delete(member.id);
+                              } else {
+                                newSelected.add(member.id);
+                              }
+                              setSelectedMembers(newSelected);
+                            }}
+                            className="cursor-pointer"
+                          />
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap font-medium">{member.name}</td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {member.identity === "student" && "學生"}

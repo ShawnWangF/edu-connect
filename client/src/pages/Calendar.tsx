@@ -79,7 +79,7 @@ export default function Calendar() {
 
   return (
     <DashboardLayout>
-      <div className="container mx-auto py-6">
+      <div className="py-6 px-6">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
