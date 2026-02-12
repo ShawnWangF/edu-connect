@@ -354,6 +354,34 @@ export const appRouter = router({
         await db.deleteMember(input.id);
         return { success: true };
       }),
+    
+    batchCreate: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        members: z.array(z.object({
+          name: z.string(),
+          identity: z.enum(['student', 'teacher', 'staff', 'other']),
+          gender: z.enum(['male', 'female', 'other']).optional(),
+          phone: z.string().optional(),
+          idCard: z.string().optional(),
+          notes: z.string().optional(),
+        })),
+      }))
+      .mutation(async ({ input }) => {
+        const results = [];
+        for (const member of input.members) {
+          try {
+            await db.createMember({
+              groupId: input.groupId,
+              ...member,
+            });
+            results.push({ success: true, member });
+          } catch (error) {
+            results.push({ success: false, member, error: String(error) });
+          }
+        }
+        return { success: true, results };
+      }),
   }),
   
   // 景點資源管理

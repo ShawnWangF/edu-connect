@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -744,6 +744,9 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
 function MembersTab({ groupId, members, utils }: any) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<any>(null);
+  const [isBatchImportOpen, setIsBatchImportOpen] = useState(false);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const createMutation = trpc.members.create.useMutation({
     onSuccess: () => {
@@ -778,6 +781,105 @@ function MembersTab({ groupId, members, utils }: any) {
     },
   });
 
+  const batchCreateMutation = trpc.members.batchCreate.useMutation({
+    onSuccess: () => {
+      toast.success("批量導入成功！");
+      utils.members.listByGroup.invalidate({ groupId });
+      setIsBatchImportOpen(false);
+      setImportData([]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "批量導入失敗");
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const XLSX = await import('xlsx');
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      // 映射表頭到字段
+      const fieldMapping: Record<string, string> = {
+        '姓名': 'name',
+        '名字': 'name',
+        '身份': 'identity',
+        '性別': 'gender',
+        '聯系電話': 'phone',
+        '電話': 'phone',
+        '身份證': 'idCard',
+        '身份證號': 'idCard',
+        '備註': 'notes',
+      };
+
+      const identityMapping: Record<string, string> = {
+        '學生': 'student',
+        '教師': 'teacher',
+        '工作人員': 'staff',
+        '其他': 'other',
+      };
+
+      const genderMapping: Record<string, string> = {
+        '男': 'male',
+        '女': 'female',
+        '其他': 'other',
+      };
+
+      const mapped = jsonData.map((row: any) => {
+        const member: any = {};
+        Object.keys(row).forEach((key) => {
+          const field = fieldMapping[key] || key.toLowerCase();
+          let value = row[key];
+
+          if (field === 'identity' && value) {
+            value = identityMapping[value] || value;
+          }
+          if (field === 'gender' && value) {
+            value = genderMapping[value] || value;
+          }
+
+          member[field] = value || null;
+        });
+        return member;
+      });
+
+      setImportData(mapped);
+      setIsBatchImportOpen(true);
+      toast.success(`解析成功，共 ${mapped.length} 條記錄`);
+    } catch (error) {
+      toast.error("文件解析失敗：" + String(error));
+    } finally {
+      setIsProcessing(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleBatchImport = () => {
+    const validMembers = importData.filter((m) => m.name && m.identity);
+    if (validMembers.length === 0) {
+      toast.error("沒有有效的成員數據");
+      return;
+    }
+
+    batchCreateMutation.mutate({
+      groupId,
+      members: validMembers.map((m) => ({
+        name: m.name,
+        identity: m.identity,
+        gender: m.gender || undefined,
+        phone: m.phone || undefined,
+        idCard: m.idCard || undefined,
+        notes: m.notes || undefined,
+      })),
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -803,13 +905,29 @@ function MembersTab({ groupId, members, utils }: any) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>團組成員</CardTitle>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingMember(null)}>
-              <Plus className="mr-2 h-4 w-4" />
-              添加成員
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            className="hidden"
+            id="excel-upload"
+          />
+          <Button
+            variant="outline"
+            onClick={() => document.getElementById('excel-upload')?.click()}
+            disabled={isProcessing}
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            {isProcessing ? "解析中..." : "批量導入"}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setEditingMember(null)}>
+                <Plus className="mr-2 h-4 w-4" />
+                添加成員
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingMember ? "編輯成員" : "添加成員"}</DialogTitle>
@@ -869,6 +987,7 @@ function MembersTab({ groupId, members, utils }: any) {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </CardHeader>
       <CardContent>
         {members && members.length > 0 ? (
@@ -927,6 +1046,84 @@ function MembersTab({ groupId, members, utils }: any) {
           </p>
         )}
       </CardContent>
+
+      {/* 批量導入預覽對話框 */}
+      <Dialog open={isBatchImportOpen} onOpenChange={setIsBatchImportOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>批量導入預覽（共 {importData.length} 條記錄）</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              請檢查導入數據，空值字段將以黃色高亮顯示。只有包含「姓名」和「身份」的記錄才會被導入。
+            </div>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-3 py-2 text-left">姓名</th>
+                    <th className="px-3 py-2 text-left">身份</th>
+                    <th className="px-3 py-2 text-left">性別</th>
+                    <th className="px-3 py-2 text-left">聯系電話</th>
+                    <th className="px-3 py-2 text-left">身份證</th>
+                    <th className="px-3 py-2 text-left">備註</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importData.map((member, index) => (
+                    <tr key={index} className="border-t">
+                      <td className={`px-3 py-2 ${!member.name ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                        {member.name || '空值'}
+                      </td>
+                      <td className={`px-3 py-2 ${!member.identity ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                        {member.identity ? (
+                          member.identity === 'student' ? '學生' :
+                          member.identity === 'teacher' ? '教師' :
+                          member.identity === 'staff' ? '工作人員' : '其他'
+                        ) : '空值'}
+                      </td>
+                      <td className={`px-3 py-2 ${!member.gender ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                        {member.gender ? (
+                          member.gender === 'male' ? '男' :
+                          member.gender === 'female' ? '女' : '其他'
+                        ) : '空值'}
+                      </td>
+                      <td className={`px-3 py-2 ${!member.phone ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                        {member.phone || '空值'}
+                      </td>
+                      <td className={`px-3 py-2 ${!member.idCard ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                        {member.idCard || '空值'}
+                      </td>
+                      <td className={`px-3 py-2 ${!member.notes ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                        {member.notes || '空值'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsBatchImportOpen(false);
+                  setImportData([]);
+                }}
+              >
+                取消
+              </Button>
+              <Button
+                type="button"
+                onClick={handleBatchImport}
+                disabled={batchCreateMutation.isPending || importData.filter(m => m.name && m.identity).length === 0}
+              >
+                {batchCreateMutation.isPending ? "導入中..." : `確認導入 (${importData.filter(m => m.name && m.identity).length} 條)`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
