@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, name, code, startDate, endDate FROM `groups` ORDER BY id LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, code, startDate, endDate FROM `groups` ORDER BY id LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Test Group",
+      "code": "TEST001",
+      "startDate": "2026-02-12",
+      "endDate": "2026-02-15"
+    },
+    {
+      "id": "30038",
+      "name": "測試團組-已編輯",
+      "code": "EDIT-TEST-1770892269849",
+      "startDate": "2024-06-01",
+      "endDate": "2024-06-05"
+    },
+    {
+      "id": "30039",
+      "name": "測試團組-批量導入",
+      "code": "BATCH-TEST-1770892269839",
+      "startDate": "2024-06-01",
+      "endDate": "2024-06-05"
+    },
+    {
+      "id": "30041",
+      "name": "Test Group",
+      "code": "TEST1770892271309",
+      "startDate": "2024-01-01",
+      "endDate": "2024-01-07"
+    },
+    {
+      "id": "30043",
+      "name": "測試團組-字段映射",
+      "code": "FIELD-MAPPING-1770892272315",
+      "startDate": "2024-06-01",
+      "endDate": "2024-06-05"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcode\tstartDate\tendDate\n1\tTest Group\tTEST001\t2026-02-12\t2026-02-15\n30038\t測試團組-已編輯\tEDIT-TEST-1770892269849\t2024-06-01\t2024-06-05\n30039\t測試團組-批量導入\tBATCH-TEST-1770892269839\t2024-06-01\t2024-06-05\n30041\tTest Group\tTEST1770892271309\t2024-01-01\t2024-01-07\n30043\t測試團組-字段映射\tFIELD-MAPPING-1770892272315\t2024-06-01\t2024-06-05\n",
+  "stderr": "",
+  "execution_time_ms": 1705
+}

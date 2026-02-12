@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as count FROM members WHERE groupId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT COUNT(*) as count FROM members WHERE groupId = 1;",
+  "rows": [
+    {
+      "count": "11"
+    }
+  ],
+  "messages": [],
+  "stdout": "count\n11\n",
+  "stderr": "",
+  "execution_time_ms": 1724
+}
