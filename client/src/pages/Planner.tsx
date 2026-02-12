@@ -1,92 +1,64 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Calendar, ChevronLeft, ChevronRight, Plus, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { Calendar, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, isSameDay } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 
 export default function Planner() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [draggedItem, setDraggedItem] = useState<any>(null);
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // 週一開始
+  const [resizingItem, setResizingItem] = useState<any>(null);
+  const [resizeMode, setResizeMode] = useState<'top' | 'bottom' | null>(null);
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
 
   const { data: groups } = trpc.groups.list.useQuery();
   const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
   const utils = trpc.useUtils();
 
-  // 更新行程時間
   const updateItinerary = trpc.itineraries.update.useMutation({
     onSuccess: () => {
       utils.itineraries.listAll.invalidate();
-      toast.success("行程已移動");
+      toast.success("行程已更新");
     },
     onError: (error) => {
-      toast.error(error.message || "移動失敗");
+      toast.error(error.message || "更新失敗");
     },
   });
 
-  // 生成本週的日期
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  
+  // 生成24小時時段（00:00-23:00）
+  const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  const goToPreviousWeek = () => {
-    setCurrentDate(addDays(currentDate, -7));
-  };
+  const goToPreviousWeek = () => setCurrentDate(addDays(currentDate, -7));
+  const goToNextWeek = () => setCurrentDate(addDays(currentDate, 7));
+  const goToToday = () => setCurrentDate(new Date());
 
-  const goToNextWeek = () => {
-    setCurrentDate(addDays(currentDate, 7));
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  // 動態時段定義（根據實際行程時間生成）
-  const getTimePeriods = () => {
-    const periods = [
-      { id: "early_morning", label: "早晨", time: "00:00-06:59", startHour: 0, endHour: 7 },
-      { id: "morning", label: "上午", time: "07:00-11:59", startHour: 7, endHour: 12 },
-      { id: "afternoon", label: "下午", time: "12:00-17:59", startHour: 12, endHour: 18 },
-      { id: "evening", label: "晚上", time: "18:00-23:59", startHour: 18, endHour: 24 },
-    ];
+  // 計算行程在時間軸上的位置和高度
+  const calculatePosition = (startTime: string, endTime: string) => {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime ? endTime.split(':').map(Number) : [startHour + 1, 0];
     
-    // 檢查是否有行程在每個時段
-    return periods.filter(period => {
-      if (!allItineraries) return false;
-      return allItineraries.some(itinerary => {
-        const hour = itinerary.startTime ? parseInt(itinerary.startTime.split(":")[0]) : null;
-        if (hour === null) return false;
-        return hour >= period.startHour && hour < period.endHour;
-      });
-    });
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    const duration = endMinutes - startMinutes;
+    
+    return {
+      top: (startMinutes / 60) * 60, // 每小時60px
+      height: Math.max((duration / 60) * 60, 30), // 最小30px
+    };
   };
 
-  const timePeriods = getTimePeriods();
-
-  // 根據時間判斷行程屬於哪個時段
-  const getTimePeriod = (time: string | null) => {
-    if (!time) return null;
-    const hour = parseInt(time.split(":")[0]);
-    for (const period of timePeriods) {
-      if (hour >= period.startHour && hour < period.endHour) {
-        return period.id;
-      }
-    }
-    return null;
-  };
-
-  // 獲取指定日期和時段的行程
-  const getItinerariesForDayAndPeriod = (day: Date, periodId: string) => {
+  // 獲取指定日期的行程
+  const getItinerariesForDay = (day: Date) => {
     if (!allItineraries) return [];
-    
     return allItineraries.filter((itinerary) => {
       const itineraryDate = itinerary.date instanceof Date ? itinerary.date : new Date(itinerary.date);
-      const matchesDay = isSameDay(itineraryDate, day);
-      const matchesPeriod = getTimePeriod(itinerary.startTime) === periodId;
-      return matchesDay && matchesPeriod;
+      return isSameDay(itineraryDate, day);
     });
   };
 
@@ -98,233 +70,297 @@ export default function Planner() {
     "bg-purple-100 text-purple-700 border-purple-300",
     "bg-orange-100 text-orange-700 border-orange-300",
     "bg-pink-100 text-pink-700 border-pink-300",
-    "bg-cyan-100 text-cyan-700 border-cyan-300",
+    "bg-yellow-100 text-yellow-700 border-yellow-300",
+    "bg-red-100 text-red-700 border-red-300",
+    "bg-indigo-100 text-indigo-700 border-indigo-300",
   ];
 
-  // 為每個團組分配顏色
-  if (groups) {
-    groups.forEach((group, index) => {
-      if (!groupColors[group.id]) {
-        groupColors[group.id] = colorPalette[index % colorPalette.length];
-      }
-    });
-  }
+  groups?.forEach((group, index) => {
+    groupColors[group.id] = colorPalette[index % colorPalette.length];
+  });
 
-  // 獲取團組名稱
-  const getGroupName = (groupId: number) => {
-    return groups?.find((g) => g.id === groupId)?.name || "未知團組";
+  // 處理拖拽開始
+  const handleDragStart = (e: React.DragEvent, item: any) => {
+    setDraggedItem(item);
+    e.dataTransfer.effectAllowed = 'move';
   };
+
+  // 處理拖拽放置
+  const handleDrop = (e: React.DragEvent, day: Date, hour: number) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    const newDate = format(day, 'yyyy-MM-dd');
+    const newStartTime = `${hour.toString().padStart(2, '0')}:00`;
+    
+    // 計算結束時間（保持原有時長）
+    const [oldStartHour, oldStartMin] = draggedItem.startTime.split(':').map(Number);
+    const [oldEndHour, oldEndMin] = draggedItem.endTime ? draggedItem.endTime.split(':').map(Number) : [oldStartHour + 1, 0];
+    const duration = (oldEndHour * 60 + oldEndMin) - (oldStartHour * 60 + oldStartMin);
+    const newEndMinutes = hour * 60 + duration;
+    const newEndTime = `${Math.floor(newEndMinutes / 60).toString().padStart(2, '0')}:${(newEndMinutes % 60).toString().padStart(2, '0')}`;
+
+    updateItinerary.mutate({
+      id: draggedItem.id,
+      startTime: newStartTime,
+      endTime: newEndTime,
+    });
+
+    setDraggedItem(null);
+  };
+
+  // 處理調整大小（拖拽邊緣）
+  const handleResizeStart = (e: React.MouseEvent, item: any, mode: 'top' | 'bottom') => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingItem(item);
+    setResizeMode(mode);
+  };
+
+  useEffect(() => {
+    if (!resizingItem || !resizeMode) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById('planner-grid');
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const hour = Math.floor(y / 60);
+      const minutes = Math.round(((y % 60) / 60) * 60);
+
+      const [startHour, startMin] = resizingItem.startTime.split(':').map(Number);
+      const [endHour, endMin] = resizingItem.endTime ? resizingItem.endTime.split(':').map(Number) : [startHour + 1, 0];
+
+      let newStartTime = resizingItem.startTime;
+      let newEndTime = resizingItem.endTime;
+
+      if (resizeMode === 'top') {
+        // 調整開始時間
+        const newStartMinutes = Math.max(0, Math.min(hour * 60 + minutes, endHour * 60 + endMin - 30));
+        newStartTime = `${Math.floor(newStartMinutes / 60).toString().padStart(2, '0')}:${(newStartMinutes % 60).toString().padStart(2, '0')}`;
+      } else {
+        // 調整結束時間
+        const newEndMinutes = Math.max(startHour * 60 + startMin + 30, Math.min((hour * 60 + minutes), 24 * 60));
+        newEndTime = `${Math.floor(newEndMinutes / 60).toString().padStart(2, '0')}:${(newEndMinutes % 60).toString().padStart(2, '0')}`;
+      }
+
+      // 實時更新UI（通過重新設置resizingItem觸發重渲染）
+      setResizingItem({ ...resizingItem, startTime: newStartTime, endTime: newEndTime });
+    };
+
+    const handleMouseUp = () => {
+      if (resizingItem) {
+        updateItinerary.mutate({
+          id: resizingItem.id,
+          startTime: resizingItem.startTime,
+          endTime: resizingItem.endTime,
+        });
+      }
+      setResizingItem(null);
+      setResizeMode(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingItem, resizeMode]);
+
+  // 獲取本週關注事項
+  const thisWeekItineraries = allItineraries?.filter((item: any) => {
+    const itemDate = new Date(item.date);
+    return itemDate >= weekStart && itemDate <= weekEnd;
+  }) || [];
+
+  const upcomingItems = thisWeekItineraries
+    .filter((item: any) => {
+      const itemDate = new Date(item.date);
+      return itemDate >= new Date();
+    })
+    .sort((a: any, b: any) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    })
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">行程設計器</h1>
-          <p className="text-muted-foreground mt-1">週視圖統籌多團組行程安排</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={goToPreviousWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" onClick={goToToday}>
-            今天
-          </Button>
-          <Button variant="outline" onClick={goToNextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            {format(weekStart, "yyyy年MM月dd日", { locale: zhCN })} -{" "}
-            {format(weekEnd, "MM月dd日", { locale: zhCN })}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              行程設計器
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={goToToday}>
+                今天
+              </Button>
+              <Button variant="outline" size="sm" onClick={goToNextWeek}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span className="ml-4 font-medium">
+                {format(weekStart, "yyyy年MM月", { locale: zhCN })}
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="border p-2 bg-muted/50 w-32">時段</th>
-                  {weekDays.map((day) => (
-                    <th key={day.toISOString()} className="border p-2 bg-muted/50 min-w-[150px]">
-                      <div className="text-center">
-                        <div className="font-medium">
-                          {format(day, "MM-dd", { locale: zhCN })}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {format(day, "EEEE", { locale: zhCN })}
-                        </div>
-                      </div>
-                    </th>
+          <div className="border rounded-lg overflow-hidden">
+            {/* 表頭 */}
+            <div className="grid grid-cols-8 bg-muted border-b">
+              <div className="p-3 border-r font-medium text-center">時間</div>
+              {weekDays.map((day) => (
+                <div
+                  key={day.toISOString()}
+                  className={`p-3 border-r last:border-r-0 text-center ${
+                    isSameDay(day, new Date()) ? 'bg-primary/10' : ''
+                  }`}
+                >
+                  <div className="font-medium">
+                    {format(day, "EEE", { locale: zhCN })}
+                  </div>
+                  <div className={`text-sm ${isSameDay(day, new Date()) ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
+                    {format(day, "MM/dd")}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 時間網格 */}
+            <div className="relative max-h-[600px] overflow-y-auto" id="planner-grid">
+              <div className="grid grid-cols-8">
+                {/* 時間列 */}
+                <div className="border-r">
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="h-[60px] border-b p-2 text-center text-sm text-muted-foreground bg-muted/50"
+                    >
+                      {hour.toString().padStart(2, '0')}:00
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {timePeriods.map((period) => (
-                  <tr key={period.id}>
-                    <td className="border p-2 bg-muted/30">
-                      <div className="text-sm font-medium">{period.label}</div>
-                      <div className="text-xs text-muted-foreground">{period.time}</div>
-                    </td>
-                    {weekDays.map((day) => {
-                      const itineraries = getItinerariesForDayAndPeriod(day, period.id);
-                      return (
-                        <td
-                          key={`${period.id}-${day.toISOString()}`}
-                          className="border p-2 min-h-[120px] align-top hover:bg-accent/30 transition-colors"
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.add('bg-primary/10');
-                          }}
-                          onDragLeave={(e) => {
-                            e.currentTarget.classList.remove('bg-primary/10');
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.remove('bg-primary/10');
-                            if (draggedItem) {
-                              // 計算新的時間基於時段
-                              const newStartHour = period.startHour;
-                              const newStartTime = `${newStartHour.toString().padStart(2, '0')}:00`;
-                              const oldStartHour = draggedItem.startTime ? parseInt(draggedItem.startTime.split(':')[0]) : 0;
-                              const oldEndHour = draggedItem.endTime ? parseInt(draggedItem.endTime.split(':')[0]) : oldStartHour + 1;
-                              const duration = oldEndHour - oldStartHour;
-                              const newEndTime = `${(newStartHour + duration).toString().padStart(2, '0')}:00`;
-                              
-                              updateItinerary.mutate({
-                                id: draggedItem.id,
-                                startTime: newStartTime,
-                                endTime: newEndTime,
-                              });
-                            }
-                          }}
-                        >
-                          {itineraries.length > 0 ? (
-                            <div className="space-y-1">
-                              {itineraries.map((itinerary) => (
-                                <div
-                                  key={itinerary.id}
-                                  draggable
-                                  onDragStart={(e) => {
-                                    setDraggedItem(itinerary);
-                                    e.dataTransfer.effectAllowed = "move";
-                                  }}
-                                  onDragEnd={() => setDraggedItem(null)}
-                                  className={`p-2 rounded border text-xs cursor-move ${groupColors[itinerary.groupId] || "bg-gray-100 text-gray-700 border-gray-300"} ${draggedItem?.id === itinerary.id ? 'opacity-50' : ''}`}
-                                >
-                                  <div className="font-medium truncate">{itinerary.locationName || "未命名地點"}</div>
-                                  <div className="text-xs opacity-80 truncate">
-                                    {getGroupName(itinerary.groupId)}
-                                  </div>
-                                  <div className="text-xs opacity-70">{itinerary.startTime || "未設定時間"}</div>
-                                </div>
-                              ))}
+                </div>
+
+                {/* 日期列 */}
+                {weekDays.map((day) => (
+                  <div key={day.toISOString()} className="border-r last:border-r-0 relative">
+                    {/* 時間槽背景 */}
+                    {hours.map((hour) => (
+                      <div
+                        key={hour}
+                        className="h-[60px] border-b hover:bg-muted/30 transition-colors"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.add('bg-primary/10');
+                        }}
+                        onDragLeave={(e) => {
+                          e.currentTarget.classList.remove('bg-primary/10');
+                        }}
+                        onDrop={(e) => {
+                          e.currentTarget.classList.remove('bg-primary/10');
+                          handleDrop(e, day, hour);
+                        }}
+                      />
+                    ))}
+
+                    {/* 行程卡片（絕對定位） */}
+                    <div className="absolute top-0 left-0 right-0 pointer-events-none">
+                      {getItinerariesForDay(day).map((item: any) => {
+                        const displayItem = resizingItem?.id === item.id ? resizingItem : item;
+                        const position = calculatePosition(
+                          displayItem.startTime || '09:00',
+                          displayItem.endTime || '10:00'
+                        );
+                        const group = groups?.find((g) => g.id === item.groupId);
+                        const colorClass = groupColors[item.groupId] || colorPalette[0];
+
+                        return (
+                          <div
+                            key={item.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, item)}
+                            className={`absolute left-1 right-1 border-l-4 rounded p-2 text-xs cursor-move pointer-events-auto ${colorClass} ${
+                              draggedItem?.id === item.id ? 'opacity-50' : ''
+                            }`}
+                            style={{
+                              top: `${position.top}px`,
+                              height: `${position.height}px`,
+                            }}
+                          >
+                            {/* 頂部調整手柄 */}
+                            <div
+                              className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-black/10"
+                              onMouseDown={(e) => handleResizeStart(e, item, 'top')}
+                            />
+
+                            {/* 內容 */}
+                            <div className="font-medium truncate">{item.locationName || '未命名'}</div>
+                            <div className="text-xs opacity-75">
+                              {item.startTime} - {item.endTime || '未設定'}
                             </div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground text-center py-6 opacity-50">
-                              暫無行程
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                            {group && (
+                              <div className="text-xs opacity-75 truncate">{group.name}</div>
+                            )}
+
+                            {/* 底部調整手柄 */}
+                            <div
+                              className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-black/10"
+                              onMouseDown={(e) => handleResizeStart(e, item, 'bottom')}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* 本週關注事項 */}
+      {upcomingItems.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>進行中的團組</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {groups && groups.filter((g) => g.status === "ongoing").length > 0 ? (
-              <div className="space-y-2">
-                {groups
-                  .filter((g) => g.status === "ongoing")
-                  .map((group) => (
-                    <div
-                      key={group.id}
-                      className={`p-3 border rounded-lg transition-colors ${groupColors[group.id]}`}
-                    >
-                      <p className="font-medium">{group.name}</p>
-                      <p className="text-sm opacity-80">
-                        {format(new Date(group.startDate), "MM-dd")} 至{" "}
-                        {format(new Date(group.endDate), "MM-dd")} · {group.totalCount} 人
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">暫無進行中的團組</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>本週關注事項</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              本週關注事項
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {groups && groups.filter((g) => {
-                const start = new Date(g.startDate);
-                const end = new Date(g.endDate);
-                return (start >= weekStart && start <= weekEnd) || 
-                       (end >= weekStart && end <= weekEnd) ||
-                       (start <= weekStart && end >= weekEnd);
-              }).length > 0 ? (
-                <div className="space-y-2">
-                  {groups
-                    .filter((g) => {
-                      const start = new Date(g.startDate);
-                      const end = new Date(g.endDate);
-                      return (start >= weekStart && start <= weekEnd) || 
-                             (end >= weekStart && end <= weekEnd) ||
-                             (start <= weekStart && end >= weekEnd);
-                    })
-                    .map((group) => (
-                      <div key={group.id} className="p-3 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950/20">
-                        <p className="text-sm font-medium">{group.name}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {format(new Date(group.startDate), "MM月dd日")} 出發 · {group.totalCount} 人
-                        </p>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="p-3 border rounded-lg">
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    本週暫無需要關注的團組
-                  </p>
-                </div>
-              )}
-              
-              <div className="p-3 border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">使用提示</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      • 不同顏色代表不同團組<br />
-                      • 行程按時段（上午/下午/晚上）劃分<br />
-                      • 點擊團組詳情可查看完整行程
-                    </p>
+              {upcomingItems.map((item: any) => {
+                const group = groups?.find((g) => g.id === item.groupId);
+                const itemDate = new Date(item.date);
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{item.locationName || '未指定地點'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {group?.name || '未知團組'} · {format(itemDate, 'MM月dd日 EEE', { locale: zhCN })}
+                        {item.startTime && ` · ${item.startTime}`}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 }
