@@ -30,7 +30,8 @@ import { Button } from "./ui/button";
 const menuItems = [
   { icon: LayoutDashboard, label: "儀表板", path: "/" },
   { icon: Users, label: "團組管理", path: "/groups" },
-  { icon: Calendar, label: "行程設計器", path: "/planner" },
+  { icon: Briefcase, label: "行程設計器", path: "/planner" },
+  { icon: Calendar, label: "日曆視圖", path: "/calendar" },
   { icon: MapPin, label: "資源管理", path: "/resources" },
   { icon: BarChart3, label: "統計報表", path: "/reports" },
   { icon: FileText, label: "用戶管理", path: "/users" },

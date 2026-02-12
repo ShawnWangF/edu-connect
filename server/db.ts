@@ -225,6 +225,13 @@ export async function getItinerariesByGroupId(groupId: number) {
   return await db.select().from(itineraries).where(eq(itineraries.groupId, groupId));
 }
 
+export async function getAllItineraries() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(itineraries);
+}
+
 export async function createItinerary(itineraryData: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

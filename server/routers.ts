@@ -219,6 +219,11 @@ export const appRouter = router({
         return await db.getItinerariesByGroupId(input.groupId);
       }),
     
+    listAll: protectedProcedure
+      .query(async () => {
+        return await db.getAllItineraries();
+      }),
+    
     create: editorProcedure
       .input(z.object({
         groupId: z.number(),

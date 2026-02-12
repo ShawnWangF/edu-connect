@@ -16,6 +16,7 @@ import Users from "./pages/Users";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Planner from "./pages/Planner";
+import Calendar from "./pages/Calendar";
 
 function Router() {
   return (
@@ -69,6 +70,11 @@ function Router() {
       <Route path="/planner">
         <DashboardLayout>
           <Planner />
+        </DashboardLayout>
+      </Route>
+      <Route path="/calendar">
+        <DashboardLayout>
+          <Calendar />
         </DashboardLayout>
       </Route>
       <Route path="/404" component={NotFound} />
