@@ -107,11 +107,23 @@ export default function GroupEdit() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="startDate">開始日期 *</Label>
-                <Input id="startDate" name="startDate" type="date" defaultValue={group.startDate.toString().split('T')[0]} required />
+                <Input 
+                  id="startDate" 
+                  name="startDate" 
+                  type="date" 
+                  defaultValue={typeof group.startDate === 'string' ? (group.startDate as string).split('T')[0] : new Date(group.startDate as Date).toISOString().split('T')[0]} 
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="endDate">結束日期 *</Label>
-                <Input id="endDate" name="endDate" type="date" defaultValue={group.endDate.toString().split('T')[0]} required />
+                <Input 
+                  id="endDate" 
+                  name="endDate" 
+                  type="date" 
+                  defaultValue={typeof group.endDate === 'string' ? (group.endDate as string).split('T')[0] : new Date(group.endDate as Date).toISOString().split('T')[0]} 
+                  required 
+                />
               </div>
             </div>
 
