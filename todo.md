@@ -134,3 +134,6 @@
 - [x] 進行權限測試
 - [x] 創建項目檢查點
 - [ ] 準備部署文檔
+
+## Bug 修復
+- [x] 修復首頁中 /settings/snapshots 路由錯誤（應為 /settings）

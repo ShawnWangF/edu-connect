@@ -125,14 +125,14 @@ export default function Home() {
               <p className="text-sm text-muted-foreground">創建新的教育團組</p>
             </a>
             <a
-              href="/resources/locations"
+              href="/resources"
               className="block p-4 border rounded-lg hover:bg-accent transition-colors"
             >
               <p className="font-medium">管理景點</p>
               <p className="text-sm text-muted-foreground">添加或編輯參訪地點</p>
             </a>
             <a
-              href="/settings/snapshots"
+              href="/settings"
               className="block p-4 border rounded-lg hover:bg-accent transition-colors"
             >
               <p className="font-medium">版本控制</p>
