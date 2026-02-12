@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -140,7 +140,7 @@ export default function GroupDetail() {
         </TabsList>
 
         <TabsContent value="itinerary">
-          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} />
+          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} />
         </TabsContent>
 
         <TabsContent value="daily">
@@ -160,21 +160,163 @@ export default function GroupDetail() {
 }
 
 // 行程詳情標籤頁
-function ItineraryTab({ groupId, itineraries, utils }: any) {
+function ItineraryTab({ groupId, itineraries, utils, group }: any) {
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const createMutation = trpc.itineraries.create.useMutation({
+    onSuccess: () => {
+      toast.success("行程點已添加");
+      utils.itineraries.listByGroup.invalidate({ groupId });
+      setIsDialogOpen(false);
+      setSelectedItem(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || "添加失敗");
+    },
+  });
+
+  const updateMutation = trpc.itineraries.update.useMutation({
+    onSuccess: () => {
+      toast.success("行程點已更新");
+      utils.itineraries.listByGroup.invalidate({ groupId });
+      setIsDialogOpen(false);
+      setSelectedItem(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || "更新失敗");
+    },
+  });
+
+  const deleteMutation = trpc.itineraries.delete.useMutation({
+    onSuccess: () => {
+      toast.success("行程點已刪除");
+      utils.itineraries.listByGroup.invalidate({ groupId });
+    },
+    onError: (error) => {
+      toast.error(error.message || "刪除失敗");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    const data = {
+      groupId,
+      date: formData.get("date") as string,
+      dayNumber: parseInt(formData.get("dayNumber") as string),
+      startTime: (formData.get("startTime") as string) || undefined,
+      endTime: (formData.get("endTime") as string) || undefined,
+      locationName: (formData.get("locationName") as string) || undefined,
+      description: (formData.get("description") as string) || undefined,
+      notes: (formData.get("notes") as string) || undefined,
+    };
+
+    if (selectedItem) {
+      updateMutation.mutate({ id: selectedItem.id, ...data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  // 生成日期列表
+  const dateList = [];
+  const startDate = new Date(group.startDate);
+  for (let i = 0; i < group.days; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+    dateList.push(date);
+  }
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>行程時間軸</CardTitle>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setSelectedItem(null)}>
+              <Plus className="mr-2 h-4 w-4" />
+              添加行程點
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{selectedItem ? "編輯行程點" : "添加行程點"}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date">日期 *</Label>
+                  <Select name="date" defaultValue={selectedItem?.date || dateList[0]?.toISOString().split('T')[0]} required>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dateList.map((date, index) => (
+                        <SelectItem key={date.toISOString()} value={date.toISOString().split('T')[0]}>
+                          {format(date, "yyyy-MM-dd EEEE", { locale: zhCN })} (第{index + 1}天)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dayNumber">天數 *</Label>
+                  <Input id="dayNumber" name="dayNumber" type="number" min="1" defaultValue={selectedItem?.dayNumber || 1} required />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">開始時間</Label>
+                  <Input id="startTime" name="startTime" type="time" defaultValue={selectedItem?.startTime || ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">結束時間</Label>
+                  <Input id="endTime" name="endTime" type="time" defaultValue={selectedItem?.endTime || ""} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="locationName">地點名稱</Label>
+                <Input id="locationName" name="locationName" defaultValue={selectedItem?.locationName || ""} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">活動描述</Label>
+                <Textarea id="description" name="description" defaultValue={selectedItem?.description || ""} rows={3} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">備註</Label>
+                <Textarea id="notes" name="notes" defaultValue={selectedItem?.notes || ""} rows={2} />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  取消
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {(createMutation.isPending || updateMutation.isPending) ? "保存中..." : "保存"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </CardHeader>
       <CardContent>
         {itineraries && itineraries.length > 0 ? (
           <div className="space-y-4">
             {itineraries.map((item: any) => (
               <div key={item.id} className="flex gap-4 pb-4 border-b last:border-0">
-                <div className="flex-shrink-0 w-24 text-sm text-muted-foreground">
-                  {item.startTime && item.endTime
-                    ? `${item.startTime} - ${item.endTime}`
-                    : "全天"}
+                <div className="flex-shrink-0 w-32 text-sm text-muted-foreground">
+                  <div className="font-medium">第{item.dayNumber}天</div>
+                  <div className="text-xs">
+                    {item.startTime && item.endTime
+                      ? `${item.startTime} - ${item.endTime}`
+                      : "全天"}
+                  </div>
                 </div>
                 <div className="flex-1">
                   <p className="font-medium">{item.locationName || "未指定地點"}</p>
@@ -185,12 +327,32 @@ function ItineraryTab({ groupId, itineraries, utils }: any) {
                     <p className="text-sm text-muted-foreground mt-1">備註: {item.notes}</p>
                   )}
                 </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => deleteMutation.mutate({ id: item.id })}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-center text-muted-foreground py-8">
-            暫無行程安排
+            暫無行程安排，點擊上方按鈕添加
           </p>
         )}
       </CardContent>
@@ -266,20 +428,49 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
               <DialogTitle>編輯食行卡片</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="date">日期</Label>
-                <Select name="date" defaultValue={selectedCard?.date || dateList[0]?.toISOString().split('T')[0]} required>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dateList.map((date) => (
-                      <SelectItem key={date.toISOString()} value={date.toISOString().split('T')[0]}>
-                        {format(date, "yyyy-MM-dd EEEE", { locale: zhCN })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="date">日期</Label>
+                  <Select name="date" defaultValue={selectedCard?.date || dateList[0]?.toISOString().split('T')[0]} required>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dateList.map((date) => (
+                        <SelectItem key={date.toISOString()} value={date.toISOString().split('T')[0]}>
+                          {format(date, "yyyy-MM-dd EEEE", { locale: zhCN })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const currentDate = (document.querySelector('[name="date"]') as any)?.value;
+                      if (!currentDate || !dailyCards) return;
+                      
+                      const currentDateObj = new Date(currentDate);
+                      const previousDate = new Date(currentDateObj);
+                      previousDate.setDate(previousDate.getDate() - 1);
+                      const previousDateStr = previousDate.toISOString().split('T')[0];
+                      
+                      const previousCard = dailyCards.find((c: any) => c.date === previousDateStr);
+                      if (!previousCard) {
+                        toast.error("前一天沒有卡片數據");
+                        return;
+                      }
+                      
+                      setSelectedCard({ ...previousCard, date: currentDate });
+                      toast.success("已複製上一日安排");
+                    }}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    複製上一日
+                  </Button>
+                </div>
               </div>
 
               <div className="border-t pt-4">

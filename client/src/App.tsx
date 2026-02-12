@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Groups from "./pages/Groups";
 import GroupNew from "./pages/GroupNew";
 import GroupDetail from "./pages/GroupDetail";
+import GroupEdit from "./pages/GroupEdit";
 import Locations from "./pages/Locations";
 import Users from "./pages/Users";
 import Reports from "./pages/Reports";
@@ -33,6 +34,11 @@ function Router() {
       <Route path="/groups/new">
         <DashboardLayout>
           <GroupNew />
+        </DashboardLayout>
+      </Route>
+      <Route path="/groups/:id/edit">
+        <DashboardLayout>
+          <GroupEdit />
         </DashboardLayout>
       </Route>
       <Route path="/groups/:id">

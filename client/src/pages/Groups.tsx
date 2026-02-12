@@ -5,7 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Plus, Search, Calendar, Users, MapPin } from "lucide-react";
+import { Plus, Search, Calendar, Users, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
@@ -27,6 +30,22 @@ export default function Groups() {
   const [searchQuery, setSearchQuery] = useState("");
   
   const { data: groups, isLoading } = trpc.groups.list.useQuery();
+  const utils = trpc.useUtils();
+  
+  const deleteMutation = trpc.groups.delete.useMutation({
+    onSuccess: () => {
+      toast.success("團組已刪除");
+      utils.groups.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "刪除失敗");
+    },
+  });
+  
+  const handleDelete = (e: React.MouseEvent, groupId: number) => {
+    e.stopPropagation();
+    deleteMutation.mutate({ id: groupId });
+  };
 
   const filteredGroups = groups?.filter((group) => {
     if (!searchQuery) return true;
@@ -81,12 +100,54 @@ export default function Groups() {
                       編號: {group.code}
                     </p>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className={`${statusMap[group.status].color} text-white`}
-                  >
-                    {statusMap[group.status].label}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="secondary"
+                      className={`${statusMap[group.status].color} text-white`}
+                    >
+                      {statusMap[group.status].label}
+                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/groups/${group.id}/edit`);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>確認刪除</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            您確定要刪除團組「{group.name}」嗎？此操作無法撤銷。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={(e) => handleDelete(e, group.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            刪除
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
