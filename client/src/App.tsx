@@ -17,6 +17,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Planner from "./pages/Planner";
 import Calendar from "./pages/Calendar";
+import Notifications from "./pages/Notifications";
 
 function Router() {
   return (
@@ -75,6 +76,11 @@ function Router() {
       <Route path="/calendar">
         <DashboardLayout>
           <Calendar />
+        </DashboardLayout>
+      </Route>
+      <Route path="/notifications">
+        <DashboardLayout>
+          <Notifications />
         </DashboardLayout>
       </Route>
       <Route path="/404" component={NotFound} />

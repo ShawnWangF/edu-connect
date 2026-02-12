@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, ChevronLeft, ChevronRight, Plus, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { toast } from "sonner";
 
 export default function Planner() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -12,6 +14,7 @@ export default function Planner() {
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
 
   const { data: groups } = trpc.groups.list.useQuery();
+  const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
 
   // 生成本週的日期
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -30,10 +33,57 @@ export default function Planner() {
 
   // 時段定義
   const timePeriods = [
-    { id: "morning", label: "上午", time: "08:00-12:00" },
-    { id: "afternoon", label: "下午", time: "13:00-17:00" },
-    { id: "evening", label: "晚上", time: "18:00-21:00" },
+    { id: "morning", label: "上午", time: "08:00-12:00", startHour: 8, endHour: 12 },
+    { id: "afternoon", label: "下午", time: "13:00-17:00", startHour: 13, endHour: 17 },
+    { id: "evening", label: "晚上", time: "18:00-21:00", startHour: 18, endHour: 21 },
   ];
+
+  // 根據時間判斷行程屬於哪個時段
+  const getTimePeriod = (time: string | null) => {
+    if (!time) return null;
+    const hour = parseInt(time.split(":")[0]);
+    if (hour >= 8 && hour < 12) return "morning";
+    if (hour >= 13 && hour < 18) return "afternoon";
+    if (hour >= 18 && hour <= 21) return "evening";
+    return null;
+  };
+
+  // 獲取指定日期和時段的行程
+  const getItinerariesForDayAndPeriod = (day: Date, periodId: string) => {
+    if (!allItineraries) return [];
+    
+    return allItineraries.filter((itinerary) => {
+      const itineraryDate = itinerary.date instanceof Date ? itinerary.date : new Date(itinerary.date);
+      const matchesDay = isSameDay(itineraryDate, day);
+      const matchesPeriod = getTimePeriod(itinerary.startTime) === periodId;
+      return matchesDay && matchesPeriod;
+    });
+  };
+
+  // 團組顏色映射
+  const groupColors: Record<number, string> = {};
+  const colorPalette = [
+    "bg-blue-100 text-blue-700 border-blue-300",
+    "bg-green-100 text-green-700 border-green-300",
+    "bg-purple-100 text-purple-700 border-purple-300",
+    "bg-orange-100 text-orange-700 border-orange-300",
+    "bg-pink-100 text-pink-700 border-pink-300",
+    "bg-cyan-100 text-cyan-700 border-cyan-300",
+  ];
+
+  // 為每個團組分配顏色
+  if (groups) {
+    groups.forEach((group, index) => {
+      if (!groupColors[group.id]) {
+        groupColors[group.id] = colorPalette[index % colorPalette.length];
+      }
+    });
+  }
+
+  // 獲取團組名稱
+  const getGroupName = (groupId: number) => {
+    return groups?.find((g) => g.id === groupId)?.name || "未知團組";
+  };
 
   return (
     <div className="space-y-6">
@@ -70,7 +120,7 @@ export default function Planner() {
                 <tr>
                   <th className="border p-2 bg-muted/50 w-32">時段</th>
                   {weekDays.map((day) => (
-                    <th key={day.toISOString()} className="border p-2 bg-muted/50 min-w-[120px]">
+                    <th key={day.toISOString()} className="border p-2 bg-muted/50 min-w-[150px]">
                       <div className="text-center">
                         <div className="font-medium">
                           {format(day, "MM-dd", { locale: zhCN })}
@@ -90,17 +140,36 @@ export default function Planner() {
                       <div className="text-sm font-medium">{period.label}</div>
                       <div className="text-xs text-muted-foreground">{period.time}</div>
                     </td>
-                    {weekDays.map((day) => (
-                      <td
-                        key={`${period.id}-${day.toISOString()}`}
-                        className="border p-2 min-h-[100px] align-top hover:bg-accent/50 cursor-pointer transition-colors"
-                      >
-                        {/* 這裡可以顯示該時段的行程安排 */}
-                        <div className="text-xs text-muted-foreground text-center py-4">
-                          點擊添加行程
-                        </div>
-                      </td>
-                    ))}
+                    {weekDays.map((day) => {
+                      const itineraries = getItinerariesForDayAndPeriod(day, period.id);
+                      return (
+                        <td
+                          key={`${period.id}-${day.toISOString()}`}
+                          className="border p-2 min-h-[120px] align-top hover:bg-accent/30 transition-colors"
+                        >
+                          {itineraries.length > 0 ? (
+                            <div className="space-y-1">
+                              {itineraries.map((itinerary) => (
+                                <div
+                                  key={itinerary.id}
+                                  className={`p-2 rounded border text-xs ${groupColors[itinerary.groupId] || "bg-gray-100 text-gray-700 border-gray-300"}`}
+                                >
+                                  <div className="font-medium truncate">{itinerary.locationName || "未命名地點"}</div>
+                                  <div className="text-xs opacity-80 truncate">
+                                    {getGroupName(itinerary.groupId)}
+                                  </div>
+                                  <div className="text-xs opacity-70">{itinerary.startTime || "未設定時間"}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground text-center py-6 opacity-50">
+                              暫無行程
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -122,10 +191,10 @@ export default function Planner() {
                   .map((group) => (
                     <div
                       key={group.id}
-                      className="p-3 border rounded-lg hover:bg-accent transition-colors cursor-pointer"
+                      className={`p-3 border rounded-lg transition-colors ${groupColors[group.id]}`}
                     >
                       <p className="font-medium">{group.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm opacity-80">
                         {format(new Date(group.startDate), "MM-dd")} 至{" "}
                         {format(new Date(group.endDate), "MM-dd")} · {group.totalCount} 人
                       </p>
@@ -144,22 +213,51 @@ export default function Planner() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
+              {groups && groups.filter((g) => {
+                const start = new Date(g.startDate);
+                const end = new Date(g.endDate);
+                return (start >= weekStart && start <= weekEnd) || 
+                       (end >= weekStart && end <= weekEnd) ||
+                       (start <= weekStart && end >= weekEnd);
+              }).length > 0 ? (
+                <div className="space-y-2">
+                  {groups
+                    .filter((g) => {
+                      const start = new Date(g.startDate);
+                      const end = new Date(g.endDate);
+                      return (start >= weekStart && start <= weekEnd) || 
+                             (end >= weekStart && end <= weekEnd) ||
+                             (start <= weekStart && end >= weekEnd);
+                    })
+                    .map((group) => (
+                      <div key={group.id} className="p-3 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+                        <p className="text-sm font-medium">{group.name}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {format(new Date(group.startDate), "MM月dd日")} 出發 · {group.totalCount} 人
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="p-3 border rounded-lg">
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    本週暫無需要關注的團組
+                  </p>
+                </div>
+              )}
+              
               <div className="p-3 border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
-                <p className="text-sm font-medium">提示</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  行程設計器功能正在開發中，即將支持拖拽式行程安排
-                </p>
-              </div>
-              <div className="p-3 border rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  • 支持按上午/下午/晚上時段劃分
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  • 可視化週視圖統籌多團組
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  • 拖拽調整行程安排
-                </p>
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">使用提示</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      • 不同顏色代表不同團組<br />
+                      • 行程按時段（上午/下午/晚上）劃分<br />
+                      • 點擊團組詳情可查看完整行程
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>

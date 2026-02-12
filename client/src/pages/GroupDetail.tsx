@@ -1129,6 +1129,8 @@ function MembersTab({ groupId, members, utils }: any) {
 // 文件管理標籤頁
 function FilesTab({ groupId, files, utils }: any) {
   const [isUploading, setIsUploading] = useState(false);
+  const [previewFile, setPreviewFile] = useState<any>(null);
+  const [filterType, setFilterType] = useState<string>("all");
 
   const createFileMutation = trpc.files.create.useMutation({
     onSuccess: () => {
@@ -1209,67 +1211,188 @@ function FilesTab({ groupId, files, utils }: any) {
     return (bytes / (1024 * 1024)).toFixed(2) + " MB";
   };
 
+  const getFileType = (mimeType: string) => {
+    if (mimeType.startsWith("image/")) return "image";
+    if (mimeType === "application/pdf") return "pdf";
+    if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "excel";
+    if (mimeType.includes("document") || mimeType.includes("word")) return "document";
+    return "other";
+  };
+
+  const getFileIcon = (mimeType: string) => {
+    const type = getFileType(mimeType);
+    switch (type) {
+      case "image":
+        return "🖼️";
+      case "pdf":
+        return "📄";
+      case "excel":
+        return "📈";
+      case "document":
+        return "📃";
+      default:
+        return "📁";
+    }
+  };
+
+  const filteredFiles = files?.filter((file: any) => {
+    if (filterType === "all") return true;
+    return getFileType(file.mimeType) === filterType;
+  }) || [];
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>文件管理</CardTitle>
-        <div>
-          <input
-            type="file"
-            id="file-upload"
-            className="hidden"
-            onChange={handleFileUpload}
-            disabled={isUploading}
-          />
-          <Button asChild disabled={isUploading}>
-            <label htmlFor="file-upload" className="cursor-pointer">
-              <Upload className="mr-2 h-4 w-4" />
-              {isUploading ? "上傳中..." : "上傳文件"}
-            </label>
+      <CardHeader>
+        <div className="flex flex-row items-center justify-between mb-4">
+          <CardTitle>文件管理</CardTitle>
+          <div>
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+            />
+            <Button asChild disabled={isUploading}>
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <Upload className="mr-2 h-4 w-4" />
+                {isUploading ? "上傳中..." : "上傳文件"}
+              </label>
+            </Button>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={filterType === "all" ? "default" : "outline"}
+            onClick={() => setFilterType("all")}
+          >
+            全部 ({files?.length || 0})
+          </Button>
+          <Button
+            size="sm"
+            variant={filterType === "image" ? "default" : "outline"}
+            onClick={() => setFilterType("image")}
+          >
+            圖片 ({files?.filter((f: any) => getFileType(f.mimeType) === "image").length || 0})
+          </Button>
+          <Button
+            size="sm"
+            variant={filterType === "pdf" ? "default" : "outline"}
+            onClick={() => setFilterType("pdf")}
+          >
+            PDF ({files?.filter((f: any) => getFileType(f.mimeType) === "pdf").length || 0})
+          </Button>
+          <Button
+            size="sm"
+            variant={filterType === "excel" ? "default" : "outline"}
+            onClick={() => setFilterType("excel")}
+          >
+            Excel ({files?.filter((f: any) => getFileType(f.mimeType) === "excel").length || 0})
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {files && files.length > 0 ? (
-          <div className="space-y-2">
-            {files.map((file: any) => (
+        {filteredFiles.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredFiles.map((file: any) => (
               <div
                 key={file.id}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50"
+                className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
               >
-                <div className="flex-1">
-                  <p className="font-medium">{file.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {file.size && formatFileSize(file.size)} · {format(new Date(file.createdAt), "yyyy-MM-dd HH:mm")}
+                {getFileType(file.mimeType) === "image" ? (
+                  <div
+                    className="h-40 bg-muted flex items-center justify-center cursor-pointer"
+                    onClick={() => setPreviewFile(file)}
+                  >
+                    <img
+                      src={file.url}
+                      alt={file.name}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-40 bg-muted flex items-center justify-center text-6xl">
+                    {getFileIcon(file.mimeType)}
+                  </div>
+                )}
+                <div className="p-3">
+                  <p className="font-medium truncate" title={file.name}>{file.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {file.size && formatFileSize(file.size)}
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.open(file.url, "_blank")}
-                  >
-                    下載
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                      if (confirm("確定要刪除這個文件嗎？")) {
-                        deleteFileMutation.mutate({ id: file.id });
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(file.createdAt), "yyyy-MM-dd HH:mm")}
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    {(getFileType(file.mimeType) === "image" || getFileType(file.mimeType) === "pdf") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setPreviewFile(file)}
+                      >
+                        預覽
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => window.open(file.url, "_blank")}
+                    >
+                      下載
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm("確定要刪除這個文件嗎？")) {
+                          deleteFileMutation.mutate({ id: file.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-center text-muted-foreground py-8">
-            暫無文件，點擊上方按鈕上傳文件
+            {filterType === "all" ? "暫無文件，點擊上方按鈕上傳文件" : `暫無${filterType === "image" ? "圖片" : filterType === "pdf" ? "PDF" : "Excel"}文件`}
           </p>
+        )}
+        
+        {/* 文件預覽對話框 */}
+        {previewFile && (
+          <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
+            <DialogContent className="max-w-4xl max-h-[90vh]">
+              <DialogHeader>
+                <DialogTitle>{previewFile.name}</DialogTitle>
+              </DialogHeader>
+              <div className="overflow-auto max-h-[70vh]">
+                {getFileType(previewFile.mimeType) === "image" ? (
+                  <img
+                    src={previewFile.url}
+                    alt={previewFile.name}
+                    className="w-full h-auto"
+                  />
+                ) : getFileType(previewFile.mimeType) === "pdf" ? (
+                  <iframe
+                    src={previewFile.url}
+                    className="w-full h-[70vh]"
+                    title={previewFile.name}
+                  />
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">
+                    無法預覽此文件類型
+                  </p>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </CardContent>
     </Card>

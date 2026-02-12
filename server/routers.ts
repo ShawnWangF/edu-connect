@@ -472,6 +472,19 @@ export const appRouter = router({
       return await db.getNotificationsByUserId(ctx.user.id);
     }),
     
+    create: editorProcedure
+      .input(z.object({
+        userId: z.number(),
+        type: z.enum(["reminder", "deadline", "departure", "change"]),
+        title: z.string(),
+        content: z.string().optional(),
+        relatedGroupId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createNotification(input);
+        return { success: true };
+      }),
+    
     markAsRead: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
