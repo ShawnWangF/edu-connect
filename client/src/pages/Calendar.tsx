@@ -29,8 +29,9 @@ export default function Calendar() {
       const itemDate = new Date(item.date);
       if (!isSameDay(itemDate, date)) return false;
       
-      // 簡單的時間匹配邏輯
-      const itemHour = parseInt(item.time?.split(':')[0] || '0');
+      // 使用 startTime 字段進行時間匹配
+      if (!item.startTime) return false;
+      const itemHour = parseInt(item.startTime.split(':')[0]);
       return itemHour === hour;
     });
   };
@@ -130,10 +131,13 @@ export default function Calendar() {
                               <div
                                 key={item.id}
                                 className={`${getGroupColor(item.groupId)} text-white text-xs p-1 rounded mb-1 cursor-pointer hover:opacity-80 transition-opacity`}
-                                title={`${group?.name || '未知團組'} - ${item.location}`}
+                                title={`${group?.name || '未知團組'} - ${item.locationName || '未指定地點'}`}
                               >
                                 <div className="font-medium truncate">{group?.name}</div>
-                                <div className="truncate">{item.location}</div>
+                                <div className="truncate">{item.locationName || '未指定地點'}</div>
+                                {item.startTime && item.endTime && (
+                                  <div className="text-[10px] opacity-80">{item.startTime}-{item.endTime}</div>
+                                )}
                               </div>
                             );
                           })}
