@@ -40,9 +40,10 @@ describe("Groups Management", () => {
     const ctx = createTestContext("editor");
     const caller = appRouter.createCaller(ctx);
 
+    const randomCode = `TEST${Date.now()}`;
     const groupData = {
       name: "Test Group",
-      code: "TEST001",
+      code: randomCode,
       startDate: "2024-01-01",
       endDate: "2024-01-07",
       days: 7,
@@ -93,11 +94,12 @@ describe("User Management", () => {
     const ctx = createTestContext("admin");
     const caller = appRouter.createCaller(ctx);
 
+    const randomUsername = `testuser_${Date.now()}`;
     const userData = {
-      username: "testuser",
+      username: randomUsername,
       password: "testpass123",
       name: "Test User",
-      email: "test@example.com",
+      email: `${randomUsername}@example.com`,
       role: "viewer" as const,
     };
 

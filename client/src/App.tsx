@@ -14,6 +14,7 @@ import Locations from "./pages/Locations";
 import Users from "./pages/Users";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Planner from "./pages/Planner";
 
 function Router() {
   return (
@@ -57,6 +58,11 @@ function Router() {
       <Route path="/settings">
         <DashboardLayout>
           <Settings />
+        </DashboardLayout>
+      </Route>
+      <Route path="/planner">
+        <DashboardLayout>
+          <Planner />
         </DashboardLayout>
       </Route>
       <Route path="/404" component={NotFound} />

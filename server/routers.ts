@@ -41,8 +41,22 @@ export const appRouter = router({
           throw new TRPCError({ code: 'UNAUTHORIZED', message: '用戶名或密碼錯誤' });
         }
         
-        // 這裡需要設置session cookie，但由於模板限制，我們返回用戶信息
-        // 實際應用中需要通過OAuth或JWT設置cookie
+        // 更新用戶在線狀態
+        await db.updateUserOnlineStatus(user.id, true);
+        
+        // 創建 session token 並設置 cookie
+        const { sdk } = await import('./_core/sdk');
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || user.username || '',
+          expiresInMs: 365 * 24 * 60 * 60 * 1000, // 1年
+        });
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: 365 * 24 * 60 * 60 * 1000, // 1年
+        });
+        
         return {
           success: true,
           user: {
