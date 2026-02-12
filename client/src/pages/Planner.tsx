@@ -10,11 +10,24 @@ import { toast } from "sonner";
 
 export default function Planner() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [draggedItem, setDraggedItem] = useState<any>(null);
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // 週一開始
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
 
   const { data: groups } = trpc.groups.list.useQuery();
   const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
+  const utils = trpc.useUtils();
+
+  // 更新行程時間
+  const updateItinerary = trpc.itineraries.update.useMutation({
+    onSuccess: () => {
+      utils.itineraries.listAll.invalidate();
+      toast.success("行程已移動");
+    },
+    onError: (error) => {
+      toast.error(error.message || "移動失敗");
+    },
+  });
 
   // 生成本週的日期
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -31,20 +44,37 @@ export default function Planner() {
     setCurrentDate(new Date());
   };
 
-  // 時段定義
-  const timePeriods = [
-    { id: "morning", label: "上午", time: "08:00-12:00", startHour: 8, endHour: 12 },
-    { id: "afternoon", label: "下午", time: "13:00-17:00", startHour: 13, endHour: 17 },
-    { id: "evening", label: "晚上", time: "18:00-21:00", startHour: 18, endHour: 21 },
-  ];
+  // 動態時段定義（根據實際行程時間生成）
+  const getTimePeriods = () => {
+    const periods = [
+      { id: "early_morning", label: "早晨", time: "00:00-06:59", startHour: 0, endHour: 7 },
+      { id: "morning", label: "上午", time: "07:00-11:59", startHour: 7, endHour: 12 },
+      { id: "afternoon", label: "下午", time: "12:00-17:59", startHour: 12, endHour: 18 },
+      { id: "evening", label: "晚上", time: "18:00-23:59", startHour: 18, endHour: 24 },
+    ];
+    
+    // 檢查是否有行程在每個時段
+    return periods.filter(period => {
+      if (!allItineraries) return false;
+      return allItineraries.some(itinerary => {
+        const hour = itinerary.startTime ? parseInt(itinerary.startTime.split(":")[0]) : null;
+        if (hour === null) return false;
+        return hour >= period.startHour && hour < period.endHour;
+      });
+    });
+  };
+
+  const timePeriods = getTimePeriods();
 
   // 根據時間判斷行程屬於哪個時段
   const getTimePeriod = (time: string | null) => {
     if (!time) return null;
     const hour = parseInt(time.split(":")[0]);
-    if (hour >= 8 && hour < 12) return "morning";
-    if (hour >= 13 && hour < 18) return "afternoon";
-    if (hour >= 18 && hour <= 21) return "evening";
+    for (const period of timePeriods) {
+      if (hour >= period.startHour && hour < period.endHour) {
+        return period.id;
+      }
+    }
     return null;
   };
 
@@ -146,13 +176,45 @@ export default function Planner() {
                         <td
                           key={`${period.id}-${day.toISOString()}`}
                           className="border p-2 min-h-[120px] align-top hover:bg-accent/30 transition-colors"
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.add('bg-primary/10');
+                          }}
+                          onDragLeave={(e) => {
+                            e.currentTarget.classList.remove('bg-primary/10');
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('bg-primary/10');
+                            if (draggedItem) {
+                              // 計算新的時間基於時段
+                              const newStartHour = period.startHour;
+                              const newStartTime = `${newStartHour.toString().padStart(2, '0')}:00`;
+                              const oldStartHour = draggedItem.startTime ? parseInt(draggedItem.startTime.split(':')[0]) : 0;
+                              const oldEndHour = draggedItem.endTime ? parseInt(draggedItem.endTime.split(':')[0]) : oldStartHour + 1;
+                              const duration = oldEndHour - oldStartHour;
+                              const newEndTime = `${(newStartHour + duration).toString().padStart(2, '0')}:00`;
+                              
+                              updateItinerary.mutate({
+                                id: draggedItem.id,
+                                startTime: newStartTime,
+                                endTime: newEndTime,
+                              });
+                            }
+                          }}
                         >
                           {itineraries.length > 0 ? (
                             <div className="space-y-1">
                               {itineraries.map((itinerary) => (
                                 <div
                                   key={itinerary.id}
-                                  className={`p-2 rounded border text-xs ${groupColors[itinerary.groupId] || "bg-gray-100 text-gray-700 border-gray-300"}`}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    setDraggedItem(itinerary);
+                                    e.dataTransfer.effectAllowed = "move";
+                                  }}
+                                  onDragEnd={() => setDraggedItem(null)}
+                                  className={`p-2 rounded border text-xs cursor-move ${groupColors[itinerary.groupId] || "bg-gray-100 text-gray-700 border-gray-300"} ${draggedItem?.id === itinerary.id ? 'opacity-50' : ''}`}
                                 >
                                   <div className="font-medium truncate">{itinerary.locationName || "未命名地點"}</div>
                                   <div className="text-xs opacity-80 truncate">

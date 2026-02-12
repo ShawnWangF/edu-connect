@@ -6,14 +6,28 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
+import { toast } from "sonner";
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [draggedItem, setDraggedItem] = useState<any>(null);
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // 週一開始
 
   // 獲取所有團組和行程
   const { data: groups } = trpc.groups.list.useQuery();
   const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
+  const utils = trpc.useUtils();
+
+  // 更新行程時間
+  const updateItinerary = trpc.itineraries.update.useMutation({
+    onSuccess: () => {
+      utils.itineraries.listAll.invalidate();
+      toast.success("行程時間已更新");
+    },
+    onError: (error) => {
+      toast.error(error.message || "更新失敗");
+    },
+  });
 
   // 生成一週的日期
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -124,13 +138,43 @@ export default function Calendar() {
                         <div
                           key={`${day.toISOString()}-${hour}`}
                           className="p-1 border-r last:border-r-0 min-h-[60px] hover:bg-muted/30 transition-colors"
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.add('bg-primary/10');
+                          }}
+                          onDragLeave={(e) => {
+                            e.currentTarget.classList.remove('bg-primary/10');
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('bg-primary/10');
+                            if (draggedItem) {
+                              const newStartTime = `${hour.toString().padStart(2, '0')}:00`;
+                              const oldStartHour = draggedItem.startTime ? parseInt(draggedItem.startTime.split(':')[0]) : 0;
+                              const oldEndHour = draggedItem.endTime ? parseInt(draggedItem.endTime.split(':')[0]) : oldStartHour + 1;
+                              const duration = oldEndHour - oldStartHour;
+                              const newEndTime = `${(hour + duration).toString().padStart(2, '0')}:00`;
+                              
+                              updateItinerary.mutate({
+                                id: draggedItem.id,
+                                startTime: newStartTime,
+                                endTime: newEndTime,
+                              });
+                            }
+                          }}
                         >
                           {itineraries.map((item: any) => {
                             const group = groups?.find((g: any) => g.id === item.groupId);
                             return (
                               <div
                                 key={item.id}
-                                className={`${getGroupColor(item.groupId)} text-white text-xs p-1 rounded mb-1 cursor-pointer hover:opacity-80 transition-opacity`}
+                                draggable
+                                onDragStart={(e) => {
+                                  setDraggedItem(item);
+                                  e.dataTransfer.effectAllowed = "move";
+                                }}
+                                onDragEnd={() => setDraggedItem(null)}
+                                className={`${getGroupColor(item.groupId)} text-white text-xs p-1 rounded mb-1 cursor-move hover:opacity-80 transition-opacity ${draggedItem?.id === item.id ? 'opacity-50' : ''}`}
                                 title={`${group?.name || '未知團組'} - ${item.locationName || '未指定地點'}`}
                               >
                                 <div className="font-medium truncate">{group?.name}</div>
