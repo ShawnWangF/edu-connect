@@ -951,54 +951,109 @@ function MembersTab({ groupId, members, utils }: any) {
       </CardHeader>
       <CardContent>
         {members && members.length > 0 ? (
-          <div className="space-y-2">
-            {members.map((member: any) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50"
-              >
-                <div className="flex-1">
-                  <p className="font-medium">{member.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {member.identity === "student" && "學生"}
-                    {member.identity === "teacher" && "教師"}
-                    {member.identity === "staff" && "工作人員"}
-                    {member.identity === "other" && "其他"}
-                    {member.phone && ` · ${member.phone}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {member.gender && (
-                    <Badge variant="outline">
-                      {member.gender === "male" && "男"}
-                      {member.gender === "female" && "女"}
-                      {member.gender === "other" && "其他"}
-                    </Badge>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditingMember(member);
-                      setIsDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                      if (confirm("確定要刪除這個成員嗎？")) {
-                        deleteMutation.mutate({ id: member.id });
+          <div className="border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-3 py-2 text-left whitespace-nowrap">姓名</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap">身份</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap">性別</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap">聯系電話</th>
+                  <th className="px-3 py-2 text-left whitespace-nowrap">身份證號</th>
+                  {/* 動態顯示自定義字段表頭 */}
+                  {(() => {
+                    // 收集所有成員的自定義字段名
+                    const allCustomFieldKeys = new Set<string>();
+                    members.forEach((m: any) => {
+                      if (m.customFields) {
+                        try {
+                          const fields = JSON.parse(m.customFields);
+                          Object.keys(fields).forEach(k => allCustomFieldKeys.add(k));
+                        } catch (e) {
+                          console.error('Failed to parse customFields:', e);
+                        }
                       }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+                    });
+                    return Array.from(allCustomFieldKeys).map((key) => (
+                      <th key={key} className="px-3 py-2 text-left whitespace-nowrap">{key}</th>
+                    ));
+                  })()}
+                  <th className="px-3 py-2 text-left whitespace-nowrap">備註</th>
+                  <th className="px-3 py-2 text-center whitespace-nowrap">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  // 收集所有自定義字段名
+                  const allCustomFieldKeys = new Set<string>();
+                  members.forEach((m: any) => {
+                    if (m.customFields) {
+                      try {
+                        const fields = JSON.parse(m.customFields);
+                        Object.keys(fields).forEach(k => allCustomFieldKeys.add(k));
+                      } catch (e) {}
+                    }
+                  });
+                  const customFieldKeysArray = Array.from(allCustomFieldKeys);
+
+                  return members.map((member: any) => {
+                    const customFields = member.customFields ? JSON.parse(member.customFields) : {};
+                    
+                    return (
+                      <tr key={member.id} className="border-t hover:bg-accent/50">
+                        <td className="px-3 py-2 whitespace-nowrap font-medium">{member.name}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {member.identity === "student" && "學生"}
+                          {member.identity === "teacher" && "教師"}
+                          {member.identity === "staff" && "工作人員"}
+                          {member.identity === "other" && "其他"}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {member.gender === "male" && "男"}
+                          {member.gender === "female" && "女"}
+                          {member.gender === "other" && "其他"}
+                          {!member.gender && "-"}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">{member.phone || "-"}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{member.idCard || "-"}</td>
+                        {/* 顯示自定義字段值，按照表頭順序 */}
+                        {customFieldKeysArray.map((key) => (
+                          <td key={key} className="px-3 py-2 whitespace-nowrap">
+                            {customFields[key] || "-"}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 max-w-xs truncate">{member.notes || "-"}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingMember(member);
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                if (confirm("確定要刪除這個成員嗎？")) {
+                                  deleteMutation.mutate({ id: member.id });
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
           </div>
         ) : (
           <p className="text-center text-muted-foreground py-8">
