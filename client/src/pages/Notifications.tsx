@@ -19,6 +19,16 @@ export default function Notifications() {
     },
   });
 
+  const markAllAsRead = trpc.notifications.markAllAsRead.useMutation({
+    onSuccess: () => {
+      refetch();
+      toast.success("已將所有通知標記為已讀");
+    },
+    onError: () => {
+      toast.error("操作失敗");
+    },
+  });
+
   const unreadCount = notifications?.filter((n) => !n.isRead).length || 0;
 
   const getNotificationIcon = (type: string) => {
@@ -80,10 +90,22 @@ export default function Notifications() {
             )}
           </p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          刷新
-        </Button>
+        <div className="flex gap-2">
+          {unreadCount > 0 && (
+            <Button 
+              variant="outline" 
+              onClick={() => markAllAsRead.mutate()}
+              disabled={markAllAsRead.isPending}
+            >
+              <Check className="h-4 w-4 mr-2" />
+              全部已讀
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            刷新
+          </Button>
+        </div>
       </div>
 
       <Card>

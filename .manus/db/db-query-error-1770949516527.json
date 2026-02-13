@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, name, code, startDate, endDate FROM groups ORDER BY id ASC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, code, startDate, endDate FROM groups ORDER BY id ASC LIMIT 5;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 53 near \"groups ORDER BY id ASC LIMIT 5\""
+  ]
+}

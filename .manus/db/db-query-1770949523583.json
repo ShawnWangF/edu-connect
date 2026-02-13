@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, name, code, startDate, endDate FROM `groups` ORDER BY id ASC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, code, startDate, endDate FROM `groups` ORDER BY id ASC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "江苏六天五夜粤港团",
+      "code": "TEST001",
+      "startDate": "2026-02-24",
+      "endDate": "2026-03-01"
+    },
+    {
+      "id": "30047",
+      "name": "測試團組-批量導入",
+      "code": "BATCH-TEST-1770892612360",
+      "startDate": "2024-06-01",
+      "endDate": "2024-06-05"
+    },
+    {
+      "id": "30048",
+      "name": "測試團組-自定義字段",
+      "code": "CUSTOM-FIELDS-1770892612397",
+      "startDate": "2024-06-01",
+      "endDate": "2024-06-05"
+    },
+    {
+      "id": "30049",
+      "name": "測試團組-已編輯",
+      "code": "EDIT-TEST-1770892612396",
+      "startDate": "2024-06-01",
+      "endDate": "2024-06-05"
+    },
+    {
+      "id": "30050",
+      "name": "Test Group",
+      "code": "TEST1770892613815",
+      "startDate": "2024-01-01",
+      "endDate": "2024-01-07"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcode\tstartDate\tendDate\n1\t江苏六天五夜粤港团\tTEST001\t2026-02-24\t2026-03-01\n30047\t測試團組-批量導入\tBATCH-TEST-1770892612360\t2024-06-01\t2024-06-05\n30048\t測試團組-自定義字段\tCUSTOM-FIELDS-1770892612397\t2024-06-01\t2024-06-05\n30049\t測試團組-已編輯\tEDIT-TEST-1770892612396\t2024-06-01\t2024-06-05\n30050\tTest Group\tTEST1770892613815\t2024-01-01\t2024-01-07\n",
+  "stderr": "",
+  "execution_time_ms": 1909
+}

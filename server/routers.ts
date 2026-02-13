@@ -558,6 +558,12 @@ export const appRouter = router({
         await db.markNotificationAsRead(input.id);
         return { success: true };
       }),
+    
+    markAllAsRead: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        await db.markAllNotificationsAsRead(ctx.user.id);
+        return { success: true };
+      }),
   }),
   
   // 文件管理

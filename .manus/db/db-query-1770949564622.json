@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, title, type, createdAt FROM `notifications` ORDER BY id ASC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, title, type, createdAt FROM `notifications` ORDER BY id ASC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "title": "新團組「測試團組-自定義字段」已創建",
+      "type": "reminder",
+      "createdAt": "2026-02-12 10:48:39"
+    },
+    {
+      "id": "2",
+      "title": "新團組「Test Group」已創建",
+      "type": "reminder",
+      "createdAt": "2026-02-12 10:48:39"
+    },
+    {
+      "id": "3",
+      "title": "新團組「Test Group」已創建",
+      "type": "reminder",
+      "createdAt": "2026-02-12 10:48:39"
+    },
+    {
+      "id": "4",
+      "title": "新團組「測試團組-自定義字段」已創建",
+      "type": "reminder",
+      "createdAt": "2026-02-12 10:48:39"
+    },
+    {
+      "id": "5",
+      "title": "新團組「Test Group」已創建",
+      "type": "reminder",
+      "createdAt": "2026-02-12 10:48:39"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\ttype\tcreatedAt\n1\t新團組「測試團組-自定義字段」已創建\treminder\t2026-02-12 10:48:39\n2\t新團組「Test Group」已創建\treminder\t2026-02-12 10:48:39\n3\t新團組「Test Group」已創建\treminder\t2026-02-12 10:48:39\n4\t新團組「測試團組-自定義字段」已創建\treminder\t2026-02-12 10:48:39\n5\t新團組「Test Group」已創建\treminder\t2026-02-12 10:48:39\n",
+  "stderr": "",
+  "execution_time_ms": 1657
+}
