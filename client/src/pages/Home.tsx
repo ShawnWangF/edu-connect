@@ -51,7 +51,7 @@ export default function Home() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">儀表板</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600 bg-clip-text text-transparent">儀表板</h1>
         <p className="text-muted-foreground mt-1">教育團組行程管理系統概覽</p>
       </div>
 
