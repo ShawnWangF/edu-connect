@@ -1,12 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { Users, Calendar, MapPin, TrendingUp, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { useState } from "react";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const { data: groups } = trpc.groups.list.useQuery();
   const { data: locations } = trpc.locations.list.useQuery();
   const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
@@ -23,8 +26,13 @@ export default function Home() {
     return itemDate >= weekStart && itemDate < weekEnd;
   }) || [];
 
+  // 按狀態篩選團組
+  const filteredGroups = statusFilter === "all" 
+    ? groups 
+    : groups?.filter(g => g.status === statusFilter);
+
   // 按出發時間排序團組（即將出發的在前）
-  const sortedGroups = groups?.slice().sort((a, b) => {
+  const sortedGroups = filteredGroups?.slice().sort((a, b) => {
     return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   }) || [];
 
@@ -116,8 +124,47 @@ export default function Home() {
       {/* 最近團組 - 橫向滾動時間軸視圖 */}
       <Card>
         <CardHeader>
-          <CardTitle>最近團組</CardTitle>
-          <p className="text-sm text-muted-foreground">按出發時間排序，點擊查看詳情</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>最近團組</CardTitle>
+              <p className="text-sm text-muted-foreground">按出發時間排序，點擊查看詳情</p>
+            </div>
+            {/* 狀態篩選按鈕組 */}
+            <div className="flex gap-2">
+              <Button
+                variant={statusFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter("all")}
+                className={statusFilter === "all" ? "bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600" : ""}
+              >
+                全部
+              </Button>
+              <Button
+                variant={statusFilter === "preparing" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter("preparing")}
+                className={statusFilter === "preparing" ? "bg-gradient-to-r from-yellow-400 to-orange-500" : ""}
+              >
+                準備中
+              </Button>
+              <Button
+                variant={statusFilter === "ongoing" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter("ongoing")}
+                className={statusFilter === "ongoing" ? "bg-gradient-to-r from-green-400 to-cyan-500" : ""}
+              >
+                進行中
+              </Button>
+              <Button
+                variant={statusFilter === "completed" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter("completed")}
+                className={statusFilter === "completed" ? "bg-gradient-to-r from-blue-400 to-indigo-500" : ""}
+              >
+                已完成
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {groupsWithItineraries.length > 0 ? (

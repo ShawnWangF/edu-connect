@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin } from "lucide-react";
+import { exportGroupToPDF } from "@/lib/pdfExport";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin, Download } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -66,6 +67,22 @@ export default function GroupDetail() {
           </div>
           <p className="text-muted-foreground mt-1">編號: {group.code}</p>
         </div>
+        <Button 
+          onClick={async () => {
+            toast.loading("正在生成PDF...");
+            const result = await exportGroupToPDF(group, itineraries || [], members || [], dailyCards || [], attractions || []);
+            toast.dismiss();
+            if (result.success) {
+              toast.success(`PDF已成功導出：${result.fileName}`);
+            } else {
+              toast.error(`導出失敗：${result.error}`);
+            }
+          }}
+          className="bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          導出PDF
+        </Button>
       </div>
 
       <Card>
