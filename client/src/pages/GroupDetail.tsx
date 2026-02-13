@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -252,6 +252,21 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
     dateList.push(date);
   }
 
+  // 檢查未安排的必去行程
+  const unscheduledRequired = useMemo(() => {
+    if (!group.requiredItineraries || group.requiredItineraries.length === 0) {
+      return [];
+    }
+    
+    const scheduledNames = new Set(
+      (itineraries || []).map((item: any) => item.locationName?.trim().toLowerCase())
+    );
+    
+    return group.requiredItineraries.filter((required: any) => 
+      !scheduledNames.has(required.name.trim().toLowerCase())
+    );
+  }, [group.requiredItineraries, itineraries]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -382,6 +397,32 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
         </Dialog>
       </CardHeader>
       <CardContent>
+        {/* 未安排的必去行程提示 */}
+        {unscheduledRequired.length > 0 && (
+          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                  仍未安排的必去行程
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {unscheduledRequired.map((item: any, index: number) => (
+                    <Badge 
+                      key={index} 
+                      variant="outline" 
+                      className="bg-white dark:bg-gray-800 border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200"
+                    >
+                      {item.name}
+                      {item.isCustom && <span className="ml-1 text-xs">(自定义)</span>}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {itineraries && itineraries.length > 0 ? (
           <div className="space-y-4">
             {itineraries.map((item: any) => (
