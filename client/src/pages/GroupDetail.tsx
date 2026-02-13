@@ -39,6 +39,7 @@ export default function GroupDetail() {
   const { data: members } = trpc.members.listByGroup.useQuery({ groupId });
   const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId });
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId });
+  const { data: attractions } = trpc.attractions.list.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -125,13 +126,15 @@ export default function GroupDetail() {
             </div>
             {group.requiredItineraries && group.requiredItineraries.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {group.requiredItineraries.map((item, index) => (
-                  <Badge key={index} variant="outline" className="text-sm">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {item.name}
-                    {item.isCustom && <span className="ml-1 text-xs text-muted-foreground">(自定義)</span>}
-                  </Badge>
-                ))}
+                {group.requiredItineraries.map((attractionId: number, index: number) => {
+                  const attraction = attractions?.find(a => a.id === attractionId);
+                  return (
+                    <Badge key={index} variant="outline" className="text-sm">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {attraction?.name || `景點 ID: ${attractionId}`}
+                    </Badge>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">未設置必去行程</p>
@@ -269,12 +272,12 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
       return [];
     }
     
-    const scheduledNames = new Set(
-      (itineraries || []).map((item: any) => item.locationName?.trim().toLowerCase())
+    const scheduledAttractionIds = new Set(
+      (itineraries || []).map((item: any) => item.attractionId).filter(Boolean)
     );
     
-    return group.requiredItineraries.filter((required: any) => 
-      !scheduledNames.has(required.name.trim().toLowerCase())
+    return group.requiredItineraries.filter((attractionId: number) => 
+      !scheduledAttractionIds.has(attractionId)
     );
   }, [group.requiredItineraries, itineraries]);
 
@@ -1746,12 +1749,12 @@ function FilesTab({ groupId, files, utils }: any) {
 // 必去行程配置對話框
 function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
   groupId: number;
-  currentItineraries: Array<{ id?: number; name: string; isCustom: boolean }>;
+  currentItineraries: number[];
   utils: any;
 }) {
   const [open, setOpen] = useState(false);
-  const [itineraries, setItineraries] = useState<Array<{ id?: number; name: string; isCustom: boolean }>>(currentItineraries);
-  const [newItinerary, setNewItinerary] = useState({ selectedId: "", customName: "" });
+  const [itineraries, setItineraries] = useState<number[]>(currentItineraries);
+  const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
   
   const { data: attractions } = trpc.attractions.list.useQuery();
   
@@ -1767,18 +1770,13 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
   });
   
   const handleAddItinerary = () => {
-    if (newItinerary.selectedId === "custom") {
-      if (!newItinerary.customName.trim()) {
-        toast.error("請輸入自定義行程名稱");
-        return;
-      }
-      setItineraries([...itineraries, { name: newItinerary.customName, isCustom: true }]);
-      setNewItinerary({ selectedId: "", customName: "" });
-    } else if (newItinerary.selectedId) {
-      const attraction = attractions?.find(a => a.id === parseInt(newItinerary.selectedId));
-      if (attraction) {
-        setItineraries([...itineraries, { id: attraction.id, name: attraction.name, isCustom: false }]);
-        setNewItinerary({ selectedId: "", customName: "" });
+    if (selectedAttractionId) {
+      const attractionId = parseInt(selectedAttractionId);
+      if (!itineraries.includes(attractionId)) {
+        setItineraries([...itineraries, attractionId]);
+        setSelectedAttractionId("");
+      } else {
+        toast.error("此景點已在必去行程列表中");
       }
     }
   };
@@ -1811,19 +1809,21 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
             <Label>已選擇的必去行程</Label>
             {itineraries.length > 0 ? (
               <div className="flex flex-wrap gap-2 p-3 border rounded-lg">
-                {itineraries.map((item, index) => (
-                  <Badge key={index} variant="secondary" className="text-sm">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {item.name}
-                    {item.isCustom && <span className="ml-1 text-xs">(自定義)</span>}
-                    <button
-                      onClick={() => handleRemoveItinerary(index)}
-                      className="ml-2 hover:text-destructive"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
+                {itineraries.map((attractionId, index) => {
+                  const attraction = attractions?.find(a => a.id === attractionId);
+                  return (
+                    <Badge key={index} variant="secondary" className="text-sm">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {attraction?.name || `景點 ID: ${attractionId}`}
+                      <button
+                        onClick={() => handleRemoveItinerary(index)}
+                        className="ml-2 hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground p-3 border rounded-lg">還未添加必去行程</p>
@@ -1831,12 +1831,11 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
           
           <div className="space-y-2">
             <Label>添加行程</Label>
-            <Select value={newItinerary.selectedId} onValueChange={(value) => setNewItinerary({ ...newItinerary, selectedId: value })}>
+            <Select value={selectedAttractionId} onValueChange={setSelectedAttractionId}>
               <SelectTrigger>
-                <SelectValue placeholder="選擇景點或自定義輸入" />
+                <SelectValue placeholder="選擇景點" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="custom">自定義輸入</SelectItem>
                 {attractions?.map((attraction) => (
                   <SelectItem key={attraction.id} value={attraction.id.toString()}>
                     {attraction.name}
@@ -1845,13 +1844,7 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
               </SelectContent>
             </Select>
             
-            {newItinerary.selectedId === "custom" && (
-              <Input
-                placeholder="輸入自定義行程名稱"
-                value={newItinerary.customName}
-                onChange={(e) => setNewItinerary({ ...newItinerary, customName: e.target.value })}
-              />
-            )}
+
             
             <Button onClick={handleAddItinerary} className="w-full" variant="outline">
               <Plus className="h-4 w-4 mr-2" />

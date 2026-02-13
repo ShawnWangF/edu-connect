@@ -207,11 +207,7 @@ export const appRouter = router({
         emergencyContact: z.string().optional(),
         emergencyPhone: z.string().optional(),
         notes: z.string().optional(),
-        requiredItineraries: z.array(z.object({
-          id: z.number().optional(),
-          name: z.string(),
-          isCustom: z.boolean(),
-        })).optional(),
+        requiredItineraries: z.array(z.number()).optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...updateData } = input;

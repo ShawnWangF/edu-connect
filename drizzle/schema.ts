@@ -41,7 +41,7 @@ export const groups = mysqlTable("groups", {
   emergencyContact: varchar("emergencyContact", { length: 100 }), // 緊急聯系人
   emergencyPhone: varchar("emergencyPhone", { length: 50 }), // 緊急電話
   notes: text("notes"), // 備註
-  requiredItineraries: json("requiredItineraries").$type<Array<{ id?: number; name: string; isCustom: boolean }>>(), // 必去行程列表
+  requiredItineraries: json("requiredItineraries").$type<number[]>(), // 必去景點 ID 數組
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
