@@ -172,7 +172,9 @@ export default function Groups() {
                   </div>
                 )}
                 <div className="flex items-center gap-2 pt-2">
-                  <Badge variant="outline">{typeMap[group.type]}</Badge>
+                  {Array.isArray(group.type) && group.type.map((t, idx) => (
+                    <Badge key={idx} variant="outline">{t}</Badge>
+                  ))}
                   <Badge variant="outline">{group.days} 天</Badge>
                 </div>
               </CardContent>

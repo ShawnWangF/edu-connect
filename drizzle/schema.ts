@@ -28,7 +28,7 @@ export const groups = mysqlTable("groups", {
   startDate: date("startDate").notNull(),
   endDate: date("endDate").notNull(),
   days: int("days").notNull(), // 行程天數
-  type: mysqlEnum("type", ["elementary", "middle", "vip"]).notNull(), // 小學/中學/VIP
+  type: json("type").$type<string[]>().notNull(), // 支持多選和自定義類型
   status: mysqlEnum("status", ["preparing", "ongoing", "completed", "cancelled"]).default("preparing").notNull(),
   studentCount: int("studentCount").default(0).notNull(),
   teacherCount: int("teacherCount").default(0).notNull(),
@@ -91,19 +91,23 @@ export const dailyCards = mysqlTable("dailyCards", {
   weatherData: json("weatherData"), // 存儲天氣JSON數據
   
   // 住宿信息
+  hotelId: int("hotelId"), // 關聯酒店資源ID
   hotelName: varchar("hotelName", { length: 255 }),
   hotelAddress: text("hotelAddress"),
   
   // 車輛安排
+  vehicleId: int("vehicleId"), // 關聯車輛ID
   vehiclePlate: varchar("vehiclePlate", { length: 50 }),
   driverName: varchar("driverName", { length: 100 }),
   driverPhone: varchar("driverPhone", { length: 50 }),
   
   // 導遊安排
+  guideId: int("guideId"), // 關聯導過ID
   guideName: varchar("guideName", { length: 100 }),
   guidePhone: varchar("guidePhone", { length: 50 }),
   
   // 安保安排
+  securityId: int("securityId"), // 關聯安保ID
   securityName: varchar("securityName", { length: 100 }),
   securityPhone: varchar("securityPhone", { length: 50 }),
   
@@ -253,6 +257,36 @@ export const attractions = mysqlTable("attractions", {
 });
 
 /**
+ * 導遊資源表
+ */
+export const guides = mysqlTable("guides", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  languages: text("languages"), // 語言能力，逗號分隔
+  specialties: text("specialties"), // 專長領域
+  notes: text("notes"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 安保人員資源表
+ */
+export const securities = mysqlTable("securities", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  idCard: varchar("idCard", { length: 50 }), // 證件號
+  company: varchar("company", { length: 255 }), // 所屬公司
+  notes: text("notes"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
  * 通知表 - 存儲系統通知
  */
 export const notifications = mysqlTable("notifications", {
@@ -292,3 +326,7 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 export type Attraction = typeof attractions.$inferSelect;
 export type InsertAttraction = typeof attractions.$inferInsert;
+export type Guide = typeof guides.$inferSelect;
+export type InsertGuide = typeof guides.$inferInsert;
+export type Security = typeof securities.$inferSelect;
+export type InsertSecurity = typeof securities.$inferInsert;

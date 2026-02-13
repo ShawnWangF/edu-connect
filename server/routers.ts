@@ -156,7 +156,7 @@ export const appRouter = router({
         startDate: z.string(),
         endDate: z.string(),
         days: z.number(),
-        type: z.enum(['elementary', 'middle', 'vip']),
+        type: z.array(z.string()).min(1),
         studentCount: z.number().optional(),
         teacherCount: z.number().optional(),
         totalCount: z.number().optional(),
@@ -194,7 +194,7 @@ export const appRouter = router({
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         days: z.number().optional(),
-        type: z.enum(['elementary', 'middle', 'vip']).optional(),
+        type: z.array(z.string()).optional(),
         status: z.enum(['preparing', 'ongoing', 'completed', 'cancelled']).optional(),
         studentCount: z.number().optional(),
         teacherCount: z.number().optional(),
@@ -715,6 +715,176 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await db.deleteAttraction(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 酒店資源管理
+  hotels: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllHotels();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        address: z.string().optional(),
+        contact: z.string().optional(),
+        phone: z.string().optional(),
+        roomCount: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createHotel(input);
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        address: z.string().optional(),
+        contact: z.string().optional(),
+        phone: z.string().optional(),
+        roomCount: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateHotel(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteHotel(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 車輛資源管理
+  vehicles: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllVehicles();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        plate: z.string(),
+        driverName: z.string().optional(),
+        driverPhone: z.string().optional(),
+        capacity: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createVehicle(input);
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        plate: z.string().optional(),
+        driverName: z.string().optional(),
+        driverPhone: z.string().optional(),
+        capacity: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateVehicle(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteVehicle(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 導遊資源管理
+  guides: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllGuides();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        phone: z.string().optional(),
+        languages: z.string().optional(),
+        specialties: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createGuide(input);
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        phone: z.string().optional(),
+        languages: z.string().optional(),
+        specialties: z.string().optional(),
+        notes: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateGuide(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteGuide(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 安保人員資源管理
+  securities: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllSecurities();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        phone: z.string().optional(),
+        idCard: z.string().optional(),
+        company: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createSecurity(input);
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        phone: z.string().optional(),
+        idCard: z.string().optional(),
+        company: z.string().optional(),
+        notes: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateSecurity(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteSecurity(input.id);
         return { success: true };
       }),
   }),

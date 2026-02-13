@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions } from "../drizzle/schema";
+import { InsertUser, users, groups, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 
@@ -459,4 +459,156 @@ export async function deleteAttraction(id: number) {
   if (!db) throw new Error("Database not available");
 
   await db.delete(attractions).where(eq(attractions.id, id));
+}
+
+// 酒店資源管理
+export async function getAllHotels() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(hotels);
+}
+
+export async function getHotelById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(hotels).where(eq(hotels.id, id));
+  return result[0] || null;
+}
+
+export async function createHotel(hotelData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(hotels).values(hotelData);
+  return result;
+}
+
+export async function updateHotel(id: number, hotelData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(hotels).set(hotelData).where(eq(hotels.id, id));
+}
+
+export async function deleteHotel(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(hotels).where(eq(hotels.id, id));
+}
+
+// 車輛資源管理
+export async function getAllVehicles() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(vehicles);
+}
+
+export async function getVehicleById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(vehicles).where(eq(vehicles.id, id));
+  return result[0] || null;
+}
+
+export async function createVehicle(vehicleData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(vehicles).values(vehicleData);
+  return result;
+}
+
+export async function updateVehicle(id: number, vehicleData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(vehicles).set(vehicleData).where(eq(vehicles.id, id));
+}
+
+export async function deleteVehicle(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(vehicles).where(eq(vehicles.id, id));
+}
+
+// 導遊資源管理
+export async function getAllGuides() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(guides);
+}
+
+export async function getGuideById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(guides).where(eq(guides.id, id));
+  return result[0] || null;
+}
+
+export async function createGuide(guideData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(guides).values(guideData);
+  return result;
+}
+
+export async function updateGuide(id: number, guideData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(guides).set(guideData).where(eq(guides.id, id));
+}
+
+export async function deleteGuide(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(guides).where(eq(guides.id, id));
+}
+
+// 安保人員資源管理
+export async function getAllSecurities() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(securities);
+}
+
+export async function getSecurityById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(securities).where(eq(securities.id, id));
+  return result[0] || null;
+}
+
+export async function createSecurity(securityData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(securities).values(securityData);
+  return result;
+}
+
+export async function updateSecurity(id: number, securityData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(securities).set(securityData).where(eq(securities.id, id));
+}
+
+export async function deleteSecurity(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(securities).where(eq(securities.id, id));
 }

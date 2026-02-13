@@ -19,9 +19,9 @@ export default function Reports() {
 
   // 按類型統計團組
   const groupsByType = {
-    elementary: groups?.filter((g) => g.type === "elementary").length || 0,
-    middle: groups?.filter((g) => g.type === "middle").length || 0,
-    vip: groups?.filter((g) => g.type === "vip").length || 0,
+    elementary: groups?.filter((g) => Array.isArray(g.type) && g.type.includes("小學")).length || 0,
+    middle: groups?.filter((g) => Array.isArray(g.type) && g.type.includes("中學")).length || 0,
+    vip: groups?.filter((g) => Array.isArray(g.type) && g.type.includes("VIP")).length || 0,
   };
 
   // 景點使用統計（簡化版）

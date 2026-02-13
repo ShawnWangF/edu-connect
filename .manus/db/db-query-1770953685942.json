@@ -1,0 +1,15 @@
+{
+  "query": "SELECT id, name, type FROM `groups`;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, type FROM `groups`;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "江苏六天五夜粤港团",
+      "type": "middle"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttype\n1\t江苏六天五夜粤港团\tmiddle\n",
+  "stderr": "",
+  "execution_time_ms": 1687
+}

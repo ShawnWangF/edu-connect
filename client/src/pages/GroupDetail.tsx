@@ -79,7 +79,9 @@ export default function GroupDetail() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">團組類型</p>
-              <p className="text-lg font-medium mt-1">{typeMap[group.type]} · {group.days} 天</p>
+              <p className="text-lg font-medium mt-1">
+                {Array.isArray(group.type) ? group.type.join(", ") : group.type} · {group.days} 天
+              </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">參與人數</p>
@@ -490,6 +492,13 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
 function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<any>({});
+
+  // 查詢所有資源
+  const { data: hotels = [] } = trpc.hotels.list.useQuery();
+  const { data: vehicles = [] } = trpc.vehicles.list.useQuery();
+  const { data: guides = [] } = trpc.guides.list.useQuery();
+  const { data: securities = [] } = trpc.securities.list.useQuery();
 
   const upsertMutation = trpc.dailyCards.upsert.useMutation({
     onSuccess: () => {
@@ -601,54 +610,185 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
 
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">住宿信息</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor="hotelName">酒店名稱</Label>
-                    <Input id="hotelName" name="hotelName" defaultValue={selectedCard?.hotelName} />
+                    <Label>選擇酒店資源</Label>
+                    <Select
+                      value={formData.hotelId?.toString() || ""}
+                      onValueChange={(value) => {
+                        const hotel = hotels.find((h: any) => h.id.toString() === value);
+                        if (hotel) {
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            hotelId: hotel.id,
+                            hotelName: hotel.name,
+                            hotelAddress: hotel.address || "",
+                          }));
+                          // 更新表單字段
+                          (document.getElementById("hotelName") as HTMLInputElement).value = hotel.name;
+                          (document.getElementById("hotelAddress") as HTMLInputElement).value = hotel.address || "";
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="從資源庫選擇酒店" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hotels.filter((h: any) => h.isActive !== false).map((hotel: any) => (
+                          <SelectItem key={hotel.id} value={hotel.id.toString()}>
+                            {hotel.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hotelAddress">酒店地址</Label>
-                    <Input id="hotelAddress" name="hotelAddress" defaultValue={selectedCard?.hotelAddress} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hotelName">酒店名稱</Label>
+                      <Input id="hotelName" name="hotelName" defaultValue={selectedCard?.hotelName} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hotelAddress">酒店地址</Label>
+                      <Input id="hotelAddress" name="hotelAddress" defaultValue={selectedCard?.hotelAddress} />
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">車輛安排</h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor="vehiclePlate">車牌號</Label>
-                    <Input id="vehiclePlate" name="vehiclePlate" defaultValue={selectedCard?.vehiclePlate} />
+                    <Label>選擇車輛資源</Label>
+                    <Select
+                      value={formData.vehicleId?.toString() || ""}
+                      onValueChange={(value) => {
+                        const vehicle = vehicles.find((v: any) => v.id.toString() === value);
+                        if (vehicle) {
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            vehicleId: vehicle.id,
+                            vehiclePlate: vehicle.plate,
+                            driverName: vehicle.driverName || "",
+                            driverPhone: vehicle.driverPhone || "",
+                          }));
+                          (document.getElementById("vehiclePlate") as HTMLInputElement).value = vehicle.plate;
+                          (document.getElementById("driverName") as HTMLInputElement).value = vehicle.driverName || "";
+                          (document.getElementById("driverPhone") as HTMLInputElement).value = vehicle.driverPhone || "";
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="從資源庫選擇車輛" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vehicles.filter((v: any) => v.isActive !== false).map((vehicle: any) => (
+                          <SelectItem key={vehicle.id} value={vehicle.id.toString()}>
+                            {vehicle.plate}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="driverName">司機姓名</Label>
-                    <Input id="driverName" name="driverName" defaultValue={selectedCard?.driverName} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="driverPhone">司機電話</Label>
-                    <Input id="driverPhone" name="driverPhone" defaultValue={selectedCard?.driverPhone} />
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="vehiclePlate">車牌號</Label>
+                      <Input id="vehiclePlate" name="vehiclePlate" defaultValue={selectedCard?.vehiclePlate} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="driverName">司機姓名</Label>
+                      <Input id="driverName" name="driverName" defaultValue={selectedCard?.driverName} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="driverPhone">司機電話</Label>
+                      <Input id="driverPhone" name="driverPhone" defaultValue={selectedCard?.driverPhone} />
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">導遊和安保</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="guideName">導遊姓名</Label>
-                    <Input id="guideName" name="guideName" defaultValue={selectedCard?.guideName} />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>選擇導遊資源</Label>
+                      <Select
+                        value={formData.guideId?.toString() || ""}
+                        onValueChange={(value) => {
+                          const guide = guides.find((g: any) => g.id.toString() === value);
+                          if (guide) {
+                            setFormData((prev: any) => ({
+                              ...prev,
+                              guideId: guide.id,
+                              guideName: guide.name,
+                              guidePhone: guide.phone || "",
+                            }));
+                            (document.getElementById("guideName") as HTMLInputElement).value = guide.name;
+                            (document.getElementById("guidePhone") as HTMLInputElement).value = guide.phone || "";
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="從資源庫選擇導遊" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {guides.filter((g: any) => g.isActive !== false).map((guide: any) => (
+                            <SelectItem key={guide.id} value={guide.id.toString()}>
+                              {guide.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>選擇安保資源</Label>
+                      <Select
+                        value={formData.securityId?.toString() || ""}
+                        onValueChange={(value) => {
+                          const security = securities.find((s: any) => s.id.toString() === value);
+                          if (security) {
+                            setFormData((prev: any) => ({
+                              ...prev,
+                              securityId: security.id,
+                              securityName: security.name,
+                              securityPhone: security.phone || "",
+                            }));
+                            (document.getElementById("securityName") as HTMLInputElement).value = security.name;
+                            (document.getElementById("securityPhone") as HTMLInputElement).value = security.phone || "";
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="從資源庫選擇安保" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {securities.filter((s: any) => s.isActive !== false).map((security: any) => (
+                            <SelectItem key={security.id} value={security.id.toString()}>
+                              {security.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="guidePhone">導遊電話</Label>
-                    <Input id="guidePhone" name="guidePhone" defaultValue={selectedCard?.guidePhone} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="securityName">安保姓名</Label>
-                    <Input id="securityName" name="securityName" defaultValue={selectedCard?.securityName} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="securityPhone">安保電話</Label>
-                    <Input id="securityPhone" name="securityPhone" defaultValue={selectedCard?.securityPhone} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="guideName">導遊姓名</Label>
+                      <Input id="guideName" name="guideName" defaultValue={selectedCard?.guideName} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="guidePhone">導遊電話</Label>
+                      <Input id="guidePhone" name="guidePhone" defaultValue={selectedCard?.guidePhone} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="securityName">安保姓名</Label>
+                      <Input id="securityName" name="securityName" defaultValue={selectedCard?.securityName} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="securityPhone">安保電話</Label>
+                      <Input id="securityPhone" name="securityPhone" defaultValue={selectedCard?.securityPhone} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1211,17 +1351,16 @@ function MembersTab({ groupId, members, utils }: any) {
                           {member.gender === "male" && "男"}
                           {member.gender === "female" && "女"}
                           {member.gender === "other" && "其他"}
-                          {!member.gender && "-"}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap">{member.phone || "-"}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">{member.idCard || "-"}</td>
-                        {/* 顯示自定義字段值，按照表頭順序 */}
+                        <td className="px-3 py-2 whitespace-nowrap">{member.phone}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{member.idCard}</td>
+                        {/* 顯示自定義字段值，空值不顯示 */}
                         {customFieldKeysArray.map((key) => (
-                          <td key={key} className="px-3 py-2 whitespace-nowrap">
-                            {customFields[key] || "-"}
+                          <td key={key} className={`px-3 py-2 whitespace-nowrap ${!customFields[key] ? 'bg-yellow-100' : ''}`}>
+                            {customFields[key]}
                           </td>
                         ))}
-                        <td className="px-3 py-2 max-w-xs truncate">{member.notes || "-"}</td>
+                        <td className="px-3 py-2 max-w-xs truncate">{member.notes}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center justify-center gap-1">
                             <Button

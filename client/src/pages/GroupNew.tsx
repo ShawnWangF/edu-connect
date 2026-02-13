@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import { format, addDays } from "date-fns";
 
 export default function GroupNew() {
@@ -19,7 +20,7 @@ export default function GroupNew() {
     startDate: format(new Date(), "yyyy-MM-dd"),
     endDate: format(addDays(new Date(), 7), "yyyy-MM-dd"),
     days: 7,
-    type: "middle" as "elementary" | "middle" | "vip",
+    type: ["中學"] as string[],
     studentCount: 0,
     teacherCount: 0,
     totalCount: 0,
@@ -31,6 +32,8 @@ export default function GroupNew() {
     emergencyPhone: "",
     notes: "",
   });
+
+  const [customType, setCustomType] = useState("");
 
   const createMutation = trpc.groups.create.useMutation({
     onSuccess: () => {
@@ -47,6 +50,11 @@ export default function GroupNew() {
     
     if (!formData.name || !formData.code) {
       toast.error("請填寫團組名稱和編號");
+      return;
+    }
+
+    if (formData.type.length === 0) {
+      toast.error("請選擇至少一個團組類型");
       return;
     }
 
@@ -75,6 +83,32 @@ export default function GroupNew() {
     });
   };
 
+  const toggleType = (type: string) => {
+    setFormData(prev => ({
+      ...prev,
+      type: prev.type.includes(type)
+        ? prev.type.filter(t => t !== type)
+        : [...prev.type, type]
+    }));
+  };
+
+  const addCustomType = () => {
+    if (customType.trim() && !formData.type.includes(customType.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        type: [...prev.type, customType.trim()]
+      }));
+      setCustomType("");
+    }
+  };
+
+  const removeType = (type: string) => {
+    setFormData(prev => ({
+      ...prev,
+      type: prev.type.filter(t => t !== type)
+    }));
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -82,7 +116,7 @@ export default function GroupNew() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">新建團組</h1>
+          <h1 className="text-3xl font-bold">創建新團組</h1>
           <p className="text-muted-foreground mt-1">填寫團組基本信息</p>
         </div>
       </div>
@@ -93,14 +127,15 @@ export default function GroupNew() {
             <CardTitle>基本信息</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">團組名稱 *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => updateField("name", e.target.value)}
-                  placeholder="例如：深圳中學2024春季交流團"
+                  placeholder="例如：江蘇六天五夜粵港團"
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -109,73 +144,96 @@ export default function GroupNew() {
                   id="code"
                   value={formData.code}
                   onChange={(e) => updateField("code", e.target.value)}
-                  placeholder="例如：SZ2024001"
+                  placeholder="例如：TEST001"
+                  required
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>團組類型 *</Label>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {["小學", "中學", "VIP"].map((type) => (
+                    <div key={type} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`type-${type}`}
+                        checked={formData.type.includes(type)}
+                        onCheckedChange={() => toggleType(type)}
+                      />
+                      <Label htmlFor={`type-${type}`} className="cursor-pointer">
+                        {type}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="自定義類型"
+                    value={customType}
+                    onChange={(e) => setCustomType(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomType();
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={addCustomType}>
+                    添加
+                  </Button>
+                </div>
+                {formData.type.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.type.map((type) => (
+                      <Badge key={type} variant="secondary" className="gap-1">
+                        {type}
+                        <X
+                          className="h-3 w-3 cursor-pointer"
+                          onClick={() => removeType(type)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate">開始日期</Label>
+                <Label htmlFor="startDate">開始日期 *</Label>
                 <Input
                   id="startDate"
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => updateField("startDate", e.target.value)}
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endDate">結束日期</Label>
+                <Label htmlFor="endDate">結束日期 *</Label>
                 <Input
                   id="endDate"
                   type="date"
                   value={formData.endDate}
                   onChange={(e) => updateField("endDate", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="days">行程天數</Label>
-                <Input
-                  id="days"
-                  type="number"
-                  value={formData.days}
-                  readOnly
-                  className="bg-muted"
+                  required
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">團組類型</Label>
-                <Select value={formData.type} onValueChange={(value: any) => updateField("type", value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="elementary">小學</SelectItem>
-                    <SelectItem value="middle">中學</SelectItem>
-                    <SelectItem value="vip">VIP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hotel">住宿酒店</Label>
-                <Input
-                  id="hotel"
-                  value={formData.hotel}
-                  onChange={(e) => updateField("hotel", e.target.value)}
-                  placeholder="例如：香港九龍酒店"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>行程天數</Label>
+              <div className="text-2xl font-bold text-primary">{formData.days} 天</div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="studentCount">學生人數</Label>
                 <Input
                   id="studentCount"
                   type="number"
+                  min="0"
                   value={formData.studentCount}
                   onChange={(e) => updateField("studentCount", parseInt(e.target.value) || 0)}
                 />
@@ -185,30 +243,49 @@ export default function GroupNew() {
                 <Input
                   id="teacherCount"
                   type="number"
+                  min="0"
                   value={formData.teacherCount}
                   onChange={(e) => updateField("teacherCount", parseInt(e.target.value) || 0)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="totalCount">總人數</Label>
-                <Input
-                  id="totalCount"
-                  type="number"
-                  value={formData.totalCount}
-                  readOnly
-                  className="bg-muted"
-                />
+                <Label>總人數</Label>
+                <div className="text-2xl font-bold text-primary">{formData.totalCount}</div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="hotel">住宿酒店</Label>
+              <Input
+                id="hotel"
+                value={formData.hotel}
+                onChange={(e) => updateField("hotel", e.target.value)}
+                placeholder="例如：香港迪士尼樂園酒店"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="color">標識顏色</Label>
+              <div className="flex gap-4 items-center">
+                <Input
+                  id="color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => updateField("color", e.target.value)}
+                  className="w-20 h-10"
+                />
+                <div className="flex-1 h-10 rounded-md border" style={{ backgroundColor: formData.color }} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="contact">聯系人</Label>
                 <Input
                   id="contact"
                   value={formData.contact}
                   onChange={(e) => updateField("contact", e.target.value)}
-                  placeholder="聯系人姓名"
+                  placeholder="例如：張老師"
                 />
               </div>
               <div className="space-y-2">
@@ -217,19 +294,19 @@ export default function GroupNew() {
                   id="phone"
                   value={formData.phone}
                   onChange={(e) => updateField("phone", e.target.value)}
-                  placeholder="聯系電話"
+                  placeholder="例如：13800138000"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="emergencyContact">緊急聯系人</Label>
                 <Input
                   id="emergencyContact"
                   value={formData.emergencyContact}
                   onChange={(e) => updateField("emergencyContact", e.target.value)}
-                  placeholder="緊急聯系人姓名"
+                  placeholder="例如：李主任"
                 />
               </div>
               <div className="space-y-2">
@@ -238,7 +315,7 @@ export default function GroupNew() {
                   id="emergencyPhone"
                   value={formData.emergencyPhone}
                   onChange={(e) => updateField("emergencyPhone", e.target.value)}
-                  placeholder="緊急聯系電話"
+                  placeholder="例如：13900139000"
                 />
               </div>
             </div>
@@ -249,24 +326,18 @@ export default function GroupNew() {
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => updateField("notes", e.target.value)}
-                placeholder="其他備註信息..."
+                placeholder="其他需要說明的信息..."
                 rows={4}
               />
             </div>
 
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-4">
+              <Button type="submit" disabled={createMutation.isPending || formData.type.length === 0}>
+                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                創建團組
+              </Button>
               <Button type="button" variant="outline" onClick={() => setLocation("/groups")}>
                 取消
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    創建中...
-                  </>
-                ) : (
-                  "創建團組"
-                )}
               </Button>
             </div>
           </CardContent>
