@@ -39,7 +39,7 @@ export default function GroupDetail() {
   const { data: members } = trpc.members.listByGroup.useQuery({ groupId });
   const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId });
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId });
-  const { data: attractions } = trpc.attractions.list.useQuery();
+  const { data: attractions } = trpc.locations.list.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -1756,7 +1756,7 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
   const [itineraries, setItineraries] = useState<number[]>(currentItineraries);
   const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
   
-  const { data: attractions } = trpc.attractions.list.useQuery();
+  const { data: attractions } = trpc.locations.list.useQuery();
   
   const updateGroup = trpc.groups.update.useMutation({
     onSuccess: () => {
