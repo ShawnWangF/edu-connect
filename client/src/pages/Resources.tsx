@@ -8,13 +8,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Hotel, Car, Users, Shield, Plus, Edit, Trash2 } from "lucide-react";
+import { Hotel, Car, Users, Shield, MapPin, Plus, Edit, Trash2, Clock, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type TimeSlot = {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+};
+
+const WEEKDAYS = [
+  { value: 0, label: "週日" },
+  { value: 1, label: "週一" },
+  { value: 2, label: "週二" },
+  { value: 3, label: "週三" },
+  { value: 4, label: "週四" },
+  { value: 5, label: "週五" },
+  { value: 6, label: "週六" },
+];
 
 export default function Resources() {
   const [activeTab, setActiveTab] = useState("hotels");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [resourceType, setResourceType] = useState<"hotels" | "vehicles" | "guides" | "securities">("hotels");
+  const [resourceType, setResourceType] = useState<"hotels" | "vehicles" | "guides" | "securities" | "attractions">("hotels");
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [isAlwaysUnavailable, setIsAlwaysUnavailable] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -23,6 +43,7 @@ export default function Resources() {
   const { data: vehicles = [] } = trpc.vehicles.list.useQuery();
   const { data: guides = [] } = trpc.guides.list.useQuery();
   const { data: securities = [] } = trpc.securities.list.useQuery();
+  const { data: attractions = [] } = trpc.locations.list.useQuery();
 
   // 創建mutations
   const createHotelMutation = trpc.hotels.create.useMutation({
@@ -131,15 +152,54 @@ export default function Resources() {
     onError: (error) => toast.error(error.message),
   });
 
+  // 景點 mutations
+  const createAttractionMutation = trpc.locations.create.useMutation({
+    onSuccess: () => {
+      toast.success("景點創建成功");
+      utils.locations.list.invalidate();
+      handleCloseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateAttractionMutation = trpc.locations.update.useMutation({
+    onSuccess: () => {
+      toast.success("景點更新成功");
+      utils.locations.list.invalidate();
+      handleCloseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteAttractionMutation = trpc.locations.delete.useMutation({
+    onSuccess: () => {
+      toast.success("景點刪除成功");
+      utils.locations.list.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const handleOpenDialog = (type: typeof resourceType, item?: any) => {
     setResourceType(type);
     setEditingItem(item || null);
+    
+    // 如果是景點，初始化不可用時間狀態
+    if (type === "attractions" && item) {
+      setIsAlwaysUnavailable(item.isAlwaysUnavailable || false);
+      setTimeSlots(Array.isArray(item.unavailableTimeSlots) ? item.unavailableTimeSlots : []);
+    } else {
+      setIsAlwaysUnavailable(false);
+      setTimeSlots([]);
+    }
+    
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingItem(null);
+    setTimeSlots([]);
+    setIsAlwaysUnavailable(false);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -168,6 +228,13 @@ export default function Resources() {
         case "securities":
           updateSecurityMutation.mutate(data);
           break;
+        case "attractions":
+          updateAttractionMutation.mutate({
+            ...data,
+            isAlwaysUnavailable,
+            unavailableTimeSlots: timeSlots,
+          });
+          break;
       }
     } else {
       switch (resourceType) {
@@ -182,6 +249,13 @@ export default function Resources() {
           break;
         case "securities":
           createSecurityMutation.mutate(data);
+          break;
+        case "attractions":
+          createAttractionMutation.mutate({
+            ...data,
+            isAlwaysUnavailable,
+            unavailableTimeSlots: timeSlots,
+          });
           break;
       }
     }
@@ -203,6 +277,9 @@ export default function Resources() {
       case "securities":
         deleteSecurityMutation.mutate({ id });
         break;
+      case "attractions":
+        deleteAttractionMutation.mutate({ id });
+        break;
     }
   };
 
@@ -210,11 +287,11 @@ export default function Resources() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">資源管理</h1>
-        <p className="text-muted-foreground mt-1">管理酒店、車輛、導遊、安保等資源信息</p>
+        <p className="text-muted-foreground mt-1">管理酒店、車輛、導遊、安保、景點等資源信息</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="hotels" className="flex items-center gap-2">
             <Hotel className="h-4 w-4" />
             酒店
@@ -230,6 +307,10 @@ export default function Resources() {
           <TabsTrigger value="securities" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             安保
+          </TabsTrigger>
+          <TabsTrigger value="attractions" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            景點
           </TabsTrigger>
         </TabsList>
 
@@ -371,6 +452,53 @@ export default function Resources() {
             ))}
           </div>
         </TabsContent>
+
+        {/* 景點 */}
+        <TabsContent value="attractions" className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => handleOpenDialog("attractions")}>
+              <Plus className="mr-2 h-4 w-4" />
+              添加景點
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {attractions.map((attraction: any) => (
+              <Card key={attraction.id}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{attraction.name}</span>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => handleOpenDialog("attractions", attraction)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleDelete("attractions", attraction.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {attraction.address && <p>地址：{attraction.address}</p>}
+                  {attraction.openingHours && <p>開放時間：{attraction.openingHours}</p>}
+                  {attraction.capacity && <p>最大接待：{attraction.capacity}人</p>}
+                  {attraction.isAlwaysUnavailable && (
+                    <p className="text-destructive flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      永久不可用
+                    </p>
+                  )}
+                  {!attraction.isAlwaysUnavailable && Array.isArray(attraction.unavailableTimeSlots) && attraction.unavailableTimeSlots.length > 0 && (
+                    <p className="text-amber-600 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {attraction.unavailableTimeSlots.length}個不可用時間段
+                    </p>
+                  )}
+                  {attraction.notes && <p className="text-muted-foreground">{attraction.notes}</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* 通用對話框 */}
@@ -475,6 +603,115 @@ export default function Resources() {
                   <Label htmlFor="company">所屬公司</Label>
                   <Input id="company" name="company" defaultValue={editingItem?.company} />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">備註</Label>
+                  <Textarea id="notes" name="notes" defaultValue={editingItem?.notes} rows={3} />
+                </div>
+              </>
+            )}
+
+            {resourceType === "attractions" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="name">景點名稱 *</Label>
+                  <Input id="name" name="name" defaultValue={editingItem?.name} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">地址</Label>
+                  <Input id="address" name="address" defaultValue={editingItem?.address} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="openingHours">開放時間</Label>
+                  <Input id="openingHours" name="openingHours" defaultValue={editingItem?.openingHours} placeholder="例如：09:00-18:00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="capacity">最大接待人數</Label>
+                  <Input id="capacity" name="capacity" type="number" defaultValue={editingItem?.capacity} />
+                </div>
+                
+                {/* 不可用時間管理 */}
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="alwaysUnavailable"
+                      checked={isAlwaysUnavailable}
+                      onCheckedChange={(checked) => setIsAlwaysUnavailable(checked as boolean)}
+                    />
+                    <Label htmlFor="alwaysUnavailable" className="font-normal">
+                      此景點永久不可用
+                    </Label>
+                  </div>
+
+                  {!isAlwaysUnavailable && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>不可用時間段</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTimeSlots([...timeSlots, { dayOfWeek: 1, startTime: "09:00", endTime: "17:00" }])}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          添加時間段
+                        </Button>
+                      </div>
+                      {timeSlots.map((slot, index) => (
+                        <div key={index} className="flex gap-2 items-center">
+                          <Select
+                            value={slot.dayOfWeek.toString()}
+                            onValueChange={(value) => {
+                              const newSlots = [...timeSlots];
+                              newSlots[index].dayOfWeek = parseInt(value);
+                              setTimeSlots(newSlots);
+                            }}
+                          >
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {WEEKDAYS.map((day) => (
+                                <SelectItem key={day.value} value={day.value.toString()}>
+                                  {day.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="time"
+                            value={slot.startTime}
+                            onChange={(e) => {
+                              const newSlots = [...timeSlots];
+                              newSlots[index].startTime = e.target.value;
+                              setTimeSlots(newSlots);
+                            }}
+                            className="w-32"
+                          />
+                          <span>至</span>
+                          <Input
+                            type="time"
+                            value={slot.endTime}
+                            onChange={(e) => {
+                              const newSlots = [...timeSlots];
+                              newSlots[index].endTime = e.target.value;
+                              setTimeSlots(newSlots);
+                            }}
+                            className="w-32"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setTimeSlots(timeSlots.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="notes">備註</Label>
                   <Textarea id="notes" name="notes" defaultValue={editingItem?.notes} rows={3} />
