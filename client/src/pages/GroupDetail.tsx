@@ -225,13 +225,22 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    // 當選擇景點時，手動設置locationName
+    let locationName = formData.get("locationName") as string;
+    if (selectedAttractionId && selectedAttractionId !== "manual") {
+      const selectedAttraction = attractions.find((a: any) => a.id.toString() === selectedAttractionId);
+      if (selectedAttraction) {
+        locationName = selectedAttraction.name;
+      }
+    }
+    
     const data = {
       groupId,
       date: formData.get("date") as string,
       dayNumber: parseInt(formData.get("dayNumber") as string),
       startTime: (formData.get("startTime") as string) || undefined,
       endTime: (formData.get("endTime") as string) || undefined,
-      locationName: (formData.get("locationName") as string) || undefined,
+      locationName: locationName || undefined,
       description: (formData.get("description") as string) || undefined,
       notes: (formData.get("notes") as string) || undefined,
     };
