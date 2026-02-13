@@ -164,7 +164,7 @@ export default function GroupDetail() {
         </TabsList>
 
         <TabsContent value="itinerary">
-          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} />
+          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} attractions={attractions} />
         </TabsContent>
 
         <TabsContent value="daily">
@@ -184,13 +184,13 @@ export default function GroupDetail() {
 }
 
 // 行程詳情標籤頁
-function ItineraryTab({ groupId, itineraries, utils, group }: any) {
+function ItineraryTab({ groupId, itineraries, utils, group, attractions }: any) {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
   const [conflictWarning, setConflictWarning] = useState<string>("");
   
-  const { data: attractions = [] } = trpc.attractions.list.useQuery();
+  const { data: itineraryAttractions = [] } = trpc.locations.list.useQuery();
 
   const createMutation = trpc.itineraries.create.useMutation({
     onSuccess: () => {
@@ -233,7 +233,7 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
     // 當選擇景點時，手動設置locationName
     let locationName = formData.get("locationName") as string;
     if (selectedAttractionId && selectedAttractionId !== "manual") {
-      const selectedAttraction = attractions.find((a: any) => a.id.toString() === selectedAttractionId);
+      const selectedAttraction = itineraryAttractions.find((a: any) => a.id.toString() === selectedAttractionId);
       if (selectedAttraction) {
         locationName = selectedAttraction.name;
       }
@@ -268,7 +268,7 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
 
   // 檢查未安排的必去行程
   const unscheduledRequired = useMemo(() => {
-    if (!group.requiredItineraries || group.requiredItineraries.length === 0) {
+    if (!group.requiredItineraries || group.requiredItineraries.length === 0 || !attractions) {
       return [];
     }
     
@@ -276,10 +276,15 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
       (itineraries || []).map((item: any) => item.attractionId).filter(Boolean)
     );
     
-    return group.requiredItineraries.filter((attractionId: number) => 
+    const unscheduledIds = group.requiredItineraries.filter((attractionId: number) => 
       !scheduledAttractionIds.has(attractionId)
     );
-  }, [group.requiredItineraries, itineraries]);
+    
+    // 將ID轉換為完整的景點對象
+    return unscheduledIds.map((attractionId: number) => 
+      attractions.find((a: any) => a.id === attractionId)
+    ).filter(Boolean);
+  }, [group.requiredItineraries, itineraries, attractions]);
 
   return (
     <Card>
@@ -354,7 +359,7 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
                         手動輸入地點
                       </div>
                     </SelectItem>
-                    {attractions.map((attraction: any) => (
+                    {itineraryAttractions.map((attraction: any) => (
                       <SelectItem key={attraction.id} value={attraction.id.toString()}>
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4" />
@@ -373,7 +378,7 @@ function ItineraryTab({ groupId, itineraries, utils, group }: any) {
                   name="locationName" 
                   defaultValue={selectedItem?.locationName || ""}
                   value={selectedAttractionId && selectedAttractionId !== "manual" 
-                    ? attractions.find((a: any) => a.id.toString() === selectedAttractionId)?.name || ""
+                    ? itineraryAttractions.find((a: any) => a.id.toString() === selectedAttractionId)?.name || ""
                     : undefined
                   }
                   disabled={!!(selectedAttractionId && selectedAttractionId !== "manual")}

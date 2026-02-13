@@ -1,0 +1,28 @@
+{
+  "query": "SELECT id, name, code, color FROM `groups` ORDER BY startDate ASC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, code, color FROM `groups` ORDER BY startDate ASC LIMIT 5;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "江苏六天五夜粤港团2",
+      "code": "803888",
+      "color": "#52c41a"
+    },
+    {
+      "id": "60002",
+      "name": "江苏六天五夜粤港团3",
+      "code": "803887",
+      "color": "#5f5874"
+    },
+    {
+      "id": "1",
+      "name": "江苏六天五夜粤港团",
+      "code": "TEST001",
+      "color": "#f769ae"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcode\tcolor\n60001\t江苏六天五夜粤港团2\t803888\t#52c41a\n60002\t江苏六天五夜粤港团3\t803887\t#5f5874\n1\t江苏六天五夜粤港团\tTEST001\t#f769ae\n",
+  "stderr": "",
+  "execution_time_ms": 1735
+}
