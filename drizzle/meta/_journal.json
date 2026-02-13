@@ -36,6 +36,20 @@
       "when": 1770900950076,
       "tag": "0004_odd_vivisector",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1770950642248,
+      "tag": "0005_smiling_the_spike",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1770950700784,
+      "tag": "0006_acoustic_thunderbird",
+      "breakpoints": true
     }
   ]
 }

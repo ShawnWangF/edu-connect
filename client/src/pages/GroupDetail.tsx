@@ -116,6 +116,25 @@ export default function GroupDetail() {
               <p className="mt-2">{group.notes}</p>
             </div>
           )}
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground">必去行程</p>
+              <RequiredItinerariesDialog groupId={groupId} currentItineraries={group.requiredItineraries || []} utils={utils} />
+            </div>
+            {group.requiredItineraries && group.requiredItineraries.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {group.requiredItineraries.map((item, index) => (
+                  <Badge key={index} variant="outline" className="text-sm">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    {item.name}
+                    {item.isCustom && <span className="ml-1 text-xs text-muted-foreground">(自定義)</span>}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">未設置必去行程</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -1532,5 +1551,135 @@ function FilesTab({ groupId, files, utils }: any) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// 必去行程配置對話框
+function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
+  groupId: number;
+  currentItineraries: Array<{ id?: number; name: string; isCustom: boolean }>;
+  utils: any;
+}) {
+  const [open, setOpen] = useState(false);
+  const [itineraries, setItineraries] = useState<Array<{ id?: number; name: string; isCustom: boolean }>>(currentItineraries);
+  const [newItinerary, setNewItinerary] = useState({ selectedId: "", customName: "" });
+  
+  const { data: attractions } = trpc.attractions.list.useQuery();
+  
+  const updateGroup = trpc.groups.update.useMutation({
+    onSuccess: () => {
+      utils.groups.get.invalidate({ id: groupId });
+      toast.success("必去行程更新成功");
+      setOpen(false);
+    },
+    onError: () => {
+      toast.error("更新失敗");
+    },
+  });
+  
+  const handleAddItinerary = () => {
+    if (newItinerary.selectedId === "custom") {
+      if (!newItinerary.customName.trim()) {
+        toast.error("請輸入自定義行程名稱");
+        return;
+      }
+      setItineraries([...itineraries, { name: newItinerary.customName, isCustom: true }]);
+      setNewItinerary({ selectedId: "", customName: "" });
+    } else if (newItinerary.selectedId) {
+      const attraction = attractions?.find(a => a.id === parseInt(newItinerary.selectedId));
+      if (attraction) {
+        setItineraries([...itineraries, { id: attraction.id, name: attraction.name, isCustom: false }]);
+        setNewItinerary({ selectedId: "", customName: "" });
+      }
+    }
+  };
+  
+  const handleRemoveItinerary = (index: number) => {
+    setItineraries(itineraries.filter((_, i) => i !== index));
+  };
+  
+  const handleSave = () => {
+    updateGroup.mutate({
+      id: groupId,
+      requiredItineraries: itineraries,
+    });
+  };
+  
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Pencil className="h-4 w-4 mr-1" />
+          編輯
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>配置必去行程</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>已選擇的必去行程</Label>
+            {itineraries.length > 0 ? (
+              <div className="flex flex-wrap gap-2 p-3 border rounded-lg">
+                {itineraries.map((item, index) => (
+                  <Badge key={index} variant="secondary" className="text-sm">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    {item.name}
+                    {item.isCustom && <span className="ml-1 text-xs">(自定義)</span>}
+                    <button
+                      onClick={() => handleRemoveItinerary(index)}
+                      className="ml-2 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground p-3 border rounded-lg">還未添加必去行程</p>
+            )}</div>
+          
+          <div className="space-y-2">
+            <Label>添加行程</Label>
+            <Select value={newItinerary.selectedId} onValueChange={(value) => setNewItinerary({ ...newItinerary, selectedId: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇景點或自定義輸入" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="custom">自定義輸入</SelectItem>
+                {attractions?.map((attraction) => (
+                  <SelectItem key={attraction.id} value={attraction.id.toString()}>
+                    {attraction.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {newItinerary.selectedId === "custom" && (
+              <Input
+                placeholder="輸入自定義行程名稱"
+                value={newItinerary.customName}
+                onChange={(e) => setNewItinerary({ ...newItinerary, customName: e.target.value })}
+              />
+            )}
+            
+            <Button onClick={handleAddItinerary} className="w-full" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              添加
+            </Button>
+          </div>
+          
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSave} disabled={updateGroup.isPending}>
+              保存
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
