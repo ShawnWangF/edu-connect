@@ -828,6 +828,86 @@ export const appRouter = router({
         await db.deleteAttraction(input.id);
         return { success: true };
       }),
+    
+    checkConstraints: protectedProcedure
+      .input(z.object({
+        attractionId: z.number(),
+        date: z.string(), // YYYY-MM-DD
+        startTime: z.string(), // HH:MM
+        endTime: z.string(), // HH:MM
+      }))
+      .query(async ({ input }) => {
+        const attraction = await db.getAttractionById(input.attractionId);
+        if (!attraction) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '景點不存在' });
+        }
+        
+        const warnings: string[] = [];
+        const date = new Date(input.date);
+        const dayOfWeek = date.getDay(); // 0=Sunday, 6=Saturday
+        
+        // 檢查休館日
+        if (attraction.closedDays) {
+          try {
+            const closedDays = typeof attraction.closedDays === 'string'
+              ? JSON.parse(attraction.closedDays)
+              : attraction.closedDays;
+            if (Array.isArray(closedDays)) {
+              // 檢查是否為周期性休館日（如每周一）
+              if (closedDays.includes(dayOfWeek)) {
+                const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                warnings.push(`該景點${dayNames[dayOfWeek]}休館`);
+              }
+              // 檢查是否為特定日期休館
+              if (closedDays.includes(input.date)) {
+                warnings.push(`該景點在${input.date}休館`);
+              }
+            }
+          } catch (e) {
+            // 忽略JSON解析錯誤
+          }
+        }
+        
+        // 檢查開放時間
+        if (attraction.openingHours) {
+          try {
+            const openingHours = typeof attraction.openingHours === 'string' 
+              ? JSON.parse(attraction.openingHours) 
+              : attraction.openingHours;
+            if (openingHours && typeof openingHours === 'object' && openingHours[dayOfWeek]) {
+              const { open, close } = openingHours[dayOfWeek];
+              if (input.startTime < open || input.endTime > close) {
+                warnings.push(`該景點開放時間為${open}-${close}，您選擇的時間超出範圍`);
+              }
+            }
+          } catch (e) {
+            // 忽略JSON解析錯誤
+          }
+        }
+        
+        // 檢查預約要求
+        if (attraction.requiresBooking) {
+          const today = new Date();
+          const bookingDate = new Date(input.date);
+          const daysUntilBooking = Math.floor((bookingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntilBooking < 0) {
+            warnings.push('無法預約過去的日期');
+          } else if (attraction.bookingLeadTime && daysUntilBooking < attraction.bookingLeadTime) {
+            warnings.push(`該景點需要提前${attraction.bookingLeadTime}天預約，您只提前了${daysUntilBooking}天`);
+          }
+        }
+        
+        return {
+          hasWarnings: warnings.length > 0,
+          warnings,
+          attraction: {
+            name: attraction.name,
+            contactPerson: attraction.contactPerson,
+            contactPhone: attraction.contactPhone,
+          },
+        };
+      }),
   }),
   
   // 酒店資源管理

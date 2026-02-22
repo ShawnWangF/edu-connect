@@ -274,6 +274,8 @@ export const attractions = mysqlTable("attractions", {
   closedDays: json("closedDays"),
   // 是否需要預約
   requiresBooking: boolean("requiresBooking").default(false).notNull(),
+  // 提前預約天數
+  bookingLeadTime: int("bookingLeadTime"),
   // 對接人姓名
   contactPerson: varchar("contactPerson", { length: 100 }),
   // 對接人電話

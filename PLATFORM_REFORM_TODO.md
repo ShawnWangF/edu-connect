@@ -49,7 +49,8 @@
 - [x] **餐廳庫UI完善**：在ResourceLibrary中添加新字段的編輯功能
 - [x] **學校庫schema擴展**：添加schoolType、maxGroupSize字段
 - [x] **學校庫UI完善**：在ResourceLibrary中添加新字段的編輯功能
-- [ ] **場館約束規則**：自動根據休館日、開放時間提示排程衝突
+- [x] **場館約束規則API**：attractions.checkConstraints API已實現
+- [ ] **場館約束規則UI**：在行程點編輯表單中集成約束檢測
 
 #### 模塊三：行程模板- [x] 模板創建功能（從現有團組保存為模板）
 - [x] 模板預覽功能
