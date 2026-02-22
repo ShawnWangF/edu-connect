@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE restaurants \nADD COLUMN IF NOT EXISTS cuisine VARCHAR(100),\nADD COLUMN IF NOT EXISTS priceRange VARCHAR(50),\nADD COLUMN IF NOT EXISTS businessHours VARCHAR(200),\nADD COLUMN IF NOT EXISTS specialties TEXT;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute ALTER TABLE restaurants \nADD COLUMN IF NOT EXISTS cuisine VARCHAR(100),\nADD COLUMN IF NOT EXISTS priceRange VARCHAR(50),\nADD COLUMN IF NOT EXISTS businessHours VARCHAR(200),\nADD COLUMN IF NOT EXISTS specialties TEXT;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1835
+}

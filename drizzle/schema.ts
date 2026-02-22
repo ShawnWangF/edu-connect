@@ -296,6 +296,8 @@ export const restaurants = mysqlTable("restaurants", {
   capacity: int("capacity").default(0).notNull(), // 可容納人數
   cuisine: varchar("cuisine", { length: 100 }), // 菜系
   priceRange: varchar("priceRange", { length: 50 }), // 價格區間
+  businessHours: varchar("businessHours", { length: 200 }), // 營業時間
+  specialties: text("specialties"), // 特色菜品
   notes: text("notes"),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy").notNull(),

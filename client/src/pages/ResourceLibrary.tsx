@@ -24,6 +24,16 @@ export default function ResourceLibrary() {
   const { data: restaurants = [] } = trpc.restaurants.list.useQuery();
   const { data: schools = [] } = trpc.schools.list.useQuery();
 
+  // 景點 mutations
+  const updateAttractionMutation = trpc.locations.update.useMutation({
+    onSuccess: () => {
+      toast.success("景點更新成功");
+      utils.locations.list.invalidate();
+      handleCloseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   // 餐廳mutations
   const createRestaurantMutation = trpc.restaurants.create.useMutation({
     onSuccess: () => {
@@ -101,7 +111,17 @@ export default function ResourceLibrary() {
       }
     });
 
-    if (activeTab === "restaurants") {
+    if (activeTab === "attractions") {
+      if (editingItem) {
+        // 轉換 requiresBooking 為 boolean
+        if (data.requiresBooking === "true" || data.requiresBooking === true) {
+          data.requiresBooking = true;
+        } else if (data.requiresBooking === "false" || data.requiresBooking === false) {
+          data.requiresBooking = false;
+        }
+        updateAttractionMutation.mutate({ id: editingItem.id, ...data });
+      }
+    } else if (activeTab === "restaurants") {
       if (editingItem) {
         updateRestaurantMutation.mutate({ id: editingItem.id, ...data });
       } else {
@@ -182,16 +202,22 @@ export default function ResourceLibrary() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground mb-4">
-                景點資源管理功能已在「資源管理」頁面實現，請前往該頁面進行操作
-              </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filterItems(attractions).map((item: any) => (
                   <Card key={item.id} className="border-2">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center justify-between">
                         <span>{item.name}</span>
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleOpenDialog("attractions", item)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
@@ -200,6 +226,12 @@ export default function ResourceLibrary() {
                       )}
                       {item.capacity > 0 && (
                         <div className="text-muted-foreground">容量：{item.capacity}人</div>
+                      )}
+                      {item.contactPerson && (
+                        <div className="text-muted-foreground">對接人：{item.contactPerson}</div>
+                      )}
+                      {item.requiresBooking && (
+                        <div className="text-xs text-amber-600">需要預約</div>
                       )}
                     </CardContent>
                   </Card>
@@ -380,10 +412,97 @@ export default function ResourceLibrary() {
           <DialogHeader>
             <DialogTitle>
               {editingItem ? "編輯" : "添加"}
-              {activeTab === "restaurants" ? "餐廳" : "學校"}
+              {activeTab === "attractions" ? "景點" : activeTab === "restaurants" ? "餐廳" : "學校"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {activeTab === "attractions" && (
+              <>
+                <div>
+                  <Label htmlFor="name">景點名稱 *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    defaultValue={editingItem?.name}
+                    required
+                    disabled
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">景點名稱不可修改</p>
+                </div>
+                <div>
+                  <Label htmlFor="address">地址</Label>
+                  <Textarea
+                    id="address"
+                    name="address"
+                    defaultValue={editingItem?.address}
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="contactPerson">對接人姓名</Label>
+                    <Input
+                      id="contactPerson"
+                      name="contactPerson"
+                      defaultValue={editingItem?.contactPerson}
+                      placeholder="如：張三"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="contactPhone">對接人電話</Label>
+                    <Input
+                      id="contactPhone"
+                      name="contactPhone"
+                      defaultValue={editingItem?.contactPhone}
+                      placeholder="如：+852 1234 5678"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="openingHours">開放時間</Label>
+                    <Input
+                      id="openingHours"
+                      name="openingHours"
+                      defaultValue={editingItem?.openingHours}
+                      placeholder="如：09:00-18:00"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="closedDays">休館日</Label>
+                    <Input
+                      id="closedDays"
+                      name="closedDays"
+                      defaultValue={editingItem?.closedDays}
+                      placeholder="如：週一、公眾假期"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="requiresBooking">是否需要預約</Label>
+                  <Select name="requiresBooking" defaultValue={editingItem?.requiresBooking ? "true" : "false"}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">需要預約</SelectItem>
+                      <SelectItem value="false">不需預約</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="notes">特殊說明</Label>
+                  <Textarea
+                    id="notes"
+                    name="notes"
+                    defaultValue={editingItem?.notes}
+                    rows={3}
+                    placeholder="如：太空館逢二休、需提前三天預約"
+                  />
+                </div>
+              </>
+            )}
+
             {activeTab === "restaurants" && (
               <>
                 <div>
@@ -430,7 +549,7 @@ export default function ResourceLibrary() {
                       id="cuisine"
                       name="cuisine"
                       defaultValue={editingItem?.cuisine}
-                      placeholder="如：粵菜、川菜"
+                      placeholder="如：粤菜、川菜"
                     />
                   </div>
                   <div>
@@ -442,6 +561,25 @@ export default function ResourceLibrary() {
                       placeholder="如：50-100元/人"
                     />
                   </div>
+                </div>
+                <div>
+                  <Label htmlFor="businessHours">營業時間</Label>
+                  <Input
+                    id="businessHours"
+                    name="businessHours"
+                    defaultValue={editingItem?.businessHours}
+                    placeholder="如：11:00-22:00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="specialties">特色菜品</Label>
+                  <Textarea
+                    id="specialties"
+                    name="specialties"
+                    defaultValue={editingItem?.specialties}
+                    rows={2}
+                    placeholder="如：叉燒、螢汁鳳爪、蛙籥米線"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="notes">備註</Label>
