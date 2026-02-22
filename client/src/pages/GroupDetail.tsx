@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { trpc } from "@/lib/trpc";
 import { exportGroupToPDF } from "@/lib/pdfExport";
 import { BatchAddItineraryForm } from "@/components/BatchAddItineraryForm";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin, Download, ListPlus } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin, Download, ListPlus, School } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -42,6 +42,8 @@ export default function GroupDetail() {
   const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId });
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId });
   const { data: attractions } = trpc.locations.list.useQuery();
+  const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId });
+  const { data: schools } = trpc.schools.list.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -179,6 +181,10 @@ export default function GroupDetail() {
             <FileText className="mr-2 h-4 w-4" />
             文件管理
           </TabsTrigger>
+          <TabsTrigger value="school">
+            <School className="mr-2 h-4 w-4" />
+            學校交流
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="itinerary">
@@ -195,6 +201,10 @@ export default function GroupDetail() {
 
         <TabsContent value="files">
           <FilesTab groupId={groupId} files={files} utils={utils} />
+        </TabsContent>
+
+        <TabsContent value="school">
+          <SchoolExchangeTab groupId={groupId} schoolExchanges={schoolExchanges} schools={schools} utils={utils} />
         </TabsContent>
       </Tabs>
     </div>
@@ -2075,5 +2085,193 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+// 學校交流Tab
+function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
+  const [open, setOpen] = useState(false);
+  const [selectedExchange, setSelectedExchange] = useState<any>(null);
+
+  const createExchange = trpc.schoolExchanges.create.useMutation({
+    onSuccess: () => {
+      utils.schoolExchanges.listByGroup.invalidate({ groupId });
+      setOpen(false);
+      setSelectedExchange(null);
+      toast.success("學校交流記錄已保存");
+    },
+    onError: (error) => {
+      toast.error(`保存失敗：${error.message}`);
+    },
+  });
+
+  const deleteExchange = trpc.schoolExchanges.delete.useMutation({
+    onSuccess: () => {
+      utils.schoolExchanges.listByGroup.invalidate({ groupId });
+      toast.success("學校交流記錄已刪除");
+    },
+    onError: (error) => {
+      toast.error(`刪除失敗：${error.message}`);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      groupId,
+      schoolId: parseInt(formData.get("schoolId") as string),
+      exchangeDate: formData.get("exchangeDate") as string,
+      startTime: formData.get("startTime") as string,
+      endTime: formData.get("endTime") as string,
+      activities: formData.get("activities") as string,
+      notes: formData.get("notes") as string,
+    };
+    createExchange.mutate(data);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>學校交流記錄</CardTitle>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setSelectedExchange(null)}>
+                <Plus className="mr-2 h-4 w-4" />
+                添加交流記錄
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>添加學校交流記錄</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="schoolId">交流學校</Label>
+                  <Select name="schoolId" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇學校" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schools?.map((school: any) => (
+                        <SelectItem key={school.id} value={school.id.toString()}>
+                          {school.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="exchangeDate">交流日期</Label>
+                  <Input type="date" name="exchangeDate" required />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">開始時間</Label>
+                    <Input type="time" name="startTime" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endTime">結束時間</Label>
+                    <Input type="time" name="endTime" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="activities">交流活動</Label>
+                  <Textarea name="activities" placeholder="例如：學校參觀、課堂體驗、文化交流..." rows={3} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">備註</Label>
+                  <Textarea name="notes" placeholder="其他備註信息..." rows={2} />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                    取消
+                  </Button>
+                  <Button type="submit" disabled={createExchange.isPending}>
+                    保存
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!schoolExchanges || schoolExchanges.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <School className="mx-auto h-12 w-12 mb-4 opacity-20" />
+            <p>還沒有學校交流記錄</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {schoolExchanges.map((exchange: any) => {
+              const school = schools?.find((s: any) => s.id === exchange.schoolId);
+              return (
+                <div key={exchange.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <School className="h-5 w-5 text-blue-600" />
+                        <h3 className="font-semibold text-lg">{school?.name || "未知學校"}</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">交流日期：</span>
+                          <span className="font-medium">{format(new Date(exchange.exchangeDate), "yyyy-MM-dd", { locale: zhCN })}</span>
+                        </div>
+                        {(exchange.startTime || exchange.endTime) && (
+                          <div>
+                            <span className="text-muted-foreground">時間：</span>
+                            <span className="font-medium">
+                              {exchange.startTime || "未設置"} - {exchange.endTime || "未設置"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {school?.address && (
+                        <div className="mt-2 text-sm">
+                          <span className="text-muted-foreground">地址：</span>
+                          <span>{school.address}</span>
+                        </div>
+                      )}
+                      {exchange.activities && (
+                        <div className="mt-2 text-sm">
+                          <span className="text-muted-foreground">交流活動：</span>
+                          <p className="mt-1 text-foreground">{exchange.activities}</p>
+                        </div>
+                      )}
+                      {exchange.notes && (
+                        <div className="mt-2 text-sm">
+                          <span className="text-muted-foreground">備註：</span>
+                          <p className="mt-1 text-foreground">{exchange.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm("確定要刪除此學校交流記錄嗎？")) {
+                          deleteExchange.mutate({ id: exchange.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
