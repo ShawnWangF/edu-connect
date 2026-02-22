@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { exportGroupToPDF } from "@/lib/pdfExport";
-import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin, Download } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Utensils, User, Plus, Pencil, Trash2, Upload, Hotel, Car, UserCheck, Shield, Coffee, UtensilsCrossed, Soup, AlertCircle, Copy, FileSpreadsheet, MapPin, Download, ListPlus } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
@@ -204,8 +204,13 @@ export default function GroupDetail() {
 function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCards }: any) {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
   const [conflictWarning, setConflictWarning] = useState<string>("");
+  const [batchStartDate, setBatchStartDate] = useState<string>("");
+  const [batchEndDate, setBatchEndDate] = useState<string>("");
+  const [batchAttractions, setBatchAttractions] = useState<number[]>([]);
+  const [batchTimeSlot, setBatchTimeSlot] = useState<string>("morning");
   
   const { data: itineraryAttractions = [] } = trpc.locations.list.useQuery();
 
@@ -240,6 +245,20 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
     },
     onError: (error) => {
       toast.error(error.message || "刪除失敗");
+    },
+  });
+  
+  const batchCreateMutation = trpc.itineraries.batchCreate.useMutation({
+    onSuccess: (data) => {
+      toast.success(`成功添加 ${data.count} 個行程點`);
+      utils.itineraries.listByGroup.invalidate({ groupId });
+      setIsBatchDialogOpen(false);
+      setBatchAttractions([]);
+      setBatchStartDate("");
+      setBatchEndDate("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "批量添加失敗");
     },
   });
 
@@ -312,13 +331,34 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>行程時間軸</CardTitle>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setSelectedItem(null)}>
-              <Plus className="mr-2 h-4 w-4" />
-              添加行程點
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={isBatchDialogOpen} onOpenChange={setIsBatchDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <ListPlus className="mr-2 h-4 w-4" />
+                批量添加
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>批量添加行程點</DialogTitle>
+              </DialogHeader>
+              <BatchAddItineraryForm 
+                groupId={groupId}
+                group={group}
+                attractions={itineraryAttractions}
+                batchCreateMutation={batchCreateMutation}
+                onClose={() => setIsBatchDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setSelectedItem(null)}>
+                <Plus className="mr-2 h-4 w-4" />
+                添加行程點
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{selectedItem ? "編輯行程點" : "添加行程點"}</DialogTitle>
@@ -427,6 +467,7 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </CardHeader>
       <CardContent>
         {/* 未安排的必去行程提示 */}
@@ -2033,5 +2074,214 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// 批量添加行程點表單組件
+function BatchAddItineraryForm({ groupId, group, attractions, batchCreateMutation, onClose }: any) {
+  const [startDate, setStartDate] = useState<string>(group.startDate);
+  const [endDate, setEndDate] = useState<string>(group.endDate);
+  const [selectedAttractions, setSelectedAttractions] = useState<number[]>([]);
+  const [timeSlot, setTimeSlot] = useState<string>("morning");
+  const [startTime, setStartTime] = useState<string>("09:00");
+  const [endTime, setEndTime] = useState<string>("12:00");
+
+  // 計算預覽的行程點列表
+  const previewItineraries = useMemo(() => {
+    if (!startDate || !endDate || selectedAttractions.length === 0) {
+      return [];
+    }
+
+    const result: any[] = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const groupStart = new Date(group.startDate);
+
+    // 遍歷日期範圍
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const currentDate = new Date(d);
+      const dayNumber = Math.floor((currentDate.getTime() - groupStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      // 為每個選中的景點創建行程點
+      selectedAttractions.forEach((attractionId, index) => {
+        const attraction = attractions.find((a: any) => a.id === attractionId);
+        if (attraction) {
+          result.push({
+            date: currentDate.toISOString().split('T')[0],
+            dayNumber,
+            startTime,
+            endTime,
+            locationId: attractionId,
+            locationName: attraction.name,
+            description: `${attraction.name}參觀`,
+            sortOrder: index,
+          });
+        }
+      });
+    }
+
+    return result;
+  }, [startDate, endDate, selectedAttractions, startTime, endTime, attractions, group.startDate]);
+
+  const handleSubmit = () => {
+    if (previewItineraries.length === 0) {
+      toast.error("請選擇日期範圍和景點");
+      return;
+    }
+
+    batchCreateMutation.mutate({
+      groupId,
+      itineraries: previewItineraries,
+    });
+  };
+
+  const toggleAttraction = (attractionId: number) => {
+    setSelectedAttractions(prev => 
+      prev.includes(attractionId)
+        ? prev.filter(id => id !== attractionId)
+        : [...prev, attractionId]
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* 日期範圍選擇 */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-semibold">1. 選擇日期範圍</Label>
+          <p className="text-sm text-muted-foreground mt-1">選擇要批量添加行程的日期範圍</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="startDate">開始日期</Label>
+            <Input
+              id="startDate"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              min={group.startDate}
+              max={group.endDate}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="endDate">結束日期</Label>
+            <Input
+              id="endDate"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={startDate}
+              max={group.endDate}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 時間設置 */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-semibold">2. 設置時間</Label>
+          <p className="text-sm text-muted-foreground mt-1">設置行程點的開始和結束時間</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="startTime">開始時間</Label>
+            <Input
+              id="startTime"
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="endTime">結束時間</Label>
+            <Input
+              id="endTime"
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 景點選擇 */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-semibold">3. 選擇景點（可多選）</Label>
+          <p className="text-sm text-muted-foreground mt-1">
+            已選擇 {selectedAttractions.length} 個景點
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 border rounded-lg">
+          {attractions.map((attraction: any) => (
+            <div
+              key={attraction.id}
+              className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                selectedAttractions.includes(attraction.id)
+                  ? "bg-primary/10 border-primary"
+                  : "hover:bg-accent"
+              }`}
+              onClick={() => toggleAttraction(attraction.id)}
+            >
+              <div className="flex items-start gap-2">
+                <div className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center ${
+                  selectedAttractions.includes(attraction.id)
+                    ? "bg-primary border-primary"
+                    : "border-input"
+                }`}>
+                  {selectedAttractions.includes(attraction.id) && (
+                    <div className="h-2 w-2 bg-white rounded-sm" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{attraction.name}</div>
+                  {attraction.address && (
+                    <div className="text-xs text-muted-foreground mt-1">{attraction.address}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 預覽 */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-semibold">4. 預覽（將創建 {previewItineraries.length} 個行程點）</Label>
+        </div>
+        {previewItineraries.length > 0 ? (
+          <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
+            {previewItineraries.map((item, index) => (
+              <div key={index} className="flex items-center gap-2 text-sm p-2 bg-accent/50 rounded">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{item.date}</span>
+                <span className="text-muted-foreground">第{item.dayNumber}天</span>
+                <span className="text-muted-foreground">{item.startTime}-{item.endTime}</span>
+                <span className="flex-1">{item.locationName}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="border rounded-lg p-8 text-center text-muted-foreground">
+            請選擇日期範圍和景點以預覽
+          </div>
+        )}
+      </div>
+
+      {/* 操作按鈕 */}
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          取消
+        </Button>
+        <Button 
+          onClick={handleSubmit} 
+          disabled={previewItineraries.length === 0 || batchCreateMutation.isPending}
+        >
+          {batchCreateMutation.isPending ? "添加中..." : `確認添加 ${previewItineraries.length} 個行程點`}
+        </Button>
+      </div>
+    </div>
   );
 }

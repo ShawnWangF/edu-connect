@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE attractions\nADD COLUMN openingHours JSON COMMENT '開放時間，格式：{\"monday\": {\"open\": \"09:00\", \"close\": \"17:00\"}, ...}',\nADD COLUMN closedDays JSON COMMENT '休館日，格式：[\"2024-01-01\", \"2024-12-25\"]',\nADD COLUMN requiresBooking BOOLEAN DEFAULT FALSE NOT NULL COMMENT '是否需要預約',\nADD COLUMN contactPerson VARCHAR(100) COMMENT '對接人姓名',\nADD COLUMN contactPhone VARCHAR(50) COMMENT '對接人電話';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute ALTER TABLE attractions\nADD COLUMN openingHours JSON COMMENT '開放時間，格式：{\"monday\": {\"open\": \"09:00\", \"close\": \"17:00\"}, ...}',\nADD COLUMN closedDays JSON COMMENT '休館日，格式：[\"2024-01-01\", \"2024-12-25\"]',\nADD COLUMN requiresBooking BOOLEAN DEFAULT FALSE NOT NULL COMMENT '是否需要預約',\nADD COLUMN contactPerson VARCHAR(100) COMMENT '對接人姓名',\nADD COLUMN contactPhone VARCHAR(50) COMMENT '對接人電話';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 3560
+}

@@ -268,6 +268,16 @@ export const attractions = mysqlTable("attractions", {
   unavailableTimeSlots: json("unavailableTimeSlots"),
   // 是否全天不可用（例如永久關閉的景點）
   isAlwaysUnavailable: boolean("isAlwaysUnavailable").default(false).notNull(),
+  // 開放時間（JSON格式），例如：{"monday": {"open": "09:00", "close": "17:00"}, ...}
+  openingHours: json("openingHours"),
+  // 休館日（JSON格式），例如：["2024-01-01", "2024-12-25"]
+  closedDays: json("closedDays"),
+  // 是否需要預約
+  requiresBooking: boolean("requiresBooking").default(false).notNull(),
+  // 對接人姓名
+  contactPerson: varchar("contactPerson", { length: 100 }),
+  // 對接人電話
+  contactPhone: varchar("contactPhone", { length: 50 }),
   // 備註
   notes: text("notes"),
   createdBy: int("createdBy").notNull(),

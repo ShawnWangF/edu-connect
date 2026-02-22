@@ -388,6 +388,39 @@ export const appRouter = router({
         await db.deleteItinerary(input.id);
         return { success: true };
       }),
+    
+    batchCreate: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        itineraries: z.array(z.object({
+          date: z.string(),
+          dayNumber: z.number(),
+          startTime: z.string().optional(),
+          endTime: z.string().optional(),
+          locationId: z.number().optional(),
+          locationName: z.string().optional(),
+          description: z.string().optional(),
+          notes: z.string().optional(),
+          sortOrder: z.number().optional(),
+        })),
+      }))
+      .mutation(async ({ input }) => {
+        // 批量創建行程點
+        for (const itinerary of input.itineraries) {
+          await db.createItinerary({
+            groupId: input.groupId,
+            ...itinerary,
+          });
+        }
+        
+        // 發送批量添加通知
+        notificationService.notifyItineraryChange(
+          input.groupId,
+          `批量添加了 ${input.itineraries.length} 個行程點`
+        ).catch(console.error);
+        
+        return { success: true, count: input.itineraries.length };
+      }),
   }),
   
   // 食行卡片管理
