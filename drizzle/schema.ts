@@ -186,9 +186,9 @@ export const templates = mysqlTable("templates", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  type: mysqlEnum("type", ["elementary", "middle", "vip"]).notNull(),
   days: int("days").notNull(),
-  content: json("content").notNull(), // 存儲方案內容JSON
+  applicableTypes: json("applicableTypes").$type<string[]>(), // 適用的團組類型
+  isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -276,6 +276,62 @@ export const attractions = mysqlTable("attractions", {
 });
 
 /**
+ * 餐廳資源表
+ */
+export const restaurants = mysqlTable("restaurants", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address"),
+  phone: varchar("phone", { length: 50 }),
+  capacity: int("capacity").default(0).notNull(), // 可容納人數
+  cuisine: varchar("cuisine", { length: 100 }), // 菜系
+  priceRange: varchar("priceRange", { length: 50 }), // 價格區間
+  notes: text("notes"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 學校資源表
+ */
+export const schools = mysqlTable("schools", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address"),
+  region: varchar("region", { length: 50 }), // 地區：香港/澳門
+  contactPerson: varchar("contactPerson", { length: 100 }), // 聯繫人
+  contactPhone: varchar("contactPhone", { length: 50 }),
+  contactEmail: varchar("contactEmail", { length: 100 }),
+  receptionProcess: text("receptionProcess"), // 接待流程
+  availableTimeSlots: json("availableTimeSlots"), // 可交流時段 JSON
+  capacity: int("capacity").default(0), // 可接待人數
+  notes: text("notes"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 模板行程點表
+ */
+export const templateItineraries = mysqlTable("templateItineraries", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(), // 關聯模板
+  dayNumber: int("dayNumber").notNull(), // 第幾天
+  timeSlot: varchar("timeSlot", { length: 20 }), // 時段：上午/下午/晚上
+  startTime: varchar("startTime", { length: 10 }), // 開始時間 HH:mm
+  endTime: varchar("endTime", { length: 10 }), // 結束時間 HH:mm
+  locationId: int("locationId"), // 關聯景點資源（attractions表）
+  locationName: varchar("locationName", { length: 255 }), // 地點名稱（備用）
+  description: text("description"), // 行程描述
+  sortOrder: int("sortOrder").default(0).notNull(), // 排序
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
  * 導遊資源表
  */
 export const guides = mysqlTable("guides", {
@@ -351,3 +407,9 @@ export type Security = typeof securities.$inferSelect;
 export type InsertSecurity = typeof securities.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
+export type Restaurant = typeof restaurants.$inferSelect;
+export type InsertRestaurant = typeof restaurants.$inferInsert;
+export type School = typeof schools.$inferSelect;
+export type InsertSchool = typeof schools.$inferInsert;
+export type TemplateItinerary = typeof templateItineraries.$inferSelect;
+export type InsertTemplateItinerary = typeof templateItineraries.$inferInsert;

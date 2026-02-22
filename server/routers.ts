@@ -967,6 +967,178 @@ export const appRouter = router({
       }),
   }),
   
+  // 餐廳資源管理
+  restaurants: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllRestaurants();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+        capacity: z.number().default(0),
+        cuisine: z.string().optional(),
+        priceRange: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await db.createRestaurant({ ...input, createdBy: ctx.user.id });
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+        capacity: z.number().optional(),
+        cuisine: z.string().optional(),
+        priceRange: z.string().optional(),
+        notes: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateRestaurant(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteRestaurant(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 學校資源管理
+  schools: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllSchools();
+    }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        address: z.string().optional(),
+        region: z.string().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        contactEmail: z.string().optional(),
+        receptionProcess: z.string().optional(),
+        availableTimeSlots: z.any().optional(),
+        capacity: z.number().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await db.createSchool({ ...input, createdBy: ctx.user.id });
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        address: z.string().optional(),
+        region: z.string().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        contactEmail: z.string().optional(),
+        receptionProcess: z.string().optional(),
+        availableTimeSlots: z.any().optional(),
+        capacity: z.number().optional(),
+        notes: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateSchool(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteSchool(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 行程模板管理
+  templates: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllTemplates();
+    }),
+    
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getTemplateById(input.id);
+      }),
+    
+    create: editorProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        days: z.number(),
+        applicableTypes: z.array(z.string()).optional(),
+        sourceGroupId: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const templateId = await db.createTemplate({ ...input, createdBy: ctx.user.id });
+        
+        // 如果指定了sourceGroupId，從該團組複製行程點
+        if (input.sourceGroupId) {
+          const itineraries = await db.getItinerariesByGroupId(input.sourceGroupId);
+          for (const itinerary of itineraries) {
+            await db.createTemplateItinerary({
+              templateId,
+              dayNumber: itinerary.dayNumber,
+              startTime: itinerary.startTime,
+              endTime: itinerary.endTime,
+              locationId: itinerary.locationId,
+              locationName: itinerary.locationName,
+              description: itinerary.description,
+              sortOrder: itinerary.sortOrder || 0,
+            });
+          }
+        }
+        
+        return { success: true, templateId };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        days: z.number().optional(),
+        applicableTypes: z.array(z.string()).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateTemplate(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteTemplate(input.id);
+        return { success: true };
+      }),
+    
+    getItineraries: protectedProcedure
+      .input(z.object({ templateId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getTemplateItineraries(input.templateId);
+      }),
+  }),
+  
   // 快照管理（版本控制）
   snapshots: router({
     list: adminProcedure.query(async () => {

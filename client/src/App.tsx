@@ -13,6 +13,7 @@ import GroupDetail from "./pages/GroupDetail";
 import GroupEdit from "./pages/GroupEdit";
 import Attractions from "./pages/Attractions";
 import Resources from "./pages/Resources";
+import ResourceLibrary from "./pages/ResourceLibrary";
 import Users from "./pages/Users";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -21,6 +22,7 @@ import Calendar from "./pages/Calendar";
 import Notifications from "./pages/Notifications";
 import { ProjectList } from "./pages/ProjectList";
 import { ProjectDetail } from "./pages/ProjectDetail";
+import Templates from "./pages/Templates";
 
 function Router() {
   return (
@@ -64,6 +66,16 @@ function Router() {
       <Route path="/resources">
         <DashboardLayout>
           <Resources />
+        </DashboardLayout>
+      </Route>
+      <Route path="/resource-library">
+        <DashboardLayout>
+          <ResourceLibrary />
+        </DashboardLayout>
+      </Route>
+      <Route path="/templates">
+        <DashboardLayout>
+          <Templates />
         </DashboardLayout>
       </Route>
       <Route path="/attractions">

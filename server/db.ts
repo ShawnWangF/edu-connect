@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities } from "../drizzle/schema";
+import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, schools, templateItineraries } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 
@@ -699,4 +699,120 @@ export async function getGroupsByProjectId(projectId: number) {
   if (!db) return [];
 
   return await db.select().from(groups).where(eq(groups.projectId, projectId));
+}
+
+// 餐廳資源管理
+export async function getAllRestaurants() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(restaurants);
+}
+
+export async function createRestaurant(restaurantData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(restaurants).values(restaurantData);
+  return result;
+}
+
+export async function updateRestaurant(id: number, restaurantData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(restaurants).set(restaurantData).where(eq(restaurants.id, id));
+}
+
+export async function deleteRestaurant(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(restaurants).where(eq(restaurants.id, id));
+}
+
+// 學校資源管理
+export async function getAllSchools() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(schools);
+}
+
+export async function createSchool(schoolData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(schools).values(schoolData);
+  return result;
+}
+
+export async function updateSchool(id: number, schoolData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(schools).set(schoolData).where(eq(schools.id, id));
+}
+
+export async function deleteSchool(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(schools).where(eq(schools.id, id));
+}
+
+// 行程模板管理
+export async function getAllTemplates() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(templates);
+}
+
+export async function getTemplateById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(templates).where(eq(templates.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createTemplate(templateData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(templates).values(templateData);
+  return result[0].insertId;
+}
+
+export async function updateTemplate(id: number, templateData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(templates).set(templateData).where(eq(templates.id, id));
+}
+
+export async function deleteTemplate(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // 同時刪除關聯的模板行程點
+  await db.delete(templateItineraries).where(eq(templateItineraries.templateId, id));
+  await db.delete(templates).where(eq(templates.id, id));
+}
+
+// 模板行程點管理
+export async function getTemplateItineraries(templateId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(templateItineraries).where(eq(templateItineraries.templateId, templateId));
+}
+
+export async function createTemplateItinerary(itineraryData: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(templateItineraries).values(itineraryData);
+  return result;
 }
