@@ -370,6 +370,13 @@ export const appRouter = router({
         await db.upsertDailyCard(input);
         return { success: true };
       }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteDailyCard(input.id);
+        return { success: true };
+      }),
   }),
   
   // 人員管理

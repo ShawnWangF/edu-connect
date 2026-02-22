@@ -294,6 +294,13 @@ export async function upsertDailyCard(cardData: any) {
   }
 }
 
+export async function deleteDailyCard(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(dailyCards).where(eq(dailyCards.id, id));
+}
+
 // 人員管理
 export async function getMembersByGroupId(groupId: number) {
   const db = await getDb();

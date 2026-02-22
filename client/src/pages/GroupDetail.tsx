@@ -658,6 +658,20 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
     },
   });
 
+  const deleteMutation = trpc.dailyCards.delete.useMutation({
+    onSuccess: () => {
+      toast.success("刪除成功！");
+      utils.dailyCards.listByGroup.invalidate({ groupId });
+    },
+    onError: (error) => {
+      toast.error(error.message || "刪除失敗");
+    },
+  });
+
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate({ id });
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -998,14 +1012,27 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
         {dailyCards && dailyCards.length > 0 ? (
           <div className="space-y-4">
             {dailyCards.map((card: any) => (
-              <Card key={card.id} className="cursor-pointer hover:bg-accent/50" onClick={() => {
-                setSelectedCard(card);
-                setIsDialogOpen(true);
-              }}>
-                <CardHeader>
-                  <CardTitle className="text-lg">
+              <Card key={card.id} className="hover:bg-accent/50">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg cursor-pointer" onClick={() => {
+                    setSelectedCard(card);
+                    setIsDialogOpen(true);
+                  }}>
                     {format(new Date(card.date), "yyyy-MM-dd EEEE", { locale: zhCN })}
                   </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('確定要刪除這張食行卡片嗎？')) {
+                        handleDelete(card.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
