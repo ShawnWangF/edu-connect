@@ -19,11 +19,23 @@ import Settings from "./pages/Settings";
 import Planner from "./pages/Planner";
 import Calendar from "./pages/Calendar";
 import Notifications from "./pages/Notifications";
+import { ProjectList } from "./pages/ProjectList";
+import { ProjectDetail } from "./pages/ProjectDetail";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/projects">
+        <DashboardLayout>
+          <ProjectList />
+        </DashboardLayout>
+      </Route>
+      <Route path="/projects/:id">
+        <DashboardLayout>
+          <ProjectDetail />
+        </DashboardLayout>
+      </Route>
       <Route path="/">
         <DashboardLayout>
           <Home />
