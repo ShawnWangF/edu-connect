@@ -328,6 +328,11 @@ export const appRouter = router({
         return await db.getDailyCardsByGroupId(input.groupId);
       }),
     
+    listAll: protectedProcedure
+      .query(async () => {
+        return await db.getAllDailyCards();
+      }),
+    
     upsert: editorProcedure
       .input(z.object({
         groupId: z.number(),

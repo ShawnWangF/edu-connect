@@ -181,7 +181,7 @@ export default function GroupDetail() {
         </TabsList>
 
         <TabsContent value="itinerary">
-          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} attractions={attractions} />
+          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} attractions={attractions} dailyCards={dailyCards} />
         </TabsContent>
 
         <TabsContent value="daily">
@@ -201,7 +201,7 @@ export default function GroupDetail() {
 }
 
 // 行程詳情標籤頁
-function ItineraryTab({ groupId, itineraries, utils, group, attractions }: any) {
+function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCards }: any) {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
@@ -256,10 +256,15 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions }: any) 
       }
     }
     
+    // 自動計算dayNumber（根據選擇的日期）
+    const selectedDate = new Date(formData.get("date") as string);
+    const startDate = new Date(group.startDate);
+    const dayNumber = Math.floor((selectedDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
     const data = {
       groupId,
       date: formData.get("date") as string,
-      dayNumber: parseInt(formData.get("dayNumber") as string),
+      dayNumber: dayNumber,
       startTime: (formData.get("startTime") as string) || undefined,
       endTime: (formData.get("endTime") as string) || undefined,
       locationName: locationName || undefined,
@@ -319,29 +324,20 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions }: any) 
               <DialogTitle>{selectedItem ? "編輯行程點" : "添加行程點"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="date">日期 *</Label>
-                  <Input 
-                    id="date" 
-                    name="date" 
-                    type="date" 
-                    defaultValue={selectedItem?.date || dateList[0]?.toISOString().split('T')[0]} 
-                    min={group.startDate}
-                    max={group.endDate}
-                    required 
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    團組日期範圍：{format(new Date(group.startDate), "yyyy-MM-dd")} 至 {format(new Date(group.endDate), "yyyy-MM-dd")}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dayNumber">天數 *</Label>
-                  <Input id="dayNumber" name="dayNumber" type="number" min="1" max={group.days} defaultValue={selectedItem?.dayNumber || 1} required />
-                  <p className="text-xs text-muted-foreground">
-                    總共 {group.days} 天
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="date">日期 *</Label>
+                <Input 
+                  id="date" 
+                  name="date" 
+                  type="date" 
+                  defaultValue={selectedItem?.date || dateList[0]?.toISOString().split('T')[0]} 
+                  min={group.startDate}
+                  max={group.endDate}
+                  required 
+                />
+                <p className="text-xs text-muted-foreground">
+                  團組日期範圍：{format(new Date(group.startDate), "yyyy-MM-dd")} 至 {format(new Date(group.endDate), "yyyy-MM-dd")} （第幾天將自動計算）
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -460,48 +456,173 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions }: any) 
         )}
         
         {itineraries && itineraries.length > 0 ? (
-          <div className="space-y-4">
-            {itineraries.map((item: any) => (
-              <div key={item.id} className="flex gap-4 pb-4 border-b last:border-0">
-                <div className="flex-shrink-0 w-32 text-sm text-muted-foreground">
-                  <div className="font-medium">第{item.dayNumber}天</div>
-                  <div className="text-xs">
-                    {item.startTime && item.endTime
-                      ? `${item.startTime} - ${item.endTime}`
-                      : "全天"}
+          <div className="space-y-6">
+            {(() => {
+              // 按天分組行程
+              const groupedByDay: Record<number, any[]> = {};
+              itineraries.forEach((item: any) => {
+                if (!groupedByDay[item.dayNumber]) {
+                  groupedByDay[item.dayNumber] = [];
+                }
+                groupedByDay[item.dayNumber].push(item);
+              });
+              
+              // 按時間排序
+              Object.keys(groupedByDay).forEach(day => {
+                groupedByDay[parseInt(day)].sort((a: any, b: any) => {
+                  if (!a.startTime) return 1;
+                  if (!b.startTime) return -1;
+                  return a.startTime.localeCompare(b.startTime);
+                });
+              });
+              
+              return Object.keys(groupedByDay).sort((a, b) => parseInt(a) - parseInt(b)).map((dayNum) => {
+                const dayNumber = parseInt(dayNum);
+                const dayItems = groupedByDay[dayNumber];
+                const dayDate = new Date(group.startDate);
+                dayDate.setDate(dayDate.getDate() + dayNumber - 1);
+                const dayDateStr = dayDate.toISOString().split('T')[0];
+                
+                // 找到當天的食行卡片
+                const dayCard = dailyCards?.find((card: any) => {
+                  const cardDate = new Date(card.date).toISOString().split('T')[0];
+                  return cardDate === dayDateStr;
+                });
+                
+                // 合併行程點和餐飲信息
+                const mergedItems: any[] = [];
+                
+                // 添加行程點和餐飲
+                dayItems.forEach((item: any) => {
+                  mergedItems.push({ type: 'itinerary', data: item });
+                });
+                
+                // 添加餐飲信息
+                if (dayCard) {
+                  if (dayCard.breakfast) {
+                    mergedItems.push({ type: 'meal', mealType: 'breakfast', data: dayCard, time: '07:00' });
+                  }
+                  if (dayCard.lunch) {
+                    mergedItems.push({ type: 'meal', mealType: 'lunch', data: dayCard, time: '12:00' });
+                  }
+                  if (dayCard.dinner) {
+                    mergedItems.push({ type: 'meal', mealType: 'dinner', data: dayCard, time: '18:00' });
+                  }
+                }
+                
+                // 按時間排序所有項目
+                mergedItems.sort((a, b) => {
+                  const timeA = a.type === 'itinerary' ? (a.data.startTime || '23:59') : a.time;
+                  const timeB = b.type === 'itinerary' ? (b.data.startTime || '23:59') : b.time;
+                  return timeA.localeCompare(timeB);
+                });
+                
+                return (
+                  <div key={dayNumber} className="border-l-4 border-primary/30 pl-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold">
+                        第 {dayNumber} 天
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(dayDate, "yyyy-MM-dd (EEEE)", { locale: zhCN })}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {mergedItems.map((item: any, index: number) => {
+                        if (item.type === 'itinerary') {
+                          return (
+                            <div key={`itinerary-${item.data.id}`} className="flex gap-4 pb-3 border-b last:border-0">
+                              <div className="flex-shrink-0 w-24 text-sm text-muted-foreground">
+                                <div className="text-xs">
+                                  {item.data.startTime && item.data.endTime
+                                    ? `${item.data.startTime} - ${item.data.endTime}`
+                                    : "全天"}
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">{item.data.locationName || "未指定地點"}</p>
+                                {item.data.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{item.data.description}</p>
+                                )}
+                                {item.data.notes && (
+                                  <p className="text-sm text-muted-foreground mt-1">備註: {item.data.notes}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setSelectedItem(item.data);
+                                    setIsDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => deleteMutation.mutate({ id: item.data.id })}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        } else if (item.type === 'meal') {
+                          const mealIcons = {
+                            breakfast: Coffee,
+                            lunch: UtensilsCrossed,
+                            dinner: Soup,
+                          };
+                          const mealLabels = {
+                            breakfast: '早餐',
+                            lunch: '午餐',
+                            dinner: '晚餐',
+                          };
+                          const MealIcon = mealIcons[item.mealType as keyof typeof mealIcons];
+                          const mealLabel = mealLabels[item.mealType as keyof typeof mealLabels];
+                          const mealContent = item.data[item.mealType];
+                          
+                          return (
+                            <div key={`meal-${item.mealType}-${index}`} className="flex gap-4 pb-3 border-b last:border-0 bg-orange-50/50 dark:bg-orange-950/20 -mx-2 px-2 py-2 rounded">
+                              <div className="flex-shrink-0 w-24 text-sm text-muted-foreground">
+                                <div className="text-xs">{item.time}</div>
+                              </div>
+                              <div className="flex-1 flex items-center gap-2">
+                                <MealIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                <p className="font-medium text-orange-900 dark:text-orange-100">{mealLabel}</p>
+                                <span className="text-sm text-muted-foreground">- {mealContent}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      {/* 住宿信息 */}
+                      {dayCard && dayCard.hotelName && (
+                        <div className="flex gap-4 pb-3 bg-blue-50/50 dark:bg-blue-950/20 -mx-2 px-2 py-2 rounded mt-3">
+                          <div className="flex-shrink-0 w-24 text-sm text-muted-foreground">
+                            <div className="text-xs">晚上</div>
+                          </div>
+                          <div className="flex-1 flex items-start gap-2">
+                            <Hotel className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-blue-900 dark:text-blue-100">住宿: {dayCard.hotelName}</p>
+                              {dayCard.hotelAddress && (
+                                <p className="text-sm text-muted-foreground mt-1">{dayCard.hotelAddress}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{item.locationName || "未指定地點"}</p>
-                  {item.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
-                  )}
-                  {item.notes && (
-                    <p className="text-sm text-muted-foreground mt-1">備註: {item.notes}</p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                      setSelectedItem(item);
-                      setIsDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => deleteMutation.mutate({ id: item.id })}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         ) : (
           <p className="text-center text-muted-foreground py-8">

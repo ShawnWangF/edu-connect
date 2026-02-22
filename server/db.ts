@@ -262,6 +262,13 @@ export async function getDailyCardsByGroupId(groupId: number) {
   return await db.select().from(dailyCards).where(eq(dailyCards.groupId, groupId));
 }
 
+export async function getAllDailyCards() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(dailyCards);
+}
+
 export async function getDailyCardByGroupAndDate(groupId: number, date: Date) {
   const db = await getDb();
   if (!db) return undefined;

@@ -13,6 +13,7 @@ export default function Home() {
   const { data: groups } = trpc.groups.list.useQuery();
   const { data: locations } = trpc.locations.list.useQuery();
   const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
+  const { data: allDailyCards } = trpc.dailyCards.listAll.useQuery();
   
   // 獲取本週關注事項（本週的行程）
   const thisWeekItineraries = allItineraries?.filter((item: any) => {
@@ -36,16 +37,40 @@ export default function Home() {
     return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   }) || [];
 
-  // 為每個團組獲取行程點
+  // 為每個團組獲取行程點和食行卡片
   const groupsWithItineraries = sortedGroups.map(group => {
-    const itineraries = allItineraries?.filter((item: any) => item.groupId === group.id)
-      .sort((a: any, b: any) => {
-        const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
-        if (dateCompare !== 0) return dateCompare;
-        if (!a.startTime || !b.startTime) return 0;
-        return a.startTime.localeCompare(b.startTime);
-      }) || [];
-    return { ...group, itineraries };
+    const itineraries = allItineraries?.filter((item: any) => item.groupId === group.id) || [];
+    const dailyCards = allDailyCards?.filter((card: any) => card.groupId === group.id) || [];
+    
+    // 合併行程點和餐飲信息
+    const mergedItems: any[] = [];
+    
+    // 添加行程點
+    itineraries.forEach((item: any) => {
+      mergedItems.push({ type: 'itinerary', data: item, sortTime: item.startTime || '23:59', date: item.date });
+    });
+    
+    // 添加餐飲信息
+    dailyCards.forEach((card: any) => {
+      if (card.breakfastRestaurant) {
+        mergedItems.push({ type: 'meal', mealType: 'breakfast', data: card, sortTime: '07:00', date: card.date });
+      }
+      if (card.lunchRestaurant) {
+        mergedItems.push({ type: 'meal', mealType: 'lunch', data: card, sortTime: '12:00', date: card.date });
+      }
+      if (card.dinnerRestaurant) {
+        mergedItems.push({ type: 'meal', mealType: 'dinner', data: card, sortTime: '18:00', date: card.date });
+      }
+    });
+    
+    // 按日期和時間排序
+    mergedItems.sort((a: any, b: any) => {
+      const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateCompare !== 0) return dateCompare;
+      return a.sortTime.localeCompare(b.sortTime);
+    });
+    
+    return { ...group, itineraries: mergedItems };
   });
 
   const stats = {
@@ -201,52 +226,93 @@ export default function Home() {
                     <div className="bg-white p-4 max-h-96 overflow-y-auto">
                       {group.itineraries.length > 0 ? (
                         <div className="space-y-3">
-                          {group.itineraries.map((item: any, index: number) => (
-                            <div key={item.id} className="flex gap-3">
-                              {/* 時間軸線 */}
-                              <div className="flex flex-col items-center">
-                                <div 
-                                  className="w-3 h-3 rounded-full border-2 flex-shrink-0"
-                                  style={{
-                                    borderColor: group.color || '#6b7280',
-                                    backgroundColor: 'white',
-                                  }}
-                                />
-                                {index < group.itineraries.length - 1 && (
-                                  <div 
-                                    className="w-0.5 flex-1 min-h-[40px]"
-                                    style={{
-                                      backgroundColor: group.color || '#e5e7eb',
-                                    }}
-                                  />
-                                )}
-                              </div>
-
-                              {/* 行程內容 */}
-                              <div className="flex-1 pb-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate">
-                                      {item.locationName || '未指定地點'}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                      <Clock className="h-3 w-3" />
-                                      <span>
-                                        {format(new Date(item.date), "MM/dd", { locale: zhCN })}
-                                        {item.startTime && ` ${item.startTime}`}
-                                        {item.endTime && ` - ${item.endTime}`}
-                                      </span>
-                                    </div>
-                                    {item.description && (
-                                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                        {item.description}
-                                      </p>
+                          {group.itineraries.map((item: any, index: number) => {
+                            if (item.type === 'itinerary') {
+                              return (
+                                <div key={`itinerary-${item.data.id}`} className="flex gap-3">
+                                  {/* 時間軸線 */}
+                                  <div className="flex flex-col items-center">
+                                    <div 
+                                      className="w-3 h-3 rounded-full border-2 flex-shrink-0"
+                                      style={{
+                                        borderColor: group.color || '#6b7280',
+                                        backgroundColor: 'white',
+                                      }}
+                                    />
+                                    {index < group.itineraries.length - 1 && (
+                                      <div 
+                                        className="w-0.5 flex-1 min-h-[40px]"
+                                        style={{
+                                          backgroundColor: group.color || '#e5e7eb',
+                                        }}
+                                      />
                                     )}
                                   </div>
+
+                                  {/* 行程內容 */}
+                                  <div className="flex-1 pb-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-sm truncate">
+                                          {item.data.locationName || '未指定地點'}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                          <Clock className="h-3 w-3" />
+                                          <span>
+                                            {format(new Date(item.data.date), "MM/dd", { locale: zhCN })}
+                                            {item.data.startTime && ` ${item.data.startTime}`}
+                                            {item.data.endTime && ` - ${item.data.endTime}`}
+                                          </span>
+                                        </div>
+                                        {item.data.description && (
+                                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                            {item.data.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          ))}
+                              );
+                            } else if (item.type === 'meal') {
+                              const mealLabels = {
+                                breakfast: '🍳 早餐',
+                                lunch: '🍜 午餐',
+                                dinner: '🍝 晚餐',
+                              };
+                              const mealLabel = mealLabels[item.mealType as keyof typeof mealLabels];
+                              const restaurantField = `${item.mealType}Restaurant`;
+                              const addressField = `${item.mealType}Address`;
+                              const mealContent = `${item.data[restaurantField]}${item.data[addressField] ? ' - ' + item.data[addressField] : ''}`;
+                              
+                              return (
+                                <div key={`meal-${item.mealType}-${index}`} className="flex gap-3">
+                                  <div className="flex flex-col items-center">
+                                    <div 
+                                      className="w-3 h-3 rounded-full border-2 flex-shrink-0"
+                                      style={{
+                                        borderColor: '#f97316',
+                                        backgroundColor: '#fed7aa',
+                                      }}
+                                    />
+                                    {index < group.itineraries.length - 1 && (
+                                      <div 
+                                        className="w-0.5 flex-1 min-h-[40px]"
+                                        style={{
+                                          backgroundColor: group.color || '#e5e7eb',
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 pb-2">
+                                    <p className="text-sm font-medium text-orange-700">{mealLabel}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{mealContent}</p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })}
                         </div>
                       ) : (
                         <p className="text-center text-muted-foreground text-sm py-8">
