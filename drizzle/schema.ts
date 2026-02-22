@@ -318,6 +318,8 @@ export const schools = mysqlTable("schools", {
   contactEmail: varchar("contactEmail", { length: 100 }),
   receptionProcess: text("receptionProcess"), // 接待流程
   availableTimeSlots: json("availableTimeSlots"), // 可交流時段 JSON
+  schoolType: varchar("schoolType", { length: 50 }), // 學校類型：小學/中學/大學
+  maxGroupSize: int("maxGroupSize").default(50), // 最大接待團組人數
   capacity: int("capacity").default(0), // 可接待人數
   notes: text("notes"),
   isActive: boolean("isActive").default(true).notNull(),

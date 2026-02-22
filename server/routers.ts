@@ -1170,6 +1170,46 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await db.getTemplateItineraries(input.templateId);
       }),
+    
+    applyTemplate: editorProcedure
+      .input(z.object({
+        templateId: z.number(),
+        groupId: z.number(),
+        startDate: z.string(), // ISO date string
+      }))
+      .mutation(async ({ input }) => {
+        const { templateId, groupId, startDate } = input;
+        
+        // 獲取模板的所有行程點
+        const templateItineraries = await db.getTemplateItineraries(templateId);
+        
+        // 根據團組的開始日期計算每個行程點的實際日期
+        const baseDate = new Date(startDate);
+        let createdCount = 0;
+        
+        for (const templateItem of templateItineraries) {
+          // 計算實際日期：開始日期 + (dayNumber - 1)
+          const actualDate = new Date(baseDate);
+          actualDate.setDate(baseDate.getDate() + (templateItem.dayNumber - 1));
+          
+          // 創建行程點
+          await db.createItinerary({
+            groupId,
+            date: actualDate.toISOString().split('T')[0],
+            dayNumber: templateItem.dayNumber,
+            startTime: templateItem.startTime,
+            endTime: templateItem.endTime,
+            locationId: templateItem.locationId,
+            locationName: templateItem.locationName,
+            description: templateItem.description,
+            sortOrder: templateItem.sortOrder || 0,
+          });
+          
+          createdCount++;
+        }
+        
+        return { success: true, createdCount };
+      }),
   }),
   
   // 快照管理（版本控制）

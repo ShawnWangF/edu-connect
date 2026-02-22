@@ -652,6 +652,30 @@ export default function ResourceLibrary() {
                     defaultValue={editingItem?.contactEmail}
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="schoolType">學校類型</Label>
+                    <Select name="schoolType" defaultValue={editingItem?.schoolType || "小學"}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇學校類型" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="小學">小學</SelectItem>
+                        <SelectItem value="中學">中學</SelectItem>
+                        <SelectItem value="大學">大學</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="maxGroupSize">最大接待團組人數</Label>
+                    <Input
+                      id="maxGroupSize"
+                      name="maxGroupSize"
+                      type="number"
+                      defaultValue={editingItem?.maxGroupSize || 50}
+                    />
+                  </div>
+                </div>
                 <div>
                   <Label htmlFor="capacity">可接待人數</Label>
                   <Input

@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE schools \nADD COLUMN schoolType VARCHAR(50) COMMENT '學校類型：小學/中學/大學',\nADD COLUMN maxGroupSize INT DEFAULT 50 COMMENT '最大接待團組人數';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \nALTER TABLE schools \nADD COLUMN schoolType VARCHAR(50) COMMENT '學校類型：小學/中學/大學',\nADD COLUMN maxGroupSize INT DEFAULT 50 COMMENT '最大接待團組人數';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2122
+}
