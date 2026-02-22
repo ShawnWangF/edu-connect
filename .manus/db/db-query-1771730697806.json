@@ -1,0 +1,9 @@
+{
+  "query": "\nCREATE TABLE IF NOT EXISTS `projects` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `code` varchar(64) NOT NULL UNIQUE,\n  `name` varchar(255) NOT NULL,\n  `description` text,\n  `startDate` date NOT NULL,\n  `endDate` date NOT NULL,\n  `totalStudents` int NOT NULL DEFAULT 0,\n  `totalTeachers` int NOT NULL DEFAULT 0,\n  `status` enum('preparing', 'ongoing', 'completed', 'cancelled') NOT NULL DEFAULT 'preparing',\n  `createdBy` int NOT NULL,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `projects_id` PRIMARY KEY(`id`)\n);\n\nALTER TABLE `groups` ADD COLUMN IF NOT EXISTS `projectId` int AFTER `id`;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \nCREATE TABLE IF NOT EXISTS `projects` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `code` varchar(64) NOT NULL UNIQUE,\n  `name` varchar(255) NOT NULL,\n  `description` text,\n  `startDate` date NOT NULL,\n  `endDate` date NOT NULL,\n  `totalStudents` int NOT NULL DEFAULT 0,\n  `totalTeachers` int NOT NULL DEFAULT 0,\n  `status` enum('preparing', 'ongoing', 'completed', 'cancelled') NOT NULL DEFAULT 'preparing',\n  `createdBy` int NOT NULL,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `projects_id` PRIMARY KEY(`id`)\n);\n\nALTER TABLE `groups` ADD COLUMN IF NOT EXISTS `projectId` int AFTER `id`;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2249
+}

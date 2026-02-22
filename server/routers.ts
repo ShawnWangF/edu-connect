@@ -138,6 +138,75 @@ export const appRouter = router({
   }),
   
   // 團組管理
+  // 項目管理
+  projects: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getAllProjects();
+    }),
+    
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getProjectById(input.id);
+      }),
+    
+    create: editorProcedure
+      .input(z.object({
+        code: z.string(),
+        name: z.string(),
+        description: z.string().optional(),
+        startDate: z.string(),
+        endDate: z.string(),
+        totalStudents: z.number().optional(),
+        totalTeachers: z.number().optional(),
+        status: z.enum(['preparing', 'ongoing', 'completed', 'cancelled']).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await db.createProject({
+          ...input,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+          createdBy: ctx.user.id,
+        });
+        return { success: true, result };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        code: z.string().optional(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        totalStudents: z.number().optional(),
+        totalTeachers: z.number().optional(),
+        status: z.enum(['preparing', 'ongoing', 'completed', 'cancelled']).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const updateData: any = { ...data };
+        if (data.startDate) updateData.startDate = new Date(data.startDate);
+        if (data.endDate) updateData.endDate = new Date(data.endDate);
+        
+        const result = await db.updateProject(id, updateData);
+        return { success: true, result };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const result = await db.deleteProject(input.id);
+        return { success: true, result };
+      }),
+    
+    getGroups: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getGroupsByProjectId(input.projectId);
+      }),
+  }),
+  
   groups: router({
     list: protectedProcedure.query(async () => {
       return await db.getAllGroups();
@@ -151,6 +220,7 @@ export const appRouter = router({
     
     create: editorProcedure
       .input(z.object({
+        projectId: z.number().optional(),
         name: z.string(),
         code: z.string(),
         startDate: z.string(),

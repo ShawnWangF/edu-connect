@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities } from "../drizzle/schema";
+import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 
@@ -625,4 +625,78 @@ export async function deleteSecurity(id: number) {
   if (!db) throw new Error("Database not available");
 
   await db.delete(securities).where(eq(securities.id, id));
+}
+
+
+// ==================== 項目管理 ====================
+
+export async function createProject(data: {
+  code: string;
+  name: string;
+  description?: string;
+  startDate: Date;
+  endDate: Date;
+  totalStudents?: number;
+  totalTeachers?: number;
+  status?: 'preparing' | 'ongoing' | 'completed' | 'cancelled';
+  createdBy: number;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.insert(projects).values({
+    ...data,
+    totalStudents: data.totalStudents || 0,
+    totalTeachers: data.totalTeachers || 0,
+    status: data.status || 'preparing',
+  });
+
+  return result;
+}
+
+export async function getAllProjects() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(projects);
+}
+
+export async function getProjectById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function updateProject(id: number, data: Partial<{
+  code: string;
+  name: string;
+  description: string;
+  startDate: Date;
+  endDate: Date;
+  totalStudents: number;
+  totalTeachers: number;
+  status: 'preparing' | 'ongoing' | 'completed' | 'cancelled';
+}>) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.update(projects).set(data).where(eq(projects.id, id));
+  return result;
+}
+
+export async function deleteProject(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.delete(projects).where(eq(projects.id, id));
+  return result;
+}
+
+export async function getGroupsByProjectId(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(groups).where(eq(groups.projectId, projectId));
 }

@@ -19,10 +19,29 @@ export const users = mysqlTable("users", {
 });
 
 /**
+ * 項目表 - 存儲項目基本信息（一個項目包含多個團組）
+ */
+export const projects = mysqlTable("projects", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 64 }).unique().notNull(), // 項目編號
+  name: varchar("name", { length: 255 }).notNull(), // 項目名稱
+  description: text("description"), // 項目描述
+  startDate: date("startDate").notNull(), // 開始日期
+  endDate: date("endDate").notNull(), // 結束日期
+  totalStudents: int("totalStudents").default(0).notNull(), // 總學生數
+  totalTeachers: int("totalTeachers").default(0).notNull(), // 總教師數
+  status: mysqlEnum("status", ["preparing", "ongoing", "completed", "cancelled"]).default("preparing").notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
  * 團組表 - 存儲團組基本信息
  */
 export const groups = mysqlTable("groups", {
   id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId"), // 所屬項目 ID，可為空表示獨立團組
   name: varchar("name", { length: 255 }).notNull(),
   code: varchar("code", { length: 64 }).unique().notNull(), // 團組編號
   startDate: date("startDate").notNull(),
@@ -330,3 +349,5 @@ export type Guide = typeof guides.$inferSelect;
 export type InsertGuide = typeof guides.$inferInsert;
 export type Security = typeof securities.$inferSelect;
 export type InsertSecurity = typeof securities.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = typeof projects.$inferInsert;

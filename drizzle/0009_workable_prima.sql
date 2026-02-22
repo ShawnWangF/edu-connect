@@ -1,0 +1,1 @@
+ALTER TABLE `itineraries` ADD `contactPerson` varchar(255);
