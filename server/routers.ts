@@ -254,7 +254,7 @@ export const appRouter = router({
           notificationService.notifyGroupCreated(newGroup).catch(console.error);
         }
         
-        return { success: true };
+        return { success: true, groupId: newGroup?.id };
       }),
     
     update: editorProcedure

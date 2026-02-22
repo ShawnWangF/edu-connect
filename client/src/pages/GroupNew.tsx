@@ -34,10 +34,34 @@ export default function GroupNew() {
   });
 
   const [customType, setCustomType] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  
+  // 獲取所有模板
+  const { data: templates } = trpc.templates.list.useQuery();
+  
+  // 套用模板mutation
+  const applyTemplateMutation = trpc.templates.applyTemplate.useMutation({
+    onSuccess: (result) => {
+      toast.success(`已從模板生成 ${result.createdCount} 個行程點！`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "套用模板失敗");
+    },
+  });
 
   const createMutation = trpc.groups.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (data) => {
       toast.success("團組創建成功！");
+      
+      // 如果選擇了模板，套用模板
+      if (selectedTemplateId) {
+        await applyTemplateMutation.mutateAsync({
+          templateId: selectedTemplateId,
+          groupId: data.groupId,
+          startDate: formData.startDate,
+        });
+      }
+      
       setLocation("/groups");
     },
     onError: (error) => {
@@ -220,6 +244,26 @@ export default function GroupNew() {
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="template">選擇行程模板（可選）</Label>
+              <select
+                id="template"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={selectedTemplateId || ""}
+                onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">不使用模板（手動創建行程）</option>
+                {templates?.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} ({template.days}天)
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-muted-foreground">
+                選擇模板後，系統將自動根據開始日期生成完整行程框架
+              </p>
             </div>
 
             <div className="space-y-2">
