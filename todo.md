@@ -452,6 +452,9 @@
 - [x] 測試CalendarMatrix功能（矩陣顯示、資源衝突檢測）
 - [x] 保存Phase 1完成checkpoint
 
+## 緊急修復
+- [x] 修復批量添加行程點功能邏輯：改為選擇一天日期，在對話框內連續添加多個行程點
+
 ## Phase 2 - 資源庫管理 + 行程模板
 ### 資源庫管理
 - [x] 擴展locations表schema（添加openingHours、closedDays、requiresBooking等字段）
