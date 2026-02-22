@@ -816,3 +816,16 @@ export async function createTemplateItinerary(itineraryData: any) {
   const result = await db.insert(templateItineraries).values(itineraryData);
   return result;
 }
+
+// School Exchanges
+export async function getSchoolExchangesByGroup(groupId: number) {
+  return await database.select().from(schema.schoolExchanges).where(eq(schema.schoolExchanges.groupId, groupId));
+}
+
+export async function createSchoolExchange(data: any) {
+  return await database.insert(schema.schoolExchanges).values(data);
+}
+
+export async function deleteSchoolExchange(id: number) {
+  return await database.delete(schema.schoolExchanges).where(eq(schema.schoolExchanges.id, id));
+}

@@ -429,3 +429,16 @@ export type School = typeof schools.$inferSelect;
 export type InsertSchool = typeof schools.$inferInsert;
 export type TemplateItinerary = typeof templateItineraries.$inferSelect;
 export type InsertTemplateItinerary = typeof templateItineraries.$inferInsert;
+
+export const schoolExchanges = mysqlTable("schoolExchanges", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("groupId").notNull(),
+  schoolId: int("schoolId").notNull(),
+  exchangeDate: date("exchangeDate").notNull(),
+  startTime: varchar("startTime", { length: 10 }),
+  endTime: varchar("endTime", { length: 10 }),
+  activities: text("activities"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});

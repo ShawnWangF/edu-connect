@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS schoolExchanges (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  groupId INT NOT NULL,\n  schoolId INT NOT NULL,\n  exchangeDate DATE NOT NULL,\n  startTime VARCHAR(10),\n  endTime VARCHAR(10),\n  activities TEXT,\n  notes TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  FOREIGN KEY (groupId) REFERENCES `groups`(id) ON DELETE CASCADE,\n  FOREIGN KEY (schoolId) REFERENCES schools(id) ON DELETE CASCADE\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute CREATE TABLE IF NOT EXISTS schoolExchanges (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  groupId INT NOT NULL,\n  schoolId INT NOT NULL,\n  exchangeDate DATE NOT NULL,\n  startTime VARCHAR(10),\n  endTime VARCHAR(10),\n  activities TEXT,\n  notes TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  FOREIGN KEY (groupId) REFERENCES `groups`(id) ON DELETE CASCADE,\n  FOREIGN KEY (schoolId) REFERENCES schools(id) ON DELETE CASCADE\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1668
+}

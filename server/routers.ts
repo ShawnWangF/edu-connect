@@ -1180,6 +1180,37 @@ export const appRouter = router({
       }),
   }),
   
+  // 學校交流管理
+  schoolExchanges: router({
+    listByGroup: protectedProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getSchoolExchangesByGroup(input.groupId);
+      }),
+    
+    create: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        schoolId: z.number(),
+        exchangeDate: z.string(),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        activities: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createSchoolExchange(input);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteSchoolExchange(input.id);
+        return { success: true };
+      }),
+  }),
+  
   // 行程模板管理
   templates: router({
     list: protectedProcedure.query(async () => {
