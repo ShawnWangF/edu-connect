@@ -437,3 +437,17 @@
 - [x] 實現或修復刪除某一日卡片的功能
 - [x] 添加刪除確認對話框，防止誤刪
 - [x] 測試刪除功能
+
+## Phase 1 - 架構升級：從團組管理到項目統籌
+- [x] 創建projects表（項目基本信息）
+- [x] 修改groups表，添加projectId外鍵關聯
+- [x] 實現完整的項目管理API（create/list/get/update/delete/getGroups）
+- [x] 調整groups.create支持projectId參數
+- [x] 創建ProjectList頁面（項目列表和創建）
+- [x] 創建ProjectDetail頁面（項目詳情和統計）
+- [x] 實現CalendarMatrix組件（多團組日曆矩陣視圖）
+- [x] 實現資源衝突檢測（同一地點同一時段被多個團組佔用時紅色標記）
+- [x] 更新側邊欄導航，添加「項目總覽」入口
+- [x] 導入10月江蘇交流團測試數據（3個團組，32條行程）
+- [x] 測試CalendarMatrix功能（矩陣顯示、資源衝突檢測）
+- [x] 保存Phase 1完成checkpoint
