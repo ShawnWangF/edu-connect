@@ -115,9 +115,9 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
       // 計算每小時的高度
       const calculatedHourHeight = Math.floor(heightPerGroup / timeHours);
       
-      // 設置最小和最大高度限制，增加每小時高度讓 2-3 小時行程更明顯
-      const minHeight = 25; // 增加最小高度
-      const maxHeight = 60; // 增加最大高度
+      // 設置最小和最大高度限制，確保 1-1.5 小時行程卡片信息可見
+      const minHeight = 40; // 增加最小高度，確保 1 小時行程可見
+      const maxHeight = 80; // 增加最大高度
       const finalHeight = Math.max(minHeight, Math.min(maxHeight, calculatedHourHeight));
       
       setHourHeight(finalHeight);
@@ -231,7 +231,9 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     const duration = endTime - startTime;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const cellRect = e.currentTarget.parentElement?.getBoundingClientRect();
+      const parent = e.currentTarget.parentElement;
+      if (!parent) return;
+      const cellRect = parent.getBoundingClientRect();
       if (!cellRect) return;
 
       const y = moveEvent.clientY - cellRect.top - offsetY;
@@ -252,7 +254,9 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
-      const cellRect = e.currentTarget.parentElement?.getBoundingClientRect();
+      const parent = e.currentTarget.parentElement;
+      if (!parent) return;
+      const cellRect = parent.getBoundingClientRect();
       if (!cellRect) return;
 
       const y = upEvent.clientY - cellRect.top - offsetY;
