@@ -218,24 +218,26 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     });
   };
 
-  // 處理拖拽移動（整體移動）
+  // 處理拖拽移動行程
   const handleDrag = (e: React.MouseEvent, itinerary: Itinerary) => {
+    e.stopPropagation();
     e.preventDefault();
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetY = e.clientY - rect.top;
+    const startY = e.clientY;
+    const offsetY = startY - e.currentTarget.getBoundingClientRect().top;
     setDraggedItem({ itinerary, offsetY });
+
+    // 在函數開始時保存 parentElement 引用
+    const parentElement = e.currentTarget.parentElement;
+    if (!parentElement) return;
 
     const startTime = timeToHours(itinerary.startTime);
     const endTime = timeToHours(itinerary.endTime);
     const duration = endTime - startTime;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const parent = e.currentTarget.parentElement;
-      if (!parent) return;
-      const cellRect = parent.getBoundingClientRect();
+      const cellRect = parentElement.getBoundingClientRect();
       if (!cellRect) return;
-
+      
       const y = moveEvent.clientY - cellRect.top - offsetY;
       const hours = TIME_START + y / hourHeight;
       const newStartHours = Math.max(TIME_START, Math.min(TIME_END - duration, hours));
@@ -254,9 +256,7 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
-      const parent = e.currentTarget.parentElement;
-      if (!parent) return;
-      const cellRect = parent.getBoundingClientRect();
+      const cellRect = parentElement.getBoundingClientRect();
       if (!cellRect) return;
 
       const y = upEvent.clientY - cellRect.top - offsetY;
