@@ -368,6 +368,7 @@ export const appRouter = router({
     update: editorProcedure
       .input(z.object({
         id: z.number(),
+        date: z.string().optional(),
         startTime: z.string().optional(),
         endTime: z.string().optional(),
         locationId: z.number().optional(),

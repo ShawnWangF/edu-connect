@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { trpc } from '../lib/trpc';
 import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Group {
   id: number;
@@ -29,10 +30,27 @@ interface Itinerary {
 }
 
 export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: CalendarMatrixProps) {
+  const [draggedItem, setDraggedItem] = useState<Itinerary | null>(null);
+  const utils = trpc.useUtils();
+
   // 獲取所有團組的行程點
   const itinerariesQueries = groups.map((group) =>
     trpc.itineraries.listByGroup.useQuery({ groupId: group.id })
   );
+
+  // 更新行程日期
+  const updateItinerary = trpc.itineraries.update.useMutation({
+    onSuccess: () => {
+      // 重新獲取所有團組的行程
+      groups.forEach((group) => {
+        utils.itineraries.listByGroup.invalidate({ groupId: group.id });
+      });
+      toast.success("行程日期已更新");
+    },
+    onError: (error) => {
+      toast.error(error.message || "更新失敗");
+    },
+  });
 
   const allItineraries = useMemo(() => {
     const result: Itinerary[] = [];
@@ -127,36 +145,69 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
                       !isInRange ? 'bg-muted/20' : ''
                     }`}
                   >
-                    {isInRange && itineraries.length > 0 && (
-                      <div className="space-y-1">
-                        {itineraries.map((itinerary) => {
-                          const hasConflict = detectConflicts(
-                            date,
-                            itinerary.locationName || '',
-                            itinerary.startTime || ''
-                          );
-                          
-                          return (
-                            <div
-                              key={itinerary.id}
-                              className={`text-xs p-1 rounded ${
-                                hasConflict
-                                  ? 'bg-red-100 border border-red-300 text-red-800'
-                                  : 'bg-blue-50 border border-blue-200 text-blue-800'
-                              }`}
-                            >
-                              {hasConflict && (
-                                <AlertCircle className="w-3 h-3 inline mr-1 text-red-600" />
-                              )}
-                              <div className="font-semibold truncate">{itinerary.locationName}</div>
-                              <div className="text-[10px] text-muted-foreground">
-                                {itinerary.startTime} - {itinerary.endTime}
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (isInRange) {
+                          e.currentTarget.classList.add('bg-primary/10');
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('bg-primary/10');
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('bg-primary/10');
+                        if (draggedItem && isInRange) {
+                          const newDate = date.toISOString().split('T')[0];
+                          updateItinerary.mutate({
+                            id: draggedItem.id,
+                            date: newDate,
+                          });
+                        }
+                      }}
+                      className="min-h-[60px]"
+                    >
+                      {isInRange && itineraries.length > 0 && (
+                        <div className="space-y-1">
+                          {itineraries.map((itinerary) => {
+                            const hasConflict = detectConflicts(
+                              date,
+                              itinerary.locationName || '',
+                              itinerary.startTime || ''
+                            );
+                            
+                            return (
+                              <div
+                                key={itinerary.id}
+                                draggable
+                                onDragStart={(e) => {
+                                  setDraggedItem(itinerary);
+                                  e.dataTransfer.effectAllowed = "move";
+                                }}
+                                onDragEnd={() => setDraggedItem(null)}
+                                className={`text-xs p-1 rounded cursor-move hover:opacity-80 transition-opacity ${
+                                  draggedItem?.id === itinerary.id ? 'opacity-50' : ''
+                                } ${
+                                  hasConflict
+                                    ? 'bg-red-100 border border-red-300 text-red-800'
+                                    : 'bg-blue-50 border border-blue-200 text-blue-800'
+                                }`}
+                                title="拖拽以調整日期"
+                              >
+                                {hasConflict && (
+                                  <AlertCircle className="w-3 h-3 inline mr-1 text-red-600" />
+                                )}
+                                <div className="font-semibold truncate">{itinerary.locationName}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  {itinerary.startTime} - {itinerary.endTime}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </td>
                 );
               })}
