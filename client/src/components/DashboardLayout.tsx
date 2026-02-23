@@ -32,7 +32,6 @@ const menuItems = [
   { icon: LayoutDashboard, label: "儀表板", path: "/" },
   { icon: Briefcase, label: "項目總覽", path: "/projects" },
   { icon: Users, label: "團組管理", path: "/groups" },
-  { icon: Calendar, label: "日曆視圖", path: "/calendar" },
   { icon: MapPin, label: "資源庫", path: "/resource-library" },
   { icon: Layers, label: "行程模板", path: "/templates" },
   { icon: Bell, label: "通知中心", path: "/notifications" },

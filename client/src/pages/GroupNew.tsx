@@ -15,6 +15,7 @@ import { format, addDays } from "date-fns";
 export default function GroupNew() {
   const [, setLocation] = useLocation();
   const [formData, setFormData] = useState({
+    projectId: null as number | null,
     name: "",
     code: "",
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -32,6 +33,9 @@ export default function GroupNew() {
     emergencyPhone: "",
     notes: "",
   });
+  
+  // 獲取所有項目
+  const { data: projects } = trpc.projects.list.useQuery();
 
   const [customType, setCustomType] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
@@ -82,7 +86,11 @@ export default function GroupNew() {
       return;
     }
 
-    createMutation.mutate(formData);
+    const submitData = {
+      ...formData,
+      projectId: formData.projectId || undefined,
+    };
+    createMutation.mutate(submitData);
   };
 
   const updateField = (field: string, value: any) => {
@@ -151,6 +159,26 @@ export default function GroupNew() {
             <CardTitle>基本信息</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="projectId">所屬項目</Label>
+              <select
+                id="projectId"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData.projectId || ""}
+                onChange={(e) => updateField("projectId", e.target.value ? parseInt(e.target.value) : null)}
+              >
+                <option value="">不關聯項目（獨立團組）</option>
+                {projects?.map((project: any) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} ({project.code})
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-muted-foreground">
+                選擇一個項目來統籌管理多個團組，或留空創建獨立團組
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">團組名稱 *</Label>
