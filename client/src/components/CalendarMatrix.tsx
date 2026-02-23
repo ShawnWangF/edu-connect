@@ -94,8 +94,8 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
   }, [projectStartDate, projectEndDate]);
 
   // 時間軸配置
-  const TIME_START = 8;
-  const TIME_END = 22;
+  const TIME_START = 6.5; // 6:30
+  const TIME_END = 24; // 23:59
 
   // 自動計算時間軸高度，確保一屏可見
   useEffect(() => {
@@ -115,9 +115,9 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
       // 計算每小時的高度
       const calculatedHourHeight = Math.floor(heightPerGroup / timeHours);
       
-      // 設置最小和最大高度限制
-      const minHeight = 15;
-      const maxHeight = 50;
+      // 設置最小和最大高度限制，增加每小時高度讓 2-3 小時行程更明顯
+      const minHeight = 25; // 增加最小高度
+      const maxHeight = 60; // 增加最大高度
       const finalHeight = Math.max(minHeight, Math.min(maxHeight, calculatedHourHeight));
       
       setHourHeight(finalHeight);
