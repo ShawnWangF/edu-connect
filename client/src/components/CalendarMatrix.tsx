@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { trpc } from '../lib/trpc';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,9 +30,11 @@ interface Itinerary {
 }
 
 export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: CalendarMatrixProps) {
-  const [draggedItem, setDraggedItem] = useState<Itinerary | null>(null);
+  const [draggedItem, setDraggedItem] = useState<{ itinerary: Itinerary; offsetY: number } | null>(null);
   const [resizingItem, setResizingItem] = useState<{ itinerary: Itinerary; edge: 'top' | 'bottom' } | null>(null);
-  const [tempPosition, setTempPosition] = useState<{ id: number; top: number; height: number } | null>(null);
+  const [tempPosition, setTempPosition] = useState<{ id: number; top: number; height: number; startTime: string; endTime: string } | null>(null);
+  const [hourHeight, setHourHeight] = useState(25);
+  const containerRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
   // 獲取所有團組的行程點
@@ -76,10 +78,40 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     return dateList;
   }, [projectStartDate, projectEndDate]);
 
-  // 時間軸配置：8:00 - 22:00，每小時一個刻度
+  // 時間軸配置
   const TIME_START = 8;
   const TIME_END = 22;
-  const HOUR_HEIGHT = 40; // 每小時的像素高度
+
+  // 自動計算時間軸高度，確保一屏可見
+  useEffect(() => {
+    const calculateHourHeight = () => {
+      if (!containerRef.current) return;
+      
+      const viewportHeight = window.innerHeight;
+      const headerHeight = 300; // 頁面頭部高度
+      const footerHeight = 100; // 底部圖例高度
+      const availableHeight = viewportHeight - headerHeight - footerHeight;
+      
+      const groupCount = groups.length;
+      const timeHours = TIME_END - TIME_START;
+      
+      // 計算每個團組的可用高度
+      const heightPerGroup = availableHeight / groupCount;
+      // 計算每小時的高度
+      const calculatedHourHeight = Math.floor(heightPerGroup / timeHours);
+      
+      // 設置最小和最大高度限制
+      const minHeight = 15;
+      const maxHeight = 50;
+      const finalHeight = Math.max(minHeight, Math.min(maxHeight, calculatedHourHeight));
+      
+      setHourHeight(finalHeight);
+    };
+
+    calculateHourHeight();
+    window.addEventListener('resize', calculateHourHeight);
+    return () => window.removeEventListener('resize', calculateHourHeight);
+  }, [groups.length]);
 
   // 將時間字符串轉換為小時數（支持小數）
   const timeToHours = (timeStr: string | null): number => {
@@ -97,16 +129,26 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
 
   // 計算行程卡片的位置和高度
   const getItineraryStyle = (itinerary: Itinerary) => {
-    // 如果正在拉伸這個卡片，使用臨時位置
+    // 如果正在拖拽或拉伸這個卡片，使用臨時位置
     if (tempPosition && tempPosition.id === itinerary.id) {
-      return { top: tempPosition.top, height: tempPosition.height };
+      return { 
+        top: tempPosition.top, 
+        height: tempPosition.height,
+        startTime: tempPosition.startTime,
+        endTime: tempPosition.endTime
+      };
     }
     
     const startHours = timeToHours(itinerary.startTime);
     const endHours = timeToHours(itinerary.endTime);
-    const top = (startHours - TIME_START) * HOUR_HEIGHT;
-    const height = (endHours - startHours) * HOUR_HEIGHT;
-    return { top, height };
+    const top = (startHours - TIME_START) * hourHeight;
+    const height = (endHours - startHours) * hourHeight;
+    return { 
+      top, 
+      height,
+      startTime: itinerary.startTime || '',
+      endTime: itinerary.endTime || ''
+    };
   };
 
   // 檢測資源衝突
@@ -132,28 +174,62 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     });
   };
 
-  // 處理拖拽移動
-  const handleDrop = (e: React.DragEvent, date: Date, isInRange: boolean) => {
+  // 處理拖拽移動（整體移動）
+  const handleDrag = (e: React.MouseEvent, itinerary: Itinerary) => {
     e.preventDefault();
-    if (!draggedItem || !isInRange) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const hours = TIME_START + y / HOUR_HEIGHT;
-    const startHours = Math.max(TIME_START, Math.min(TIME_END - 0.5, hours));
     
-    const oldStart = timeToHours(draggedItem.startTime);
-    const oldEnd = timeToHours(draggedItem.endTime);
-    const duration = oldEnd - oldStart;
-    const endHours = Math.min(TIME_END, startHours + duration);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    setDraggedItem({ itinerary, offsetY });
 
-    const newDate = date.toISOString().split('T')[0];
-    updateItinerary.mutate({
-      id: draggedItem.id,
-      date: newDate,
-      startTime: hoursToTime(startHours),
-      endTime: hoursToTime(endHours),
-    });
+    const startTime = timeToHours(itinerary.startTime);
+    const endTime = timeToHours(itinerary.endTime);
+    const duration = endTime - startTime;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const cellRect = e.currentTarget.parentElement?.getBoundingClientRect();
+      if (!cellRect) return;
+
+      const y = moveEvent.clientY - cellRect.top - offsetY;
+      const hours = TIME_START + y / hourHeight;
+      const newStartHours = Math.max(TIME_START, Math.min(TIME_END - duration, hours));
+      const newEndHours = newStartHours + duration;
+
+      const newTop = (newStartHours - TIME_START) * hourHeight;
+      const newHeight = duration * hourHeight;
+
+      setTempPosition({
+        id: itinerary.id,
+        top: newTop,
+        height: newHeight,
+        startTime: hoursToTime(newStartHours),
+        endTime: hoursToTime(newEndHours)
+      });
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      const cellRect = e.currentTarget.parentElement?.getBoundingClientRect();
+      if (!cellRect) return;
+
+      const y = upEvent.clientY - cellRect.top - offsetY;
+      const hours = TIME_START + y / hourHeight;
+      const newStartHours = Math.max(TIME_START, Math.min(TIME_END - duration, hours));
+      const newEndHours = newStartHours + duration;
+
+      updateItinerary.mutate({
+        id: itinerary.id,
+        startTime: hoursToTime(newStartHours),
+        endTime: hoursToTime(newEndHours),
+      });
+
+      setDraggedItem(null);
+      setTempPosition(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   // 處理拉伸調整時間
@@ -165,12 +241,12 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     const startY = e.clientY;
     const startTime = timeToHours(itinerary.startTime);
     const endTime = timeToHours(itinerary.endTime);
-    const initialTop = (startTime - TIME_START) * HOUR_HEIGHT;
-    const initialHeight = (endTime - startTime) * HOUR_HEIGHT;
+    const initialTop = (startTime - TIME_START) * hourHeight;
+    const initialHeight = (endTime - startTime) * hourHeight;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = moveEvent.clientY - startY;
-      const deltaHours = deltaY / HOUR_HEIGHT;
+      const deltaHours = deltaY / hourHeight;
 
       let newStartTime = startTime;
       let newEndTime = endTime;
@@ -179,20 +255,26 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
 
       if (edge === 'top') {
         newStartTime = Math.max(TIME_START, Math.min(endTime - 0.5, startTime + deltaHours));
-        newTop = (newStartTime - TIME_START) * HOUR_HEIGHT;
-        newHeight = (endTime - newStartTime) * HOUR_HEIGHT;
+        newTop = (newStartTime - TIME_START) * hourHeight;
+        newHeight = (endTime - newStartTime) * hourHeight;
       } else {
         newEndTime = Math.max(startTime + 0.5, Math.min(TIME_END, endTime + deltaHours));
-        newHeight = (newEndTime - startTime) * HOUR_HEIGHT;
+        newHeight = (newEndTime - startTime) * hourHeight;
       }
 
-      // 實時更新視覺反饋
-      setTempPosition({ id: itinerary.id, top: newTop, height: newHeight });
+      // 實時更新視覺反饋和時間顯示
+      setTempPosition({ 
+        id: itinerary.id, 
+        top: newTop, 
+        height: newHeight,
+        startTime: hoursToTime(newStartTime),
+        endTime: hoursToTime(newEndTime)
+      });
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
       const deltaY = upEvent.clientY - startY;
-      const deltaHours = deltaY / HOUR_HEIGHT;
+      const deltaHours = deltaY / hourHeight;
 
       let newStartTime = startTime;
       let newEndTime = endTime;
@@ -220,7 +302,7 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
   };
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" ref={containerRef}>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -230,7 +312,7 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
             {dates.map((date, index) => (
               <th
                 key={index}
-                className="border border-border p-2 min-w-[160px] text-center bg-muted/50"
+                className="border border-border p-2 min-w-[140px] text-center bg-muted/50"
               >
                 <div className="font-semibold">{date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}</div>
                 <div className="text-xs text-muted-foreground">
@@ -268,35 +350,22 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
                   >
                     <div
                       className="relative"
-                      style={{ height: `${(TIME_END - TIME_START) * HOUR_HEIGHT}px` }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (isInRange) {
-                          e.currentTarget.classList.add('bg-primary/5');
-                        }
-                      }}
-                      onDragLeave={(e) => {
-                        e.currentTarget.classList.remove('bg-primary/5');
-                      }}
-                      onDrop={(e) => {
-                        e.currentTarget.classList.remove('bg-primary/5');
-                        handleDrop(e, date, isInRange);
-                      }}
+                      style={{ height: `${(TIME_END - TIME_START) * hourHeight}px` }}
                     >
                       {/* 時間刻度線 */}
                       {Array.from({ length: TIME_END - TIME_START + 1 }, (_, i) => TIME_START + i).map((hour) => (
                         <div
                           key={hour}
                           className="absolute w-full border-t border-border/30"
-                          style={{ top: `${(hour - TIME_START) * HOUR_HEIGHT}px` }}
+                          style={{ top: `${(hour - TIME_START) * hourHeight}px` }}
                         >
-                          <span className="text-[10px] text-muted-foreground ml-1">{hour}:00</span>
+                          <span className="text-[9px] text-muted-foreground ml-0.5">{hour}:00</span>
                         </div>
                       ))}
 
                       {/* 行程卡片 */}
                       {isInRange && itineraries.map((itinerary) => {
-                        const { top, height } = getItineraryStyle(itinerary);
+                        const { top, height, startTime, endTime } = getItineraryStyle(itinerary);
                         const hasConflict = detectConflicts(
                           date,
                           itinerary.locationName || '',
@@ -306,8 +375,8 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
                         return (
                           <div
                             key={itinerary.id}
-                            className={`absolute left-1 right-1 rounded hover:shadow-lg transition-shadow select-none ${
-                              resizingItem?.itinerary.id === itinerary.id ? 'shadow-xl ring-2 ring-blue-500' : ''
+                            className={`absolute left-0.5 right-0.5 rounded hover:shadow-lg transition-shadow select-none ${
+                              resizingItem?.itinerary.id === itinerary.id || draggedItem?.itinerary.id === itinerary.id ? 'shadow-xl ring-2 ring-blue-500 z-10' : ''
                             } ${
                               hasConflict
                                 ? 'bg-red-100 border-2 border-red-400 text-red-900'
@@ -316,30 +385,32 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
                             style={{
                               top: `${top}px`,
                               height: `${height}px`,
-                              minHeight: '40px',
+                              minHeight: '30px',
                             }}
-                            title="拉伸邊緣調整時間"
                           >
                             {/* 上邊緣拉伸手柄 */}
                             <div
-                              className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors z-10"
+                              className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors z-10"
                               onMouseDown={(e) => handleResize(e, itinerary, 'top')}
                             />
 
-                            {/* 內容 */}
-                            <div className="px-1.5 py-0.5 overflow-hidden pointer-events-none">
+                            {/* 中間區域：拖拽移動 */}
+                            <div
+                              className="absolute top-2 bottom-2 left-0 right-0 cursor-move px-1 py-0.5 overflow-hidden"
+                              onMouseDown={(e) => handleDrag(e, itinerary)}
+                            >
                               {hasConflict && (
                                 <AlertCircle className="w-3 h-3 inline mr-1 text-red-600" />
                               )}
-                              <div className="font-semibold text-[11px] truncate leading-tight">{itinerary.locationName}</div>
-                              <div className="text-[9px] text-muted-foreground leading-tight">
-                                {itinerary.startTime}-{itinerary.endTime}
+                              <div className="font-semibold text-[10px] truncate leading-tight">{itinerary.locationName}</div>
+                              <div className="text-[8px] text-muted-foreground leading-tight">
+                                {startTime}-{endTime}
                               </div>
                             </div>
 
                             {/* 下邊緣拉伸手柄 */}
                             <div
-                              className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors z-10"
+                              className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors z-10"
                               onMouseDown={(e) => handleResize(e, itinerary, 'bottom')}
                             />
                           </div>
@@ -370,7 +441,7 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
           <span>非團組時間</span>
         </div>
         <div className="text-muted-foreground">
-          💡 提示：拖拽卡片移動時間，拉伸邊緣調整時長
+          💡 提示：拖拽卡片中間移動時間，拉伸邊緣調整時長
         </div>
       </div>
     </div>
