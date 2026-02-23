@@ -218,12 +218,37 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [selectedAttractionId, setSelectedAttractionId] = useState<string>("");
   const [conflictWarning, setConflictWarning] = useState<string>("");
+  const [constraintWarnings, setConstraintWarnings] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedStartTime, setSelectedStartTime] = useState<string>("");
   const [batchStartDate, setBatchStartDate] = useState<string>("");
   const [batchEndDate, setBatchEndDate] = useState<string>("");
   const [batchAttractions, setBatchAttractions] = useState<number[]>([]);
   const [batchTimeSlot, setBatchTimeSlot] = useState<string>("morning");
   
   const { data: itineraryAttractions = [] } = trpc.locations.list.useQuery();
+  
+  // 約束檢查函數
+  const checkConstraints = async (attractionId: number, date: string, startTime: string) => {
+    try {
+      const result = await utils.client.attractions.checkConstraints.query({
+        attractionId,
+        date,
+        startTime,
+      });
+      
+      const warnings: string[] = [];
+      if (!result.isAvailable) {
+        result.conflicts.forEach((conflict: string) => {
+          warnings.push(conflict);
+        });
+      }
+      setConstraintWarnings(warnings);
+    } catch (error) {
+      console.error("約束檢查失敗", error);
+      setConstraintWarnings([]);
+    }
+  };
 
   const createMutation = trpc.itineraries.create.useMutation({
     onSuccess: () => {
@@ -384,7 +409,17 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                   defaultValue={selectedItem?.date || dateList[0]?.toISOString().split('T')[0]} 
                   min={group.startDate}
                   max={group.endDate}
-                  required 
+                  required
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    // 重新檢查約束條件
+                    if (selectedAttractionId && selectedAttractionId !== "manual") {
+                      const startTimeInput = document.getElementById("startTime") as HTMLInputElement;
+                      if (startTimeInput?.value) {
+                        checkConstraints(parseInt(selectedAttractionId), e.target.value, startTimeInput.value);
+                      }
+                    }
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   團組日期範圍：{format(new Date(group.startDate), "yyyy-MM-dd")} 至 {format(new Date(group.endDate), "yyyy-MM-dd")} （第幾天將自動計算）
@@ -394,7 +429,22 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="startTime">開始時間</Label>
-                  <Input id="startTime" name="startTime" type="time" defaultValue={selectedItem?.startTime || ""} />
+                  <Input 
+                    id="startTime" 
+                    name="startTime" 
+                    type="time" 
+                    defaultValue={selectedItem?.startTime || ""}
+                    onChange={(e) => {
+                      setSelectedStartTime(e.target.value);
+                      // 重新檢查約束條件
+                      if (selectedAttractionId && selectedAttractionId !== "manual") {
+                        const dateInput = document.getElementById("date") as HTMLInputElement;
+                        if (dateInput?.value) {
+                          checkConstraints(parseInt(selectedAttractionId), dateInput.value, e.target.value);
+                        }
+                      }
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endTime">結束時間</Label>
@@ -406,10 +456,36 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                 <Label htmlFor="attractionSelect">景點選擇</Label>
                 <Select
                   value={selectedAttractionId}
-                  onValueChange={(value) => {
+                  onValueChange={async (value) => {
                     setSelectedAttractionId(value);
                     if (value === "manual") {
                       setConflictWarning("");
+                      setConstraintWarnings([]);
+                    } else {
+                      // 當選擇景點時，檢查約束條件
+                      const attractionId = parseInt(value);
+                      const dateInput = document.getElementById("date") as HTMLInputElement;
+                      const startTimeInput = document.getElementById("startTime") as HTMLInputElement;
+                      
+                      if (dateInput?.value && startTimeInput?.value) {
+                        try {
+                          const result = await utils.client.attractions.checkConstraints.query({
+                            attractionId,
+                            date: dateInput.value,
+                            startTime: startTimeInput.value,
+                          });
+                          
+                          const warnings: string[] = [];
+                          if (!result.isAvailable) {
+                            result.conflicts.forEach((conflict: string) => {
+                              warnings.push(conflict);
+                            });
+                          }
+                          setConstraintWarnings(warnings);
+                        } catch (error) {
+                          console.error("約束檢查失敗", error);
+                        }
+                      }
                     }
                   }}
                 >
@@ -454,6 +530,26 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-800">{conflictWarning}</p>
+                </div>
+              )}
+              
+              {/* 約束條件警告 */}
+              {constraintWarnings.length > 0 && (
+                <div className="space-y-2">
+                  {constraintWarnings.map((warning, index) => {
+                    const isBookingWarning = warning.includes("需要預約");
+                    const bgColor = isBookingWarning ? "bg-orange-50" : "bg-red-50";
+                    const borderColor = isBookingWarning ? "border-orange-200" : "border-red-200";
+                    const textColor = isBookingWarning ? "text-orange-800" : "text-red-800";
+                    const iconColor = isBookingWarning ? "text-orange-600" : "text-red-600";
+                    
+                    return (
+                      <div key={index} className={`${bgColor} border ${borderColor} rounded-md p-3 flex items-start gap-2`}>
+                        <AlertCircle className={`h-5 w-5 ${iconColor} flex-shrink-0 mt-0.5`} />
+                        <p className={`text-sm ${textColor} font-medium`}>{warning}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -584,12 +680,32 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                         if (item.type === 'itinerary') {
                           return (
                             <div key={`itinerary-${item.data.id}`} className="flex gap-4 pb-3 border-b last:border-0">
-                              <div className="flex-shrink-0 w-24 text-sm text-muted-foreground">
-                                <div className="text-xs">
+                              <div className="flex-shrink-0 w-32 text-sm">
+                                <div className="text-xs text-muted-foreground">
                                   {item.data.startTime && item.data.endTime
                                     ? `${item.data.startTime} - ${item.data.endTime}`
                                     : "全天"}
                                 </div>
+                                {item.data.startTime && (() => {
+                                  const hour = parseInt(item.data.startTime.split(':')[0]);
+                                  let period = '';
+                                  let periodColor = '';
+                                  if (hour >= 6 && hour < 12) {
+                                    period = '上午';
+                                    periodColor = 'text-amber-600 bg-amber-50';
+                                  } else if (hour >= 12 && hour < 18) {
+                                    period = '下午';
+                                    periodColor = 'text-blue-600 bg-blue-50';
+                                  } else if (hour >= 18 || hour < 6) {
+                                    period = '晚上';
+                                    periodColor = 'text-purple-600 bg-purple-50';
+                                  }
+                                  return period ? (
+                                    <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${periodColor}`}>
+                                      {period}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
                               <div className="flex-1">
                                 <p className="font-medium">{item.data.locationName || "未指定地點"}</p>

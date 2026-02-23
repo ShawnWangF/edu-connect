@@ -2,8 +2,125 @@ import { useParams, useLocation } from 'wouter';
 import { trpc } from '../lib/trpc';
 import { Button } from '../components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import { ArrowLeft, Calendar, Users, Plus } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { ArrowLeft, Calendar, Users, Plus, UtensilsCrossed } from 'lucide-react';
 import { CalendarMatrix } from '../components/CalendarMatrix';
+
+// 餐飲統籌 Tab 組件
+function DiningCoordinationTab({ projectId, groups, project }: any) {
+  const utils = trpc.useUtils();
+  
+  // 獲取所有團組的食行卡片
+  const dailyCardsQueries = groups.map((group: any) => 
+    trpc.dailyCards.listByGroup.useQuery({ groupId: group.id })
+  );
+  
+  // 生成日期列表
+  const dateList: string[] = [];
+  const startDate = new Date(project.startDate);
+  const endDate = new Date(project.endDate);
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    dateList.push(d.toISOString().split('T')[0]);
+  }
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UtensilsCrossed className="w-5 h-5 text-orange-500" />
+          餐飲統籌矩陣
+        </CardTitle>
+        <p className="text-sm text-muted-foreground mt-2">
+          一覽所有團組的餐飲安排，方便統籌者協調餐廳資源
+        </p>
+      </CardHeader>
+      <CardContent>
+        {groups.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <UtensilsCrossed className="w-16 h-16 mx-auto mb-4 opacity-20" />
+            <p>還沒有團組，點擊右上角添加第一個團組</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border p-2 bg-muted text-left font-semibold sticky left-0 z-10 bg-background">
+                    團組
+                  </th>
+                  {dateList.map((date, index) => (
+                    <th key={date} className="border p-2 bg-muted text-center text-sm min-w-[200px]">
+                      <div>{new Date(date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(date).toLocaleDateString('zh-CN', { weekday: 'short' })}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((group: any, groupIndex: number) => {
+                  const dailyCards = dailyCardsQueries[groupIndex]?.data || [];
+                  
+                  return (
+                    <tr key={group.id}>
+                      <td className="border p-2 font-medium sticky left-0 z-10 bg-background">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: group.color }}
+                          />
+                          <span className="text-sm">{group.name}</span>
+                        </div>
+                      </td>
+                      {dateList.map((date) => {
+                        const card = dailyCards.find((c: any) => 
+                          new Date(c.date).toISOString().split('T')[0] === date
+                        );
+                        
+                        return (
+                          <td key={date} className="border p-2 align-top">
+                            {card ? (
+                              <div className="space-y-1 text-xs">
+                                {card.breakfast && (
+                                  <div className="flex items-start gap-1">
+                                    <span className="text-orange-600 font-medium">早:</span>
+                                    <span className="text-muted-foreground">{card.breakfast}</span>
+                                  </div>
+                                )}
+                                {card.lunch && (
+                                  <div className="flex items-start gap-1">
+                                    <span className="text-blue-600 font-medium">午:</span>
+                                    <span className="text-muted-foreground">{card.lunch}</span>
+                                  </div>
+                                )}
+                                {card.dinner && (
+                                  <div className="flex items-start gap-1">
+                                    <span className="text-purple-600 font-medium">晚:</span>
+                                    <span className="text-muted-foreground">{card.dinner}</span>
+                                  </div>
+                                )}
+                                {!card.breakfast && !card.lunch && !card.dinner && (
+                                  <span className="text-muted-foreground">未安排</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">未安排</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function ProjectDetail() {
   const params = useParams<{ id: string }>();
@@ -104,32 +221,51 @@ export function ProjectDetail() {
         </Card>
       </div>
 
-      {/* 多團組日曆矩陣 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-purple-500" />
-            行程儀表盤
-          </CardTitle>
-          <p className="text-sm text-muted-foreground mt-2">
-            一覽所有團組的行程安排，紅色標記表示資源衝突
-          </p>
-        </CardHeader>
-        <CardContent>
-          {groups && groups.length > 0 ? (
-            <CalendarMatrix
-              projectStartDate={project.startDate}
-              projectEndDate={project.endDate}
-              groups={groups}
-            />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <Calendar className="w-16 h-16 mx-auto mb-4 opacity-20" />
-              <p>還沒有團組，點擊右上角添加第一個團組</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs 切換 */}
+      <Tabs defaultValue="calendar" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            行程儀表板
+          </TabsTrigger>
+          <TabsTrigger value="dining" className="flex items-center gap-2">
+            <UtensilsCrossed className="w-4 h-4" />
+            餐飲統籌
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="calendar">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-purple-500" />
+                行程儀表板
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                一覽所有團組的行程安排，紅色標記表示資源衝突
+              </p>
+            </CardHeader>
+            <CardContent>
+              {groups && groups.length > 0 ? (
+                <CalendarMatrix
+                  projectStartDate={project.startDate}
+                  projectEndDate={project.endDate}
+                  groups={groups}
+                />
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Calendar className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                  <p>還沒有團組，點擊右上角添加第一個團組</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="dining">
+          <DiningCoordinationTab projectId={projectId} groups={groups || []} project={project} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
