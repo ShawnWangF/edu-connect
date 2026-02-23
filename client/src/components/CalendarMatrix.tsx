@@ -33,6 +33,7 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
   const [draggedItem, setDraggedItem] = useState<{ itinerary: Itinerary; offsetY: number } | null>(null);
   const [resizingItem, setResizingItem] = useState<{ itinerary: Itinerary; edge: 'top' | 'bottom' } | null>(null);
   const [tempPosition, setTempPosition] = useState<{ id: number; top: number; height: number; startTime: string; endTime: string } | null>(null);
+  const [selectedItinerary, setSelectedItinerary] = useState<number | null>(null);
   const [hourHeight, setHourHeight] = useState(25);
   const containerRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
@@ -52,6 +53,20 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     },
     onError: (error) => {
       toast.error(error.message || "更新失敗");
+    },
+  });
+
+  // 刪除行程
+  const deleteItinerary = trpc.itineraries.delete.useMutation({
+    onSuccess: () => {
+      groups.forEach((group) => {
+        utils.itineraries.listByGroup.invalidate({ groupId: group.id });
+      });
+      toast.success("行程已刪除");
+      setSelectedItinerary(null);
+    },
+    onError: (error) => {
+      toast.error(error.message || "刪除失敗");
     },
   });
 
@@ -113,6 +128,25 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     return () => window.removeEventListener('resize', calculateHourHeight);
   }, [groups.length]);
 
+  // 鍵盤刪除事件監聽
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedItinerary) {
+        e.preventDefault();
+        const itinerary = allItineraries.find(it => it.id === selectedItinerary);
+        if (!itinerary) return;
+        
+        const confirmed = window.confirm(`確認刪除行程「${itinerary.locationName}」？`);
+        if (confirmed) {
+          deleteItinerary.mutate({ id: selectedItinerary });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedItinerary, allItineraries, deleteItinerary]);
+
   // 將時間字符串轉換為小時數（支持小數）
   const timeToHours = (timeStr: string | null): number => {
     if (!timeStr) return TIME_START;
@@ -151,18 +185,28 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
     };
   };
 
-  // 檢測資源衝突
-  const detectConflicts = (date: Date, location: string, time: string) => {
+  // 檢測資源衝突，返回衝突的團組列表
+  const detectConflicts = (date: Date, location: string, time: string, currentGroupId: number) => {
     const dateStr = date.toISOString().split('T')[0];
     const conflicts = allItineraries.filter((itinerary) => {
       const itineraryDateStr = new Date(itinerary.date).toISOString().split('T')[0];
       return (
         itineraryDateStr === dateStr &&
         itinerary.locationName === location &&
-        itinerary.startTime === time
+        itinerary.startTime === time &&
+        itinerary.groupId !== currentGroupId
       );
     });
-    return conflicts.length > 1;
+    
+    if (conflicts.length === 0) return null;
+    
+    // 返回衝突的團組名稱列表
+    const conflictGroups = conflicts.map(c => {
+      const group = groups.find(g => g.id === c.groupId);
+      return group?.name || '未知團組';
+    });
+    
+    return conflictGroups;
   };
 
   // 獲取某個團組在某一天的行程點
@@ -358,24 +402,27 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
                           key={hour}
                           className="absolute w-full border-t border-border/30"
                           style={{ top: `${(hour - TIME_START) * hourHeight}px` }}
-                        >
-                          <span className="text-[9px] text-muted-foreground ml-0.5">{hour}:00</span>
-                        </div>
+                        />
                       ))}
 
                       {/* 行程卡片 */}
                       {isInRange && itineraries.map((itinerary) => {
                         const { top, height, startTime, endTime } = getItineraryStyle(itinerary);
-                        const hasConflict = detectConflicts(
+                        const conflictGroups = detectConflicts(
                           date,
                           itinerary.locationName || '',
-                          itinerary.startTime || ''
+                          itinerary.startTime || '',
+                          group.id
                         );
+                        const hasConflict = conflictGroups !== null;
 
                         return (
                           <div
                             key={itinerary.id}
-                            className={`absolute left-0.5 right-0.5 rounded hover:shadow-lg transition-shadow select-none ${
+                            onClick={() => setSelectedItinerary(itinerary.id)}
+                            className={`absolute left-0.5 right-0.5 rounded hover:shadow-lg transition-all select-none cursor-pointer ${
+                              selectedItinerary === itinerary.id ? 'shadow-xl ring-2 ring-purple-500 z-10' : ''
+                            } ${
                               resizingItem?.itinerary.id === itinerary.id || draggedItem?.itinerary.id === itinerary.id ? 'shadow-xl ring-2 ring-blue-500 z-10' : ''
                             } ${
                               hasConflict
@@ -396,16 +443,22 @@ export function CalendarMatrix({ projectStartDate, projectEndDate, groups }: Cal
 
                             {/* 中間區域：拖拽移動 */}
                             <div
-                              className="absolute top-2 bottom-2 left-0 right-0 cursor-move px-1 py-0.5 overflow-hidden"
+                              className="absolute top-2 bottom-2 left-0 right-0 cursor-move px-1 py-0.5 flex flex-col justify-center overflow-hidden"
                               onMouseDown={(e) => handleDrag(e, itinerary)}
+                              title={hasConflict ? `衝突：與 ${conflictGroups!.join('、')} 同時使用此場館` : ''}
                             >
                               {hasConflict && (
                                 <AlertCircle className="w-3 h-3 inline mr-1 text-red-600" />
                               )}
-                              <div className="font-semibold text-[10px] truncate leading-tight">{itinerary.locationName}</div>
-                              <div className="text-[8px] text-muted-foreground leading-tight">
+                              <div className="font-semibold text-[10px] leading-tight break-words">{itinerary.locationName}</div>
+                              <div className="text-[9px] text-muted-foreground leading-tight whitespace-nowrap">
                                 {startTime}-{endTime}
                               </div>
+                              {hasConflict && (
+                                <div className="text-[8px] text-red-700 leading-tight mt-0.5">
+                                  衝突：{conflictGroups!.join('、')}
+                                </div>
+                              )}
                             </div>
 
                             {/* 下邊緣拉伸手柄 */}
