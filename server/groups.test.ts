@@ -47,7 +47,7 @@ describe("Groups Management", () => {
       startDate: "2024-01-01",
       endDate: "2024-01-07",
       days: 7,
-      type: "middle" as const,
+      type: ["middle"],
       studentCount: 30,
       teacherCount: 3,
       totalCount: 33,
@@ -67,7 +67,7 @@ describe("Groups Management", () => {
       startDate: "2024-01-01",
       endDate: "2024-01-07",
       days: 7,
-      type: "middle" as const,
+      type: ["middle"],
     };
 
     await expect(caller.groups.create(groupData)).rejects.toThrow();

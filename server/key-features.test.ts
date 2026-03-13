@@ -44,7 +44,7 @@ describe("團組編輯和刪除功能", () => {
       startDate: "2024-06-01",
       endDate: "2024-06-05",
       days: 5,
-      type: "elementary",
+      type: ["elementary"],
     });
 
     // 獲取團組列表
@@ -78,7 +78,7 @@ describe("團組編輯和刪除功能", () => {
       startDate: "2024-06-01",
       endDate: "2024-06-05",
       days: 5,
-      type: "elementary",
+      type: ["elementary"],
     });
 
     // 獲取團組
@@ -108,7 +108,7 @@ describe("行程點管理功能", () => {
       startDate: "2024-06-01",
       endDate: "2024-06-05",
       days: 5,
-      type: "elementary",
+      type: ["elementary"],
     });
 
     const groups = await caller.groups.list();
@@ -165,7 +165,7 @@ describe("食行卡片複製功能", () => {
       startDate: "2024-06-01",
       endDate: "2024-06-05",
       days: 5,
-      type: "elementary",
+      type: ["elementary"],
     });
 
     const groups = await caller.groups.list();

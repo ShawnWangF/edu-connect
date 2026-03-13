@@ -23,6 +23,7 @@ import Notifications from "./pages/Notifications";
 import { ProjectList } from "./pages/ProjectList";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import Templates from "./pages/Templates";
+import ScheduleOverview from "./pages/ScheduleOverview";
 
 function Router() {
   return (
@@ -31,6 +32,11 @@ function Router() {
       <Route path="/projects">
         <DashboardLayout>
           <ProjectList />
+        </DashboardLayout>
+      </Route>
+      <Route path="/projects/:projectId/schedule">
+        <DashboardLayout>
+          <ScheduleOverview />
         </DashboardLayout>
       </Route>
       <Route path="/projects/:id">

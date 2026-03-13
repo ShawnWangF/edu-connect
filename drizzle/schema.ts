@@ -429,6 +429,110 @@ export type School = typeof schools.$inferSelect;
 export type InsertSchool = typeof schools.$inferInsert;
 export type TemplateItinerary = typeof templateItineraries.$inferSelect;
 export type InsertTemplateItinerary = typeof templateItineraries.$inferInsert;
+export type ScheduleBlock = typeof scheduleBlocks.$inferSelect;
+export type InsertScheduleBlock = typeof scheduleBlocks.$inferInsert;
+export type Staff = typeof staff.$inferSelect;
+export type InsertStaff = typeof staff.$inferInsert;
+export type BatchStaff = typeof batchStaff.$inferSelect;
+export type InsertBatchStaff = typeof batchStaff.$inferInsert;
+export type ExchangeSchoolAvailability = typeof exchangeSchoolAvailability.$inferSelect;
+export type InsertExchangeSchoolAvailability = typeof exchangeSchoolAvailability.$inferInsert;
+export type BatchExchangeSchool = typeof batchExchangeSchools.$inferSelect;
+export type InsertBatchExchangeSchool = typeof batchExchangeSchools.$inferInsert;
+
+/**
+ * 日程色塊表 - 排程總覽儀表板的核心數據
+ * 每個色塊代表某個批次在某天的狀態
+ */
+export const scheduleBlocks = mysqlTable("scheduleBlocks", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("groupId").notNull(), // 關聯批次（groups表）
+  date: date("date").notNull(), // 日期
+  blockType: mysqlEnum("blockType", [
+    "sz_arrive",    // 抵達深圳（淺藍）
+    "sz_stay",      // 在深圳（淺藍）
+    "hk_arrive",    // 抵達香港（較深藍）
+    "hk_stay",      // 在香港（較深藍）
+    "exchange",     // 交流日（深藍★）
+    "border_sz_hk", // 過關：深圳→香港（黃色）
+    "border_hk_sz", // 過關：香港→深圳（黃色）
+    "departure",    // 離開（灰色）
+    "free"          // 空白/未安排
+  ]).notNull().default("free"),
+  isExchangeDay: boolean("isExchangeDay").default(false).notNull(), // 是否為交流日（★）
+  exchangeSchoolId: int("exchangeSchoolId"), // 關聯的交流學校
+  flightNumber: varchar("flightNumber", { length: 50 }), // 航班號
+  flightTime: varchar("flightTime", { length: 10 }), // 航班時間
+  busInfo: text("busInfo"), // 巴士信息
+  hotelCity: mysqlEnum("hotelCity", ["sz", "hk", "macau", "other"]), // 當晚住宿城市
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 工作人員表 - 總統籌、工作人員、導遊、司機
+ */
+export const staff = mysqlTable("staff", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver"]).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 100 }),
+  wechat: varchar("wechat", { length: 100 }),
+  languages: text("languages"), // 語言能力（導遊用）
+  licenseNumber: varchar("licenseNumber", { length: 50 }), // 駕照/導遊證號
+  notes: text("notes"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 批次工作人員指派表 - 記錄哪些工作人員被指派到哪個批次
+ */
+export const batchStaff = mysqlTable("batchStaff", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("groupId").notNull(), // 關聯批次
+  staffId: int("staffId").notNull(), // 關聯工作人員
+  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver"]).notNull(), // 在此批次的角色
+  startDate: date("startDate"), // 指派開始日期
+  endDate: date("endDate"), // 指派結束日期
+  currentTask: varchar("currentTask", { length: 255 }), // 當前任務描述
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 交流學校可用日表 - 記錄香港/澳門學校的可交流日期
+ */
+export const exchangeSchoolAvailability = mysqlTable("exchangeSchoolAvailability", {
+  id: int("id").autoincrement().primaryKey(),
+  schoolId: int("schoolId").notNull(), // 關聯 schools 表
+  date: date("date").notNull(), // 可用日期
+  isAvailable: boolean("isAvailable").default(true).notNull(),
+  availableTimeStart: varchar("availableTimeStart", { length: 10 }), // 可用開始時間
+  availableTimeEnd: varchar("availableTimeEnd", { length: 10 }), // 可用結束時間
+  maxGroups: int("maxGroups").default(1), // 當天最多接待幾個批次
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
+ * 批次與交流學校配對表
+ */
+export const batchExchangeSchools = mysqlTable("batchExchangeSchools", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("groupId").notNull(), // 關聯批次
+  schoolId: int("schoolId").notNull(), // 關聯交流學校
+  plannedDate: date("plannedDate"), // 計劃交流日期
+  confirmedDate: date("confirmedDate"), // 確認交流日期
+  status: mysqlEnum("status", ["pending", "confirmed", "cancelled"]).default("pending").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
 export const schoolExchanges = mysqlTable("schoolExchanges", {
   id: int("id").autoincrement().primaryKey(),

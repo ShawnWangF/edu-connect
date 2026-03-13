@@ -3,7 +3,7 @@ import { trpc } from '../lib/trpc';
 import { Button } from '../components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { ArrowLeft, Calendar, Users, Plus, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, Plus, UtensilsCrossed, LayoutGrid } from 'lucide-react';
 import { CalendarMatrix } from '../components/CalendarMatrix';
 
 // 餐飲統籌 Tab 組件
@@ -161,13 +161,22 @@ export function ProjectDetail() {
               <p className="text-sm text-muted-foreground mt-2">{project.description}</p>
             )}
           </div>
-          <Button
-            className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
-            onClick={() => setLocation(`/groups/create?projectId=${projectId}`)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            添加團組
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLocation(`/projects/${projectId}/schedule`)}
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              排程總覽
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
+              onClick={() => setLocation(`/groups/create?projectId=${projectId}`)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              添加團組
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -44,7 +44,7 @@ describe("批量導入人員功能", () => {
       startDate: "2024-06-01",
       endDate: "2024-06-05",
       days: 5,
-      type: "elementary",
+      type: ["elementary"],
     });
 
     const groups = await caller.groups.list();
@@ -100,7 +100,7 @@ describe("批量導入人員功能", () => {
       startDate: "2024-06-01",
       endDate: "2024-06-05",
       days: 5,
-      type: "elementary",
+      type: ["elementary"],
     });
 
     const groups = await caller.groups.list();

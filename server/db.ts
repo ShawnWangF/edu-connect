@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, schools, templateItineraries, schoolExchanges } from "../drizzle/schema";
+import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, schools, templateItineraries, schoolExchanges, scheduleBlocks, staff, batchStaff, exchangeSchoolAvailability, batchExchangeSchools } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 

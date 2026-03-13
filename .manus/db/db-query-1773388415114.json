@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `scheduleBlocks` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `groupId` int NOT NULL,\n  `date` date NOT NULL,\n  `blockType` enum('sz_arrive','sz_stay','hk_arrive','hk_stay','exchange','border_sz_hk','border_hk_sz','departure','free') NOT NULL DEFAULT 'free',\n  `isExchangeDay` boolean NOT NULL DEFAULT false,\n  `exchangeSchoolId` int,\n  `flightNumber` varchar(50),\n  `flightTime` varchar(10),\n  `busInfo` text,\n  `hotelCity` enum('sz','hk','macau','other'),\n  `notes` text,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `scheduleBlocks_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute CREATE TABLE IF NOT EXISTS `scheduleBlocks` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `groupId` int NOT NULL,\n  `date` date NOT NULL,\n  `blockType` enum('sz_arrive','sz_stay','hk_arrive','hk_stay','exchange','border_sz_hk','border_hk_sz','departure','free') NOT NULL DEFAULT 'free',\n  `isExchangeDay` boolean NOT NULL DEFAULT false,\n  `exchangeSchoolId` int,\n  `flightNumber` varchar(50),\n  `flightTime` varchar(10),\n  `busInfo` text,\n  `hotelCity` enum('sz','hk','macau','other'),\n  `notes` text,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `scheduleBlocks_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1649
+}

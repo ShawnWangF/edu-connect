@@ -1346,6 +1346,337 @@ export const appRouter = router({
         return { success: true, token };
       }),
   }),
+
+  // ===== 排程色塊管理 =====
+  scheduleBlocks: router({
+    // 獲取項目的所有色塊
+    listByProject: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const { scheduleBlocks, groups } = await import('../drizzle/schema');
+        const { eq, inArray } = await import('drizzle-orm');
+        // 先獲取項目下的所有團組
+        const projectGroups = await dbConn.select().from(groups).where(eq(groups.projectId, input.projectId));
+        if (projectGroups.length === 0) return [];
+        const groupIds = projectGroups.map(g => g.id);
+        const blocks = await dbConn.select().from(scheduleBlocks).where(inArray(scheduleBlocks.groupId, groupIds));
+        return blocks;
+      }),
+
+    // 獲取團組的色塊
+    listByGroup: protectedProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const { scheduleBlocks } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        return await dbConn.select().from(scheduleBlocks).where(eq(scheduleBlocks.groupId, input.groupId));
+      }),
+
+    // 創建或更新色塊（upsert）
+    upsert: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        date: z.string(), // YYYY-MM-DD
+        blockType: z.enum(['sz_arrive','sz_stay','hk_arrive','hk_stay','exchange','border_sz_hk','border_hk_sz','departure','free']),
+        isExchangeDay: z.boolean().optional(),
+        exchangeSchoolId: z.number().optional().nullable(),
+        flightNumber: z.string().optional().nullable(),
+        flightTime: z.string().optional().nullable(),
+        busInfo: z.string().optional().nullable(),
+        hotelCity: z.enum(['sz','hk','macau','other']).optional().nullable(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { scheduleBlocks } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        // 檢查是否已存在
+        const existing = await dbConn.select().from(scheduleBlocks)
+          .where(and(eq(scheduleBlocks.groupId, input.groupId), eq(scheduleBlocks.date, input.date as any)))
+          .limit(1);
+        const data = {
+          blockType: input.blockType,
+          isExchangeDay: input.isExchangeDay ?? false,
+          exchangeSchoolId: input.exchangeSchoolId ?? null,
+          flightNumber: input.flightNumber ?? null,
+          flightTime: input.flightTime ?? null,
+          busInfo: input.busInfo ?? null,
+          hotelCity: input.hotelCity ?? null,
+          notes: input.notes ?? null,
+        };
+        if (existing.length > 0) {
+          await dbConn.update(scheduleBlocks).set(data)
+            .where(and(eq(scheduleBlocks.groupId, input.groupId), eq(scheduleBlocks.date, input.date as any)));
+          return { id: existing[0].id, ...data };
+        } else {
+          const result = await dbConn.insert(scheduleBlocks).values({ groupId: input.groupId, date: input.date as any, ...data });
+          return { id: Number(result[0].insertId), ...data };
+        }
+      }),
+
+    // 批量設置批次的色塊（模板快速生成）
+    batchUpsert: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        blocks: z.array(z.object({
+          date: z.string(),
+          blockType: z.enum(['sz_arrive','sz_stay','hk_arrive','hk_stay','exchange','border_sz_hk','border_hk_sz','departure','free']),
+          isExchangeDay: z.boolean().optional(),
+          hotelCity: z.enum(['sz','hk','macau','other']).optional().nullable(),
+          notes: z.string().optional().nullable(),
+        }))
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { scheduleBlocks } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        // 先刪除此批次的所有色塊
+        await dbConn.delete(scheduleBlocks).where(eq(scheduleBlocks.groupId, input.groupId));
+        // 批量插入
+        if (input.blocks.length > 0) {
+          await dbConn.insert(scheduleBlocks).values(
+            input.blocks.map(b => ({
+              groupId: input.groupId,
+              date: b.date as any,
+              blockType: b.blockType,
+              isExchangeDay: b.isExchangeDay ?? false,
+              hotelCity: b.hotelCity ?? null,
+              notes: b.notes ?? null,
+            }))
+          );
+        }
+        return { success: true, count: input.blocks.length };
+      }),
+
+    // 整體移動批次行程（將所有色塊往後移 n 天）
+    shiftBatch: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        days: z.number(), // 正數=延後，負數=提前
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { scheduleBlocks } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        // 獲取所有色塊
+        const blocks = await dbConn.select().from(scheduleBlocks).where(eq(scheduleBlocks.groupId, input.groupId));
+        // 刪除所有色塊
+        await dbConn.delete(scheduleBlocks).where(eq(scheduleBlocks.groupId, input.groupId));
+        // 重新插入，日期往後移 n 天
+        if (blocks.length > 0) {
+          const shifted = blocks.map(b => {
+            const d = new Date(b.date);
+            d.setDate(d.getDate() + input.days);
+            const newDate = d.toISOString().split('T')[0];
+            return { ...b, id: undefined, date: newDate as any };
+          });
+          await dbConn.insert(scheduleBlocks).values(shifted);
+        }
+        return { success: true };
+      }),
+  }),
+
+  // ===== 工作人員庫 =====
+  staff: router({
+    list: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { staff } = await import('../drizzle/schema');
+      const { eq } = await import('drizzle-orm');
+      return await dbConn.select().from(staff).where(eq(staff.isActive, true));
+    }),
+
+    create: editorProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        role: z.enum(['coordinator','staff','guide','driver']),
+        phone: z.string().optional(),
+        email: z.string().optional(),
+        wechat: z.string().optional(),
+        languages: z.string().optional(),
+        licenseNumber: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { staff } = await import('../drizzle/schema');
+        const result = await dbConn.insert(staff).values(input);
+        return { id: Number(result[0].insertId), ...input };
+      }),
+
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        role: z.enum(['coordinator','staff','guide','driver']).optional(),
+        phone: z.string().optional().nullable(),
+        email: z.string().optional().nullable(),
+        wechat: z.string().optional().nullable(),
+        languages: z.string().optional().nullable(),
+        licenseNumber: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { staff } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const { id, ...data } = input;
+        await dbConn.update(staff).set(data).where(eq(staff.id, id));
+        return { success: true };
+      }),
+
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { staff } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        await dbConn.update(staff).set({ isActive: false }).where(eq(staff.id, input.id));
+        return { success: true };
+      }),
+
+    // 獲取工作人員的指派列表
+    getAssignments: protectedProcedure
+      .input(z.object({ staffId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const { batchStaff, groups } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const assignments = await dbConn.select({
+          assignment: batchStaff,
+          group: groups,
+        }).from(batchStaff)
+          .leftJoin(groups, eq(batchStaff.groupId, groups.id))
+          .where(eq(batchStaff.staffId, input.staffId));
+        return assignments;
+      }),
+  }),
+
+  // ===== 批次工作人員指派 =====
+  batchStaff: router({
+    listByGroup: protectedProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const { batchStaff, staff } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const result = await dbConn.select({
+          assignment: batchStaff,
+          staffMember: staff,
+        }).from(batchStaff)
+          .leftJoin(staff, eq(batchStaff.staffId, staff.id))
+          .where(eq(batchStaff.groupId, input.groupId));
+        return result;
+      }),
+
+    assign: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        staffId: z.number(),
+        role: z.enum(['coordinator','staff','guide','driver']),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { batchStaff } = await import('../drizzle/schema');
+        const result = await dbConn.insert(batchStaff).values({
+          ...input,
+          startDate: input.startDate as any,
+          endDate: input.endDate as any,
+        });
+        return { id: Number(result[0].insertId) };
+      }),
+
+    remove: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { batchStaff } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        await dbConn.delete(batchStaff).where(eq(batchStaff.id, input.id));
+        return { success: true };
+      }),
+  }),
+
+  // ===== 交流學校可用日管理 =====
+  exchangeAvailability: router({
+    listBySchool: protectedProcedure
+      .input(z.object({ schoolId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const { exchangeSchoolAvailability } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        return await dbConn.select().from(exchangeSchoolAvailability)
+          .where(eq(exchangeSchoolAvailability.schoolId, input.schoolId));
+      }),
+
+    upsert: editorProcedure
+      .input(z.object({
+        schoolId: z.number(),
+        date: z.string(),
+        isAvailable: z.boolean(),
+        availableTimeStart: z.string().optional().nullable(),
+        availableTimeEnd: z.string().optional().nullable(),
+        maxGroups: z.number().optional(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { exchangeSchoolAvailability } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        const existing = await dbConn.select().from(exchangeSchoolAvailability)
+          .where(and(
+            eq(exchangeSchoolAvailability.schoolId, input.schoolId),
+            eq(exchangeSchoolAvailability.date, input.date as any)
+          )).limit(1);
+        const data = {
+          isAvailable: input.isAvailable,
+          availableTimeStart: input.availableTimeStart ?? null,
+          availableTimeEnd: input.availableTimeEnd ?? null,
+          maxGroups: input.maxGroups ?? 1,
+          notes: input.notes ?? null,
+        };
+        if (existing.length > 0) {
+          await dbConn.update(exchangeSchoolAvailability).set(data)
+            .where(eq(exchangeSchoolAvailability.id, existing[0].id));
+        } else {
+          await dbConn.insert(exchangeSchoolAvailability).values({
+            schoolId: input.schoolId, date: input.date as any, ...data
+          });
+        }
+        return { success: true };
+      }),
+
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { exchangeSchoolAvailability } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        await dbConn.delete(exchangeSchoolAvailability).where(eq(exchangeSchoolAvailability.id, input.id));
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
