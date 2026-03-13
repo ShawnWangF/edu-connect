@@ -5,7 +5,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
-import Home from "./pages/Home";
+// Home page replaced by ScheduleOverview as main dashboard
 import Login from "./pages/Login";
 import Groups from "./pages/Groups";
 import GroupNew from "./pages/GroupNew";
@@ -46,7 +46,7 @@ function Router() {
       </Route>
       <Route path="/">
         <DashboardLayout>
-          <Home />
+          <ScheduleOverview />
         </DashboardLayout>
       </Route>
       <Route path="/groups">
