@@ -4,7 +4,7 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, GripHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, GripHorizontal, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -846,54 +846,78 @@ export default function ScheduleOverview() {
         </div>
       )}
 
-      {/* 色塊編輯對話框 */}
-      <Dialog open={!!editDialog} onOpenChange={() => setEditDialog(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-sm">編輯色塊 — {editDialog?.date}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label className="text-xs">日程類型</Label>
-              <Select value={editBlockType} onValueChange={v => setEditBlockType(v as BlockType)}>
-                <SelectTrigger className="h-8 text-xs mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(BLOCK_CONFIG) as [BlockType, any][]).map(([key, cfg]) => (
-                    <SelectItem key={key} value={key} className="text-xs">
-                      <span className="inline-block w-3 h-3 rounded-sm mr-2 border" style={{ backgroundColor: cfg.bg, borderColor: cfg.border }} />
-                      {cfg.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* 色塊編輯側邊面板 */}
+      {editDialog && (
+        <div
+          className="fixed right-0 top-0 h-full z-50 flex"
+          style={{ pointerEvents: 'none' }}
+        >
+          <div
+            className="w-64 bg-white border-l border-gray-200 shadow-xl flex flex-col"
+            style={{ pointerEvents: 'auto', marginTop: '0px' }}
+          >
+            {/* 面板標題 */}
+            <div className="flex items-center justify-between px-3 py-2 border-b bg-[#1F4E79]">
+              <div>
+                <div className="text-xs font-semibold text-white">編輯色塊</div>
+                <div className="text-[10px] text-blue-200">{editDialog.date}</div>
+              </div>
+              <button onClick={() => setEditDialog(null)} className="text-blue-200 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            {['sz_arrive', 'hk_arrive', 'departure'].includes(editBlockType) && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">航班號</Label>
-                  <Input className="h-7 text-xs mt-1" placeholder="如 CZ3456" value={editFlightNumber} onChange={e => setEditFlightNumber(e.target.value)} />
-                </div>
-                <div>
-                  <Label className="text-xs">航班時間</Label>
-                  <Input className="h-7 text-xs mt-1" placeholder="如 14:30" value={editFlightTime} onChange={e => setEditFlightTime(e.target.value)} />
+            {/* 面板內容 */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {/* 色塊類型快速選擇 */}
+              <div>
+                <Label className="text-xs text-gray-600 mb-1.5 block">日程類型</Label>
+                <div className="grid grid-cols-2 gap-1">
+                  {(Object.entries(BLOCK_CONFIG) as [BlockType, any][]).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      onClick={() => setEditBlockType(key as BlockType)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded border text-left transition-all"
+                      style={{
+                        backgroundColor: editBlockType === key ? cfg.bg : '#f9fafb',
+                        borderColor: editBlockType === key ? cfg.border : '#e5e7eb',
+                        color: editBlockType === key ? cfg.text : '#374151',
+                        fontWeight: editBlockType === key ? 600 : 400,
+                        boxShadow: editBlockType === key ? `0 0 0 2px ${cfg.border}` : 'none',
+                      }}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0 border" style={{ backgroundColor: cfg.bg, borderColor: cfg.border }} />
+                      <span className="text-[10px] leading-tight">{cfg.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
-            <div>
-              <Label className="text-xs">備注</Label>
-              <Input className="h-7 text-xs mt-1" placeholder="可選備注" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+              {['sz_arrive', 'hk_arrive', 'departure'].includes(editBlockType) && (
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-xs text-gray-600">航班號</Label>
+                    <Input className="h-7 text-xs mt-1" placeholder="如 CZ3456" value={editFlightNumber} onChange={e => setEditFlightNumber(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-600">航班時間</Label>
+                    <Input className="h-7 text-xs mt-1" placeholder="如 14:30" value={editFlightTime} onChange={e => setEditFlightTime(e.target.value)} />
+                  </div>
+                </div>
+              )}
+              <div>
+                <Label className="text-xs text-gray-600">備注</Label>
+                <Input className="h-7 text-xs mt-1" placeholder="可選備注" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+              </div>
             </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditDialog(null)}>取消</Button>
-              <Button size="sm" className="h-7 text-xs" onClick={handleSaveBlock} disabled={upsertBlock.isPending}>
-                {upsertBlock.isPending ? '保存中...' : '保存'}
+            {/* 面板底部按鈕 */}
+            <div className="p-3 border-t flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => setEditDialog(null)}>取消</Button>
+              <Button size="sm" className="flex-1 h-8 text-xs bg-[#1F4E79] hover:bg-[#1a3f63]" onClick={handleSaveBlock} disabled={upsertBlock.isPending}>
+                {upsertBlock.isPending ? '保存中...' : '✓ 保存'}
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* 模板生成對話框 */}
       <Dialog open={!!templateDialog} onOpenChange={() => setTemplateDialog(null)}>
