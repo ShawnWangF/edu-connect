@@ -476,7 +476,16 @@ export const appRouter = router({
         })).optional(),
       }))
       .mutation(async ({ input }) => {
-        const { id, ...updateData } = input;
+        const { id, batchId, batchCode, startCity, sisterSchoolId, flightInfo, schoolList, ...rest } = input as any;
+        const updateData = {
+          ...rest,
+          ...(batchId !== undefined && { batch_id: batchId }),
+          ...(batchCode !== undefined && { batch_code: batchCode }),
+          ...(startCity !== undefined && { start_city: startCity }),
+          ...(sisterSchoolId !== undefined && { sister_school_id: sisterSchoolId }),
+          ...(flightInfo !== undefined && { flight_info: flightInfo }),
+          ...(schoolList !== undefined && { school_list: schoolList }),
+        };
         
         // 獲取更新前的團組信息
         const oldGroup = await db.getGroupById(id);

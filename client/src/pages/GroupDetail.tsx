@@ -46,6 +46,15 @@ export default function GroupDetail() {
   const { data: attractions } = trpc.locations.list.useQuery();
   const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: schools } = trpc.schools.list.useQuery();
+  // 批次列表（用於排程信息編輯）
+  const { data: project } = trpc.projects.get.useQuery(
+    { id: group?.projectId ?? 0 },
+    { enabled: !!(group?.projectId) }
+  );
+  const { data: batches } = trpc.batches.listByProject.useQuery(
+    { projectId: group?.projectId ?? 0 },
+    { enabled: !!(group?.projectId) }
+  );
 
   const utils = trpc.useUtils();
 
@@ -145,6 +154,75 @@ export default function GroupDetail() {
               <p className="mt-2">{group.notes}</p>
             </div>
           )}
+          {/* 排程信息區塊 */}
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-[#1F4E79] flex items-center gap-1.5">
+                <span>📅</span> 排程信息
+              </p>
+              <ScheduleInfoDialog group={group} batches={batches || []} schools={schools || []} utils={utils} groupId={groupId} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 批次 */}
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-xs text-blue-600 font-medium mb-1">所屬批次</p>
+                <p className="text-sm font-semibold text-blue-900">
+                  {group.batch_code || <span className="text-gray-400 font-normal">未指定批次</span>}
+                </p>
+              </div>
+              {/* 起始城市 */}
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-xs text-blue-600 font-medium mb-1">起始城市（第一天落地）</p>
+                <p className="text-sm font-semibold text-blue-900">
+                  {group.start_city === 'sz' ? '🏙️ 深圳' : group.start_city === 'hk' ? '🌆 香港' : group.start_city === 'macau' ? '🎰 澳門' : <span className="text-gray-400 font-normal">未設置</span>}
+                </p>
+              </div>
+              {/* 抵達航班 */}
+              <div className="bg-green-50 rounded-lg p-3">
+                <p className="text-xs text-green-600 font-medium mb-1">✈️ 抵達航班</p>
+                <p className="text-sm font-semibold text-green-900">
+                  {group.flight_info?.arrivalFlight
+                    ? <>{group.flight_info.arrivalFlight} {group.flight_info.arrivalTime && <span className="font-normal text-green-700">· {group.flight_info.arrivalTime}</span>}</>
+                    : <span className="text-gray-400 font-normal">未設置</span>}
+                </p>
+              </div>
+              {/* 離境航班 */}
+              <div className="bg-orange-50 rounded-lg p-3">
+                <p className="text-xs text-orange-600 font-medium mb-1">✈️ 離境航班</p>
+                <p className="text-sm font-semibold text-orange-900">
+                  {group.flight_info?.departureFlight
+                    ? <>{group.flight_info.departureFlight} {group.flight_info.departureTime && <span className="font-normal text-orange-700">· {group.flight_info.departureTime}</span>}</>
+                    : <span className="text-gray-400 font-normal">未設置</span>}
+                </p>
+              </div>
+            </div>
+            {/* 學校分組 */}
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 font-medium mb-2">🏫 學校分組（本次項目配置）</p>
+              {group.school_list && group.school_list.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {group.school_list.map((s: any, i: number) => (
+                    <div key={i} className="bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-sm">
+                      <span className="font-medium text-blue-800">{s.name}</span>
+                      <span className="text-blue-500 ml-2">學生 {s.studentCount} 人{s.teacherCount ? ` + 教師 ${s.teacherCount} 人` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">未配置學校分組 — 點擊右上角「編輯排程信息」設置</p>
+              )}
+            </div>
+            {/* 交流學校 */}
+            {group.sister_school_id && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-500 font-medium mb-1">⭐ 指定交流學校</p>
+                <p className="text-sm font-medium text-purple-700">
+                  {schools?.find((s: any) => s.id === group.sister_school_id)?.name || `學校 ID: ${group.sister_school_id}`}
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="mt-6 pt-6 border-t">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm text-muted-foreground">必去行程</p>
@@ -2210,6 +2288,225 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
   );
 }
 
+
+// 排程信息編輯對話框
+function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
+  group: any;
+  batches: any[];
+  schools: any[];
+  utils: any;
+  groupId: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [batchId, setBatchId] = useState<string>(group.batch_id?.toString() || '');
+  const [startCity, setStartCity] = useState<string>(group.start_city || '');
+  const [arrivalFlight, setArrivalFlight] = useState(group.flight_info?.arrivalFlight || '');
+  const [arrivalTime, setArrivalTime] = useState(group.flight_info?.arrivalTime || '');
+  const [departureFlight, setDepartureFlight] = useState(group.flight_info?.departureFlight || '');
+  const [departureTime, setDepartureTime] = useState(group.flight_info?.departureTime || '');
+  const [sisterSchoolId, setSisterSchoolId] = useState<string>(group.sister_school_id?.toString() || '');
+  // 學校分組列表
+  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number }>>(
+    (group.school_list || []).map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0 }))
+  );
+  const [newSchoolId, setNewSchoolId] = useState<string>('');
+  const [newSchoolStudentCount, setNewSchoolStudentCount] = useState<number>(0);
+  const [newSchoolTeacherCount, setNewSchoolTeacherCount] = useState<number>(0);
+
+  const updateGroup = trpc.groups.update.useMutation({
+    onSuccess: () => {
+      utils.groups.get.invalidate({ id: groupId });
+      toast.success('排程信息已保存');
+      setOpen(false);
+    },
+    onError: (err: any) => toast.error('保存失敗：' + err.message),
+  });
+
+  const handleOpen = () => {
+    // 每次打開重置為最新團組數據
+    setBatchId(group.batch_id?.toString() || '');
+    setStartCity(group.start_city || '');
+    setArrivalFlight(group.flight_info?.arrivalFlight || '');
+    setArrivalTime(group.flight_info?.arrivalTime || '');
+    setDepartureFlight(group.flight_info?.departureFlight || '');
+    setDepartureTime(group.flight_info?.departureTime || '');
+    setSisterSchoolId(group.sister_school_id?.toString() || '');
+    setSchoolList((group.school_list || []).map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0 })));
+    setOpen(true);
+  };
+
+  const addSchoolToList = () => {
+    if (!newSchoolId) return;
+    const school = schools.find((s: any) => s.id.toString() === newSchoolId);
+    if (!school) return;
+    if (schoolList.find(s => s.name === school.name)) {
+      toast.error('該學校已在分組列表中');
+      return;
+    }
+    setSchoolList([...schoolList, { name: school.name, studentCount: newSchoolStudentCount, teacherCount: newSchoolTeacherCount }]);
+    setNewSchoolId('');
+    setNewSchoolStudentCount(0);
+    setNewSchoolTeacherCount(0);
+  };
+
+  const removeSchool = (idx: number) => setSchoolList(schoolList.filter((_, i) => i !== idx));
+
+  const handleSave = () => {
+    const selectedBatch = batches.find((b: any) => b.id.toString() === batchId);
+    updateGroup.mutate({
+      id: groupId,
+      batchId: batchId ? parseInt(batchId) : undefined,
+      batchCode: selectedBatch?.code || undefined,
+      startCity: startCity as any || undefined,
+      sisterSchoolId: sisterSchoolId ? parseInt(sisterSchoolId) : undefined,
+      flightInfo: {
+        arrivalFlight: arrivalFlight || undefined,
+        arrivalTime: arrivalTime || undefined,
+        departureFlight: departureFlight || undefined,
+        departureTime: departureTime || undefined,
+      },
+      schoolList: schoolList.length > 0 ? schoolList : undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" onClick={handleOpen}>
+          <Pencil className="h-4 w-4 mr-1" />
+          編輯排程信息
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>編輯排程信息</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {/* 批次選擇 */}
+          <div className="space-y-1.5">
+            <Label className="text-sm">所屬批次</Label>
+            <Select value={batchId} onValueChange={setBatchId}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇批次（可空）" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">不指定批次</SelectItem>
+                {batches.map((b: any) => (
+                  <SelectItem key={b.id} value={b.id.toString()}>
+                    {b.code}{b.name ? ` · ${b.name}` : ''}
+                    {b.arrivalDate ? ` (抖達 ${typeof b.arrivalDate === 'string' ? b.arrivalDate.split('T')[0] : new Date(b.arrivalDate).toISOString().split('T')[0]})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* 起始城市 */}
+          <div className="space-y-1.5">
+            <Label className="text-sm">起始城市（第一天落地）</Label>
+            <Select value={startCity} onValueChange={setStartCity}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇起始城市" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sz">🏙️ 深圳</SelectItem>
+                <SelectItem value="hk">🌆 香港</SelectItem>
+                <SelectItem value="macau">🎰 澳門</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* 航班信息 */}
+          <div className="space-y-2">
+            <Label className="text-sm">航班信息</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-gray-500">抵達航班號</Label>
+                <Input className="h-8 text-sm mt-1" placeholder="如 CZ3456" value={arrivalFlight} onChange={e => setArrivalFlight(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">抵達時間</Label>
+                <Input className="h-8 text-sm mt-1" placeholder="如 14:30" value={arrivalTime} onChange={e => setArrivalTime(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">離境航班號</Label>
+                <Input className="h-8 text-sm mt-1" placeholder="如 CZ3457" value={departureFlight} onChange={e => setDepartureFlight(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">離境時間</Label>
+                <Input className="h-8 text-sm mt-1" placeholder="如 16:00" value={departureTime} onChange={e => setDepartureTime(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          {/* 學校分組 */}
+          <div className="space-y-2">
+            <Label className="text-sm">🏫 學校分組（本次項目配置）</Label>
+            {schoolList.length > 0 && (
+              <div className="space-y-1.5 mb-2">
+                {schoolList.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
+                    <span className="flex-1 text-sm font-medium text-blue-800">{s.name}</span>
+                    <span className="text-xs text-blue-500">學生 {s.studentCount}</span>
+                    {s.teacherCount > 0 && <span className="text-xs text-blue-400">教師 {s.teacherCount}</span>}
+                    <button onClick={() => removeSchool(i)} className="text-red-400 hover:text-red-600 ml-1">
+                      <span className="text-xs">×</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* 添加學校 */}
+            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+              <Label className="text-xs text-gray-500">添加學校（來自資源庫）</Label>
+              <Select value={newSchoolId} onValueChange={setNewSchoolId}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="選擇學校" />
+                </SelectTrigger>
+                <SelectContent>
+                  {schools.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">學生人數</Label>
+                  <Input type="number" min={0} className="h-7 text-sm mt-0.5" value={newSchoolStudentCount} onChange={e => setNewSchoolStudentCount(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">教師人數</Label>
+                  <Input type="number" min={0} className="h-7 text-sm mt-0.5" value={newSchoolTeacherCount} onChange={e => setNewSchoolTeacherCount(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="w-full h-7 text-xs" onClick={addSchoolToList} disabled={!newSchoolId}>
+                <Plus className="h-3 w-3 mr-1" /> 添加學校
+              </Button>
+            </div>
+          </div>
+          {/* 指定交流學校 */}
+          <div className="space-y-1.5">
+            <Label className="text-sm">⭐ 指定交流學校（香港學校）</Label>
+            <Select value={sisterSchoolId} onValueChange={setSisterSchoolId}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇交流學校（可空）" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">不指定</SelectItem>
+                {schools.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-3 border-t">
+          <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
+          <Button onClick={handleSave} disabled={updateGroup.isPending}>
+            {updateGroup.isPending ? '保存中...' : '保存'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // 學校交流Tab
 function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {

@@ -98,3 +98,9 @@
 - [x] 修復排程總覽色塊點擊編輯功能（改為右側滑出面板，避免 Dialog 焦點衝突）
 - [x] 項目總覽顯示當日行程卡片（基於 scheduleBlocks 數據，含日期導航和批次卡片）
 - [x] 項目總覽每個批次/團組顯示今日所在城市（深圳/香港）和行程類型
+
+## 團組維護與排程總覽對齊
+- [x] 修復 groups.update 路由缺少 camelCase→snake_case 字段映射（batchId/startCity/flightInfo/schoolList）
+- [x] GroupDetail 頁面添加「排程信息」區塊（批次、起始城市、航班、學校分組展示）
+- [x] GroupDetail 頁面添加「編輯排程信息」對話框（批次選擇、航班填寫、學校分組從資源庫添加）
+- [x] 排程總覽已正確讀取並展示 school_list/flight_info/batch_code/studentCount
