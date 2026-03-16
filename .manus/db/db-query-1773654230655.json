@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO `batches` (`projectId`, `code`, `name`, `arrivalDate`, `departureDate`, `arrivalFlight`, `departureFlight`, `arrivalTime`, `departureTime`, `notes`, `createdBy`, `createdAt`, `updatedAt`) VALUES\n(1, '批次1', '香港進小學組', '2026-07-01', '2026-07-06', 'CZ3401', 'CZ3402', '14:30', '16:00', '4所蘇州小學，7/4過關到深圳', 1, NOW(), NOW()),\n(1, '批次2', '深圳進小學組', '2026-07-06', '2026-07-07', 'MU5101', 'MU5102', '10:00', '11:30', '3所蘇州小學，7/8過關到香港', 1, NOW(), NOW()),\n(1, '批次3', '香港進中學組', '2026-07-08', '2026-07-11', 'CZ3403', 'CZ3404', '15:00', '16:30', '6所蘇州中學，7/12過關到深圳', 1, NOW(), NOW());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute INSERT INTO `batches` (`projectId`, `code`, `name`, `arrivalDate`, `departureDate`, `arrivalFlight`, `departureFlight`, `arrivalTime`, `departureTime`, `notes`, `createdBy`, `createdAt`, `updatedAt`) VALUES\n(1, '批次1', '香港進小學組', '2026-07-01', '2026-07-06', 'CZ3401', 'CZ3402', '14:30', '16:00', '4所蘇州小學，7/4過關到深圳', 1, NOW(), NOW()),\n(1, '批次2', '深圳進小學組', '2026-07-06', '2026-07-07', 'MU5101', 'MU5102', '10:00', '11:30', '3所蘇州小學，7/8過關到香港', 1, NOW(), NOW()),\n(1, '批次3', '香港進中學組', '2026-07-08', '2026-07-11', 'CZ3403', 'CZ3404', '15:00', '16:30', '6所蘇州中學，7/12過關到深圳', 1, NOW(), NOW());",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1624
+}

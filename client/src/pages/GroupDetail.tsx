@@ -2300,6 +2300,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
   const [open, setOpen] = useState(false);
   const [batchId, setBatchId] = useState<string>(group.batch_id?.toString() || '');
   const [startCity, setStartCity] = useState<string>(group.start_city || '');
+  const [crossingDate, setCrossingDate] = useState<string>(group.crossing_date ? new Date(group.crossing_date).toISOString().split('T')[0] : '');
   const [arrivalFlight, setArrivalFlight] = useState(group.flight_info?.arrivalFlight || '');
   const [arrivalTime, setArrivalTime] = useState(group.flight_info?.arrivalTime || '');
   const [departureFlight, setDepartureFlight] = useState(group.flight_info?.departureFlight || '');
@@ -2326,6 +2327,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
     // 每次打開重置為最新團組數據
     setBatchId(group.batch_id?.toString() || '');
     setStartCity(group.start_city || '');
+    setCrossingDate(group.crossing_date ? new Date(group.crossing_date).toISOString().split('T')[0] : '');
     setArrivalFlight(group.flight_info?.arrivalFlight || '');
     setArrivalTime(group.flight_info?.arrivalTime || '');
     setDepartureFlight(group.flight_info?.departureFlight || '');
@@ -2358,6 +2360,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
       batchId: batchId ? parseInt(batchId) : undefined,
       batchCode: selectedBatch?.code || undefined,
       startCity: startCity as any || undefined,
+      crossingDate: crossingDate || undefined,
       sisterSchoolId: sisterSchoolId ? parseInt(sisterSchoolId) : undefined,
       flightInfo: {
         arrivalFlight: arrivalFlight || undefined,
@@ -2413,6 +2416,11 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
                 <SelectItem value="macau">🎰 澳門</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          {/* 過關日期 */}
+          <div className="space-y-1.5">
+            <Label className="text-sm">過關日期（從起始城市過關到另一城市）</Label>
+            <Input type="date" value={crossingDate} onChange={e => setCrossingDate(e.target.value)} />
           </div>
           {/* 航班信息 */}
           <div className="space-y-2">

@@ -395,6 +395,7 @@ export const appRouter = router({
         batchId: z.number().optional(),
         batchCode: z.string().optional(),
         startCity: z.enum(['sz', 'hk', 'macau']).optional(),
+        crossingDate: z.string().optional(),
         sisterSchoolId: z.number().optional(),
         flightInfo: z.object({
           arrivalFlight: z.string().optional(),
@@ -462,6 +463,7 @@ export const appRouter = router({
         batchId: z.number().optional(),
         batchCode: z.string().optional(),
         startCity: z.enum(['sz', 'hk', 'macau']).optional(),
+        crossingDate: z.string().optional(),
         sisterSchoolId: z.number().optional(),
         flightInfo: z.object({
           arrivalFlight: z.string().optional(),
@@ -476,12 +478,13 @@ export const appRouter = router({
         })).optional(),
       }))
       .mutation(async ({ input }) => {
-        const { id, batchId, batchCode, startCity, sisterSchoolId, flightInfo, schoolList, ...rest } = input as any;
+        const { id, batchId, batchCode, startCity, crossingDate, sisterSchoolId, flightInfo, schoolList, ...rest } = input as any;
         const updateData = {
           ...rest,
           ...(batchId !== undefined && { batch_id: batchId }),
           ...(batchCode !== undefined && { batch_code: batchCode }),
           ...(startCity !== undefined && { start_city: startCity }),
+          ...(crossingDate !== undefined && { crossing_date: crossingDate }),
           ...(sisterSchoolId !== undefined && { sister_school_id: sisterSchoolId }),
           ...(flightInfo !== undefined && { flight_info: flightInfo }),
           ...(schoolList !== undefined && { school_list: schoolList }),
