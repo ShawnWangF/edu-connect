@@ -31,6 +31,7 @@ import { trpc } from "@/lib/trpc";
 const menuItems = [
   { icon: CalendarDays, label: "排程總覽", path: "/" },
   { icon: Briefcase, label: "項目總覽", path: "/projects" },
+  { icon: Layers, label: "批次管理", path: "/batches" },
   { icon: Users, label: "團組管理", path: "/groups" },
   { icon: MapPin, label: "資源庫", path: "/resource-library" },
   { icon: Layers, label: "行程模板", path: "/templates" },

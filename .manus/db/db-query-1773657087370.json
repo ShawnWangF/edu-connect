@@ -1,0 +1,16 @@
+{
+  "query": "SELECT `id`, `name`, `startDate`, `endDate` FROM `projects`;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT `id`, `name`, `startDate`, `endDate` FROM `projects`;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "7月蘇州學校交流",
+      "startDate": "2025-06-30",
+      "endDate": "2025-07-14"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tstartDate\tendDate\n60001\t7月蘇州學校交流\t2025-06-30\t2025-07-14\n",
+  "stderr": "",
+  "execution_time_ms": 1644
+}

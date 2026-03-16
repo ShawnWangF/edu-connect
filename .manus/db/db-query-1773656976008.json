@@ -1,0 +1,114 @@
+{
+  "query": "SELECT `code`, `name`, `startDate`, `endDate`, `start_city`, `crossing_date` FROM `groups` ORDER BY `startDate`;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT `code`, `name`, `startDate`, `endDate`, `start_city`, `crossing_date` FROM `groups` ORDER BY `startDate`;",
+  "rows": [
+    {
+      "code": "P1",
+      "name": "蘇州一中A組",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-06",
+      "start_city": "hk",
+      "crossing_date": "2026-07-04"
+    },
+    {
+      "code": "P2",
+      "name": "蘇州二中A組",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-06",
+      "start_city": "hk",
+      "crossing_date": "2026-07-04"
+    },
+    {
+      "code": "P3",
+      "name": "蘇州三中A組",
+      "startDate": "2026-07-02",
+      "endDate": "2026-07-06",
+      "start_city": "hk",
+      "crossing_date": "2026-07-05"
+    },
+    {
+      "code": "P4",
+      "name": "蘇州四中A組",
+      "startDate": "2026-07-02",
+      "endDate": "2026-07-06",
+      "start_city": "hk",
+      "crossing_date": "2026-07-05"
+    },
+    {
+      "code": "P5",
+      "name": "蘇州五中A組",
+      "startDate": "2026-07-06",
+      "endDate": "2026-07-11",
+      "start_city": "sz",
+      "crossing_date": "2026-07-08"
+    },
+    {
+      "code": "P6",
+      "name": "蘇州六中A組",
+      "startDate": "2026-07-06",
+      "endDate": "2026-07-11",
+      "start_city": "sz",
+      "crossing_date": "2026-07-08"
+    },
+    {
+      "code": "P7",
+      "name": "蘇州七中A組",
+      "startDate": "2026-07-06",
+      "endDate": "2026-07-11",
+      "start_city": "sz",
+      "crossing_date": "2026-07-08"
+    },
+    {
+      "code": "S1",
+      "name": "蘇州八中A組",
+      "startDate": "2026-07-06",
+      "endDate": "2026-07-11",
+      "start_city": "sz",
+      "crossing_date": "2026-07-08"
+    },
+    {
+      "code": "S2",
+      "name": "蘇州九中A組",
+      "startDate": "2026-07-08",
+      "endDate": "2026-07-11",
+      "start_city": "hk",
+      "crossing_date": "2026-07-12"
+    },
+    {
+      "code": "S3",
+      "name": "蘇州十中A組",
+      "startDate": "2026-07-08",
+      "endDate": "2026-07-11",
+      "start_city": "hk",
+      "crossing_date": "2026-07-12"
+    },
+    {
+      "code": "S4",
+      "name": "蘇州十一中A組",
+      "startDate": "2026-07-08",
+      "endDate": "2026-07-11",
+      "start_city": "hk",
+      "crossing_date": "2026-07-12"
+    },
+    {
+      "code": "S5",
+      "name": "蘇州十二中A組",
+      "startDate": "2026-07-08",
+      "endDate": "2026-07-11",
+      "start_city": "hk",
+      "crossing_date": "2026-07-12"
+    },
+    {
+      "code": "P8",
+      "name": "蘇州十三中A組",
+      "startDate": "2026-07-08",
+      "endDate": "2026-07-11",
+      "start_city": "hk",
+      "crossing_date": "2026-07-12"
+    }
+  ],
+  "messages": [],
+  "stdout": "code\tname\tstartDate\tendDate\tstart_city\tcrossing_date\nP1\t蘇州一中A組\t2026-07-01\t2026-07-06\thk\t2026-07-04\nP2\t蘇州二中A組\t2026-07-01\t2026-07-06\thk\t2026-07-04\nP3\t蘇州三中A組\t2026-07-02\t2026-07-06\thk\t2026-07-05\nP4\t蘇州四中A組\t2026-07-02\t2026-07-06\thk\t2026-07-05\nP5\t蘇州五中A組\t2026-07-06\t2026-07-11\tsz\t2026-07-08\nP6\t蘇州六中A組\t2026-07-06\t2026-07-11\tsz\t2026-07-08\nP7\t蘇州七中A組\t2026-07-06\t2026-07-11\tsz\t2026-07-08\nS1\t蘇州八中A組\t2026-07-06\t2026-07-11\tsz\t2026-07-08\nS2\t蘇州九中A組\t2026-07-08\t2026-07-11\thk\t2026-07-12\nS3\t蘇州十中A組\t2026-07-08\t2026-07-11\thk\t2026-07-12\nS4\t蘇州十一中A組\t2026-07-08\t2026-07-11\thk\t2026-07-12\nS5\t蘇州十二中A組\t2026-07-08\t2026-07-11\thk\t2026-07-12\nP8\t蘇州十三中A組\t2026-07-08\t2026-07-11\thk\t2026-07-12\n",
+  "stderr": "",
+  "execution_time_ms": 1631
+}

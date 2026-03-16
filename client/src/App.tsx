@@ -24,6 +24,7 @@ import { ProjectList } from "./pages/ProjectList";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import Templates from "./pages/Templates";
 import ScheduleOverview from "./pages/ScheduleOverview";
+import Batches from "./pages/Batches";
 
 function Router() {
   return (
@@ -82,6 +83,16 @@ function Router() {
       <Route path="/templates">
         <DashboardLayout>
           <Templates />
+        </DashboardLayout>
+      </Route>
+      <Route path="/batches">
+        <DashboardLayout>
+          <Batches />
+        </DashboardLayout>
+      </Route>
+      <Route path="/batches/:id">
+        <DashboardLayout>
+          <Batches />
         </DashboardLayout>
       </Route>
       <Route path="/attractions">
