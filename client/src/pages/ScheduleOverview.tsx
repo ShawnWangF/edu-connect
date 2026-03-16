@@ -101,13 +101,14 @@ function toDateStr(val: any): string {
 
 // ===== 左側固定列寬度 =====
 const LEFT_COL_WIDTHS = {
-  flight: 52,    // 航班
+  groupName: 90,  // 團組名稱
+  flight: 60,    // 航班
   type: 44,      // 類型
   studentCount: 52, // 人數
   total: 44,     // 合計
-  startCity: 52, // 起始城市
-  batchCode: 52, // 批次
-  schoolList: 160, // 學校分組
+  startCity: 44, // 起始城市
+  batchCode: 48, // 批次
+  schoolList: 150, // 學校分組
 };
 const TOTAL_LEFT_WIDTH = Object.values(LEFT_COL_WIDTHS).reduce((a, b) => a + b, 0);
 const CELL_WIDTH = 46;
@@ -372,6 +373,11 @@ export default function ScheduleOverview() {
           cursor: isDragging ? 'grabbing' : 'default',
         }}
       >
+        {/* 團組名稱列 */}
+        <td className="border border-gray-200 px-1 py-0.5 align-middle" style={{ width: LEFT_COL_WIDTHS.groupName, minWidth: LEFT_COL_WIDTHS.groupName, backgroundColor: rowBg }}>
+          <div className="text-[9px] font-semibold text-gray-800 leading-tight truncate" title={group.name}>{group.name || '-'}</div>
+          {group.code && <div className="text-[8px] text-gray-400 truncate">{group.code}</div>}
+        </td>
         {/* 航班列 */}
         <td className="border border-gray-200 px-1 py-0.5 text-center align-middle" style={{ width: LEFT_COL_WIDTHS.flight, minWidth: LEFT_COL_WIDTHS.flight, backgroundColor: rowBg }}>
           <div className="text-[9px] text-gray-600 leading-tight">
@@ -574,6 +580,7 @@ export default function ScheduleOverview() {
               {/* 第一行：月份 + 日期 */}
               <tr>
                 {/* 左側固定列標題 */}
+                <th className="border border-gray-300 bg-[#1F4E79] text-white text-left text-[9px] font-medium px-1 py-1" style={{ width: LEFT_COL_WIDTHS.groupName }}>團組名稱</th>
                 <th className="border border-gray-300 bg-[#1F4E79] text-white text-center text-[9px] font-medium py-1" style={{ width: LEFT_COL_WIDTHS.flight }}>航班</th>
                 <th className="border border-gray-300 bg-[#1F4E79] text-white text-center text-[9px] font-medium py-1" style={{ width: LEFT_COL_WIDTHS.type }}>類型</th>
                 <th className="border border-gray-300 bg-[#1F4E79] text-white text-center text-[9px] font-medium py-1" style={{ width: LEFT_COL_WIDTHS.studentCount }}>人數</th>
@@ -859,7 +866,9 @@ export default function ScheduleOverview() {
             {/* 面板標題 */}
             <div className="flex items-center justify-between px-3 py-2 border-b bg-[#1F4E79]">
               <div>
-                <div className="text-xs font-semibold text-white">編輯色塊</div>
+                <div className="text-xs font-semibold text-white">
+                  {groups.find(g => g.id === editDialog.groupId)?.name || '編輯色塊'}
+                </div>
                 <div className="text-[10px] text-blue-200">{editDialog.date}</div>
               </div>
               <button onClick={() => setEditDialog(null)} className="text-blue-200 hover:text-white">
