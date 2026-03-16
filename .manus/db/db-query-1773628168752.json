@@ -1,0 +1,94 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id"
+    },
+    {
+      "COLUMN_NAME": "projectId"
+    },
+    {
+      "COLUMN_NAME": "name"
+    },
+    {
+      "COLUMN_NAME": "code"
+    },
+    {
+      "COLUMN_NAME": "startDate"
+    },
+    {
+      "COLUMN_NAME": "endDate"
+    },
+    {
+      "COLUMN_NAME": "days"
+    },
+    {
+      "COLUMN_NAME": "status"
+    },
+    {
+      "COLUMN_NAME": "studentCount"
+    },
+    {
+      "COLUMN_NAME": "teacherCount"
+    },
+    {
+      "COLUMN_NAME": "totalCount"
+    },
+    {
+      "COLUMN_NAME": "hotel"
+    },
+    {
+      "COLUMN_NAME": "color"
+    },
+    {
+      "COLUMN_NAME": "tags"
+    },
+    {
+      "COLUMN_NAME": "contact"
+    },
+    {
+      "COLUMN_NAME": "phone"
+    },
+    {
+      "COLUMN_NAME": "emergencyContact"
+    },
+    {
+      "COLUMN_NAME": "emergencyPhone"
+    },
+    {
+      "COLUMN_NAME": "notes"
+    },
+    {
+      "COLUMN_NAME": "createdBy"
+    },
+    {
+      "COLUMN_NAME": "createdAt"
+    },
+    {
+      "COLUMN_NAME": "updatedAt"
+    },
+    {
+      "COLUMN_NAME": "requiredItineraries"
+    },
+    {
+      "COLUMN_NAME": "type"
+    },
+    {
+      "COLUMN_NAME": "batchCode"
+    },
+    {
+      "COLUMN_NAME": "startCity"
+    },
+    {
+      "COLUMN_NAME": "flightInfo"
+    },
+    {
+      "COLUMN_NAME": "schoolList"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nid\nprojectId\nname\ncode\nstartDate\nendDate\ndays\nstatus\nstudentCount\nteacherCount\ntotalCount\nhotel\ncolor\ntags\ncontact\nphone\nemergencyContact\nemergencyPhone\nnotes\ncreatedBy\ncreatedAt\nupdatedAt\nrequiredItineraries\ntype\nbatchCode\nstartCity\nflightInfo\nschoolList\n",
+  "stderr": "",
+  "execution_time_ms": 1642
+}

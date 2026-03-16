@@ -1,0 +1,8 @@
+{
+  "query": "\n-- P1 (批次1, 香港進, 7/1-7/8): 港→深→港\nINSERT INTO scheduleBlocks (projectId, groupId, date, type, notes, createdBy) VALUES\n(60001, 180001, '2025-07-01', 'arrive_hk', 'CZ3456 抵港 10:30', 1),\n(60001, 180001, '2025-07-02', 'hk', '香港住宿', 1),\n(60001, 180001, '2025-07-03', 'cross_border', '過關→深圳', 1),\n(60001, 180001, '2025-07-04', 'sz', '深圳住宿', 1),\n(60001, 180001, '2025-07-05', 'sz', '深圳住宿', 1),\n(60001, 180001, '2025-07-06', 'exchange', '★交流日', 1),\n(60001, 180001, '2025-07-07', 'hk', '香港住宿', 1),\n(60001, 180001, '2025-07-08', 'depart', 'CZ3457 離港 16:00', 1);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \n-- P1 (批次1, 香港進, 7/1-7/8): 港→深→港\nINSERT INTO scheduleBlocks (projectId, groupId, date, type, notes, createdBy) VALUES\n(60001, 180001, '2025-07-01', 'arrive_hk', 'CZ3456 抵港 10:30', 1),\n(60001, 180001, '2025-07-02', 'hk', '香港住宿', 1),\n(60001, 180001, '2025-07-03', 'cross_border', '過關→深圳', 1),\n(60001, 180001, '2025-07-04', 'sz', '深圳住宿', 1),\n(60001, 180001, '2025-07-05', 'sz', '深圳住宿', 1),\n(60001, 180001, '2025-07-06', 'exchange', '★交流日', 1),\n(60001, 180001, '2025-07-07', 'hk', '香港住宿', 1),\n(60001, 180001, '2025-07-08', 'depart', 'CZ3457 離港 16:00', 1);\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 3: Unknown column 'projectId' in 'field list'"
+  ]
+}

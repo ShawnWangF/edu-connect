@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM projects; DELETE FROM staff; DELETE FROM schools; DELETE FROM attractions; DELETE FROM restaurants; DELETE FROM hotels; DELETE FROM vehicles; DELETE FROM guides; DELETE FROM securities; DELETE FROM snapshots; DELETE FROM files; DELETE FROM notifications; DELETE FROM templates; DELETE FROM templateItineraries; DELETE FROM locations;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute DELETE FROM projects; DELETE FROM staff; DELETE FROM schools; DELETE FROM attractions; DELETE FROM restaurants; DELETE FROM hotels; DELETE FROM vehicles; DELETE FROM guides; DELETE FROM securities; DELETE FROM snapshots; DELETE FROM files; DELETE FROM notifications; DELETE FROM templates; DELETE FROM templateItineraries; DELETE FROM locations;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 4886
+}

@@ -1,0 +1,61 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'groups' AND COLUMN_NAME LIKE '%batch%' OR COLUMN_NAME LIKE '%start%' OR COLUMN_NAME LIKE '%flight%' OR COLUMN_NAME LIKE '%school%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'groups' AND COLUMN_NAME LIKE '%batch%' OR COLUMN_NAME LIKE '%start%' OR COLUMN_NAME LIKE '%flight%' OR COLUMN_NAME LIKE '%school%';",
+  "rows": [
+    {
+      "COLUMN_NAME": "schoolId"
+    },
+    {
+      "COLUMN_NAME": "startDate"
+    },
+    {
+      "COLUMN_NAME": "schoolId"
+    },
+    {
+      "COLUMN_NAME": "schoolType"
+    },
+    {
+      "COLUMN_NAME": "schoolId"
+    },
+    {
+      "COLUMN_NAME": "startTime"
+    },
+    {
+      "COLUMN_NAME": "startDate"
+    },
+    {
+      "COLUMN_NAME": "batchCode"
+    },
+    {
+      "COLUMN_NAME": "startCity"
+    },
+    {
+      "COLUMN_NAME": "flightInfo"
+    },
+    {
+      "COLUMN_NAME": "schoolList"
+    },
+    {
+      "COLUMN_NAME": "flightNumber"
+    },
+    {
+      "COLUMN_NAME": "flightTime"
+    },
+    {
+      "COLUMN_NAME": "flightNumber"
+    },
+    {
+      "COLUMN_NAME": "startTime"
+    },
+    {
+      "COLUMN_NAME": "startDate"
+    },
+    {
+      "COLUMN_NAME": "startTime"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nschoolId\nstartDate\nschoolId\nschoolType\nschoolId\nstartTime\nstartDate\nbatchCode\nstartCity\nflightInfo\nschoolList\nflightNumber\nflightTime\nflightNumber\nstartTime\nstartDate\nstartTime\n",
+  "stderr": "",
+  "execution_time_ms": 1575
+}

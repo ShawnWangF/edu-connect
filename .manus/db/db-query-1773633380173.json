@@ -1,0 +1,26 @@
+{
+  "query": "SELECT id, code FROM batches WHERE projectId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, code FROM batches WHERE projectId = 1;",
+  "rows": [
+    {
+      "id": "1",
+      "code": "批次1"
+    },
+    {
+      "id": "2",
+      "code": "批次2"
+    },
+    {
+      "id": "3",
+      "code": "批次3"
+    },
+    {
+      "id": "4",
+      "code": "批次4"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcode\n1\t批次1\n2\t批次2\n3\t批次3\n4\t批次4\n",
+  "stderr": "",
+  "execution_time_ms": 1696
+}

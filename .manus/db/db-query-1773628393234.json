@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `groups` DROP COLUMN `batchCode`;\nALTER TABLE `groups` DROP COLUMN `startCity`;\nALTER TABLE `groups` DROP COLUMN `flightInfo`;\nALTER TABLE `groups` DROP COLUMN `schoolList`;\nALTER TABLE `groups` ADD COLUMN `batch_code` VARCHAR(32) NULL;\nALTER TABLE `groups` ADD COLUMN `start_city` VARCHAR(10) NULL;\nALTER TABLE `groups` ADD COLUMN `flight_info` JSON NULL;\nALTER TABLE `groups` ADD COLUMN `school_list` JSON NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute ALTER TABLE `groups` DROP COLUMN `batchCode`;\nALTER TABLE `groups` DROP COLUMN `startCity`;\nALTER TABLE `groups` DROP COLUMN `flightInfo`;\nALTER TABLE `groups` DROP COLUMN `schoolList`;\nALTER TABLE `groups` ADD COLUMN `batch_code` VARCHAR(32) NULL;\nALTER TABLE `groups` ADD COLUMN `start_city` VARCHAR(10) NULL;\nALTER TABLE `groups` ADD COLUMN `flight_info` JSON NULL;\nALTER TABLE `groups` ADD COLUMN `school_list` JSON NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 4572
+}

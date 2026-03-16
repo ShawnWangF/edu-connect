@@ -1,0 +1,8 @@
+{
+  "query": "\nINSERT INTO batches (projectId, code, name, arrivalDate, departureDate) VALUES\n(1, '批次1', '批次1（小學）', '2025-07-01', '2025-07-08'),\n(1, '批次2', '批次2（小學）', '2025-07-02', '2025-07-09'),\n(1, '批次3', '批次3（混合）', '2025-07-06', '2025-07-13'),\n(1, '批次4', '批次4（中學）', '2025-07-08', '2025-07-15');\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \nINSERT INTO batches (projectId, code, name, arrivalDate, departureDate) VALUES\n(1, '批次1', '批次1（小學）', '2025-07-01', '2025-07-08'),\n(1, '批次2', '批次2（小學）', '2025-07-02', '2025-07-09'),\n(1, '批次3', '批次3（混合）', '2025-07-06', '2025-07-13'),\n(1, '批次4', '批次4（中學）', '2025-07-08', '2025-07-15');\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1364 (HY000) at line 2: Field 'createdBy' doesn't have a default value"
+  ]
+}

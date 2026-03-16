@@ -1,0 +1,48 @@
+{
+  "query": "SHOW CREATE TABLE `groups`;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SHOW CREATE TABLE `groups`;",
+  "rows": [
+    {
+      "Table": "groups",
+      "Create Table": "CREATE TABLE `groups` ("
+    }
+  ],
+  "messages": [
+    "  `id` int NOT NULL AUTO_INCREMENT,",
+    "  `projectId` int DEFAULT NULL,",
+    "  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,",
+    "  `code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,",
+    "  `startDate` date NOT NULL,",
+    "  `endDate` date NOT NULL,",
+    "  `days` int NOT NULL,",
+    "  `status` enum('preparing','ongoing','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'preparing',",
+    "  `studentCount` int NOT NULL DEFAULT '0',",
+    "  `teacherCount` int NOT NULL DEFAULT '0',",
+    "  `totalCount` int NOT NULL DEFAULT '0',",
+    "  `hotel` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `color` varchar(7) COLLATE utf8mb4_unicode_ci DEFAULT '#52c41a',",
+    "  `tags` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `contact` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `emergencyContact` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `emergencyPhone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `notes` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `createdBy` int NOT NULL,",
+    "  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,",
+    "  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,",
+    "  `requiredItineraries` json DEFAULT NULL,",
+    "  `type` json NOT NULL,",
+    "  `batch_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `start_city` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,",
+    "  `flight_info` json DEFAULT NULL,",
+    "  `school_list` json DEFAULT NULL,",
+    "  `batch_id` int DEFAULT NULL,",
+    "  `sister_school_id` int DEFAULT NULL,",
+    "  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,",
+    "  UNIQUE KEY `groups_code_unique` (`code`)",
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=180001"
+  ],
+  "stdout": "Table\tCreate Table\ngroups\tCREATE TABLE `groups` (\n  `id` int NOT NULL AUTO_INCREMENT,\n  `projectId` int DEFAULT NULL,\n  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `startDate` date NOT NULL,\n  `endDate` date NOT NULL,\n  `days` int NOT NULL,\n  `status` enum('preparing','ongoing','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'preparing',\n  `studentCount` int NOT NULL DEFAULT '0',\n  `teacherCount` int NOT NULL DEFAULT '0',\n  `totalCount` int NOT NULL DEFAULT '0',\n  `hotel` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `color` varchar(7) COLLATE utf8mb4_unicode_ci DEFAULT '#52c41a',\n  `tags` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `contact` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `emergencyContact` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `emergencyPhone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `notes` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `createdBy` int NOT NULL,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  `requiredItineraries` json DEFAULT NULL,\n  `type` json NOT NULL,\n  `batch_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `start_city` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `flight_info` json DEFAULT NULL,\n  `school_list` json DEFAULT NULL,\n  `batch_id` int DEFAULT NULL,\n  `sister_school_id` int DEFAULT NULL,\n  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,\n  UNIQUE KEY `groups_code_unique` (`code`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=180001\n",
+  "stderr": "",
+  "execution_time_ms": 1586
+}

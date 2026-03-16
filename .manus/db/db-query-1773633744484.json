@@ -1,0 +1,14 @@
+{
+  "query": "SELECT id, name FROM projects ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name FROM projects ORDER BY id;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "7月蘇州學校交流"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n60001\t7月蘇州學校交流\n",
+  "stderr": "",
+  "execution_time_ms": 1527
+}

@@ -1,0 +1,21 @@
+{
+  "query": "SELECT id, name FROM projects; SELECT id, name, projectId, batch_code FROM `groups` LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name FROM projects; SELECT id, name, projectId, batch_code FROM `groups` LIMIT 5;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "7月蘇州學校交流"
+    }
+  ],
+  "messages": [
+    "id\tname\tprojectId\tbatch_code",
+    "180001\tP1\t1\t批次1",
+    "180002\tP2\t1\t批次1",
+    "180003\tP3\t1\t批次2",
+    "180004\tP4\t1\t批次2",
+    "180005\tS1\t1\t批次3"
+  ],
+  "stdout": "id\tname\n60001\t7月蘇州學校交流\nid\tname\tprojectId\tbatch_code\n180001\tP1\t1\t批次1\n180002\tP2\t1\t批次1\n180003\tP3\t1\t批次2\n180004\tP4\t1\t批次2\n180005\tS1\t1\t批次3\n",
+  "stderr": "",
+  "execution_time_ms": 1984
+}

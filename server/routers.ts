@@ -207,6 +207,159 @@ export const appRouter = router({
       }),
   }),
   
+  // 批次管理（多個團組的打包容器，共享抵離窗口）
+  batches: router({
+    listByProject: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        const { batches, groups: groupsTable } = await import('../drizzle/schema');
+        const { getDb } = await import('./db');
+        const { eq } = await import('drizzle-orm');
+        const dbConn = await getDb();
+        if (!dbConn) return [];
+        // 查詢批次，並附帶每個批次下的團組
+        const batchList = await dbConn.select().from(batches).where(eq(batches.projectId, input.projectId));
+        const groupList = await dbConn.select().from(groupsTable).where(eq(groupsTable.projectId, input.projectId));
+        return batchList.map(batch => ({
+          ...batch,
+          groups: groupList.filter(g => g.batch_id === batch.id),
+        }));
+      }),
+
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const { batches, groups: groupsTable } = await import('../drizzle/schema');
+        const { getDb } = await import('./db');
+        const { eq } = await import('drizzle-orm');
+        const dbConn = await getDb();
+        if (!dbConn) return null;
+        const result = await dbConn.select().from(batches).where(eq(batches.id, input.id)).limit(1);
+        if (!result[0]) return null;
+        const groups = await dbConn.select().from(groupsTable).where(eq(groupsTable.batch_id, input.id));
+        return { ...result[0], groups };
+      }),
+
+    create: editorProcedure
+      .input(z.object({
+        projectId: z.number(),
+        code: z.string(),
+        name: z.string().optional(),
+        arrivalDate: z.string().optional(),
+        departureDate: z.string().optional(),
+        arrivalFlight: z.string().optional(),
+        departureFlight: z.string().optional(),
+        arrivalTime: z.string().optional(),
+        departureTime: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { batches } = await import('../drizzle/schema');
+        const { getDb } = await import('./db');
+        const dbConn = await getDb();
+        if (!dbConn) throw new Error('Database not available');
+        const result = await dbConn.insert(batches).values({
+          ...input,
+          arrivalDate: input.arrivalDate ? new Date(input.arrivalDate) as any : undefined,
+          departureDate: input.departureDate ? new Date(input.departureDate) as any : undefined,
+          createdBy: ctx.user.id,
+        });
+        return { success: true, id: Number((result as any).insertId) };
+      }),
+
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        code: z.string().optional(),
+        name: z.string().optional(),
+        arrivalDate: z.string().optional(),
+        departureDate: z.string().optional(),
+        arrivalFlight: z.string().optional(),
+        departureFlight: z.string().optional(),
+        arrivalTime: z.string().optional(),
+        departureTime: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { batches } = await import('../drizzle/schema');
+        const { getDb } = await import('./db');
+        const { eq } = await import('drizzle-orm');
+        const dbConn = await getDb();
+        if (!dbConn) throw new Error('Database not available');
+        const { id, ...data } = input;
+        const updateData: any = { ...data };
+        if (data.arrivalDate) updateData.arrivalDate = new Date(data.arrivalDate);
+        if (data.departureDate) updateData.departureDate = new Date(data.departureDate);
+        await dbConn.update(batches).set(updateData).where(eq(batches.id, id));
+        return { success: true };
+      }),
+
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { batches, groups: groupsTable } = await import('../drizzle/schema');
+        const { getDb } = await import('./db');
+        const { eq } = await import('drizzle-orm');
+        const dbConn = await getDb();
+        if (!dbConn) throw new Error('Database not available');
+        // 解除該批次下所有團組的 batchId 關聯
+        await dbConn.update(groupsTable).set({ batch_id: null } as any).where(eq(groupsTable.batch_id, input.id));
+        await dbConn.delete(batches).where(eq(batches.id, input.id));
+        return { success: true };
+      }),
+
+    // 排程統計接口：返回每日航班需求和住宿需求
+    getScheduleStats: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        const { scheduleBlocks, groups: groupsTable } = await import('../drizzle/schema');
+        const { getDb } = await import('./db');
+        const { eq, inArray } = await import('drizzle-orm');
+        const dbConn = await getDb();
+        if (!dbConn) return { dailyFlights: {}, dailyAccommodation: {} };
+
+        const projectGroups = await dbConn.select().from(groupsTable).where(eq(groupsTable.projectId, input.projectId));
+        if (!projectGroups.length) return { dailyFlights: {}, dailyAccommodation: {} };
+
+        const groupIds = projectGroups.map(g => g.id);
+        const blocks = await dbConn.select().from(scheduleBlocks).where(inArray(scheduleBlocks.groupId, groupIds));
+
+        // 按日期統計航班需求
+        const dailyFlights: Record<string, { arrivals: string[]; departures: string[]; arrivalCount: number; departureCount: number }> = {};
+        const dailyAccommodation: Record<string, { hk: number; sz: number; total: number }> = {};
+
+        for (const block of blocks) {
+          const dateStr = typeof block.date === 'string' ? block.date : (block.date as Date).toISOString().split('T')[0];
+          const group = projectGroups.find(g => g.id === block.groupId);
+          const groupTotal = (group?.totalCount || 0);
+
+          // 航班統計
+          if (block.blockType === 'sz_arrive' || block.blockType === 'hk_arrive') {
+            if (!dailyFlights[dateStr]) dailyFlights[dateStr] = { arrivals: [], departures: [], arrivalCount: 0, departureCount: 0 };
+            dailyFlights[dateStr].arrivalCount++;
+            if (block.flightNumber) dailyFlights[dateStr].arrivals.push(block.flightNumber);
+            else if (group?.code) dailyFlights[dateStr].arrivals.push(group.code);
+          }
+          if (block.blockType === 'departure') {
+            if (!dailyFlights[dateStr]) dailyFlights[dateStr] = { arrivals: [], departures: [], arrivalCount: 0, departureCount: 0 };
+            dailyFlights[dateStr].departureCount++;
+            if (block.flightNumber) dailyFlights[dateStr].departures.push(block.flightNumber);
+            else if (group?.code) dailyFlights[dateStr].departures.push(group.code);
+          }
+
+          // 住宿統計（根據 hotelCity 字段）
+          if (block.hotelCity === 'hk' || block.hotelCity === 'sz') {
+            if (!dailyAccommodation[dateStr]) dailyAccommodation[dateStr] = { hk: 0, sz: 0, total: 0 };
+            if (block.hotelCity === 'hk') dailyAccommodation[dateStr].hk += groupTotal;
+            if (block.hotelCity === 'sz') dailyAccommodation[dateStr].sz += groupTotal;
+            dailyAccommodation[dateStr].total += groupTotal;
+          }
+        }
+
+        return { dailyFlights, dailyAccommodation };
+      }),
+  }),
+
   groups: router({
     list: protectedProcedure.query(async () => {
       return await db.getAllGroups();
@@ -238,10 +391,37 @@ export const appRouter = router({
         emergencyContact: z.string().optional(),
         emergencyPhone: z.string().optional(),
         notes: z.string().optional(),
+        // 排程總覽新字段
+        batchId: z.number().optional(),
+        batchCode: z.string().optional(),
+        startCity: z.enum(['sz', 'hk', 'macau']).optional(),
+        sisterSchoolId: z.number().optional(),
+        flightInfo: z.object({
+          arrivalFlight: z.string().optional(),
+          arrivalTime: z.string().optional(),
+          departureFlight: z.string().optional(),
+          departureTime: z.string().optional(),
+        }).optional(),
+        schoolList: z.array(z.object({
+          name: z.string(),
+          studentCount: z.number(),
+          teacherCount: z.number().optional(),
+        })).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        // 將 camelCase 輸入字段映射為 schema 的 snake_case 屬性名
+        const { batchId, batchCode, startCity, sisterSchoolId, flightInfo, schoolList, ...rest } = input as any;
+        const mappedInput = {
+          ...rest,
+          ...(batchId !== undefined && { batch_id: batchId }),
+          ...(batchCode !== undefined && { batch_code: batchCode }),
+          ...(startCity !== undefined && { start_city: startCity }),
+          ...(sisterSchoolId !== undefined && { sister_school_id: sisterSchoolId }),
+          ...(flightInfo !== undefined && { flight_info: flightInfo }),
+          ...(schoolList !== undefined && { school_list: schoolList }),
+        };
         const result = await db.createGroup({
-          ...input,
+          ...mappedInput,
           createdBy: ctx.user.id,
         });
         
@@ -278,6 +458,22 @@ export const appRouter = router({
         emergencyPhone: z.string().optional(),
         notes: z.string().optional(),
         requiredItineraries: z.array(z.number()).optional(),
+        // 排程總覽新字段
+        batchId: z.number().optional(),
+        batchCode: z.string().optional(),
+        startCity: z.enum(['sz', 'hk', 'macau']).optional(),
+        sisterSchoolId: z.number().optional(),
+        flightInfo: z.object({
+          arrivalFlight: z.string().optional(),
+          arrivalTime: z.string().optional(),
+          departureFlight: z.string().optional(),
+          departureTime: z.string().optional(),
+        }).optional(),
+        schoolList: z.array(z.object({
+          name: z.string(),
+          studentCount: z.number(),
+          teacherCount: z.number().optional(),
+        })).optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...updateData } = input;

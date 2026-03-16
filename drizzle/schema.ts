@@ -37,6 +37,27 @@ export const projects = mysqlTable("projects", {
 });
 
 /**
+ * 批次表 - 多個團組的打包容器（共享抵離窗口）
+ * 同一批次的團組必須在同一天抵達、同一天離開
+ */
+export const batches = mysqlTable("batches", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(), // 所屬項目
+  code: varchar("code", { length: 64 }).notNull(), // 批次編號，如「批次1」、「批次2」
+  name: varchar("name", { length: 255 }), // 批次名稱（可選）
+  arrivalDate: date("arrivalDate"), // 計劃抵達日期（同批次所有團組共享）
+  departureDate: date("departureDate"), // 計劃離開日期（同批次所有團組共享）
+  arrivalFlight: varchar("arrivalFlight", { length: 100 }), // 抵達航班號
+  departureFlight: varchar("departureFlight", { length: 100 }), // 離開航班號
+  arrivalTime: varchar("arrivalTime", { length: 10 }), // 抵達時間
+  departureTime: varchar("departureTime", { length: 10 }), // 離開時間
+  notes: text("notes"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
  * 團組表 - 存儲團組基本信息
  */
 export const groups = mysqlTable("groups", {
@@ -61,6 +82,13 @@ export const groups = mysqlTable("groups", {
   emergencyPhone: varchar("emergencyPhone", { length: 50 }), // 緊急電話
   notes: text("notes"), // 備註
   requiredItineraries: json("requiredItineraries").$type<number[]>(), // 必去景點 ID 數組
+  // 排程總覽相關字段
+  batch_id: int("batch_id"), // 關聯批次 ID（batches 表），同批次的團組共享同一批次
+  batch_code: varchar("batch_code", { length: 32 }), // 批次編號冗餘字段（方便顯示）
+  start_city: varchar("start_city", { length: 10 }), // 起始城市（sz/hk/macau），即第一天落地城市
+  sister_school_id: int("sister_school_id"), // 指定的交流學校 ID（schools 表），創建時指定
+  flight_info: json("flight_info").$type<{ arrivalFlight?: string; arrivalTime?: string; departureFlight?: string; departureTime?: string }>(), // 航班信息
+  school_list: json("school_list").$type<Array<{ name: string; studentCount: number; teacherCount?: number }>>(), // 學校分組列表（每個項目重新配置）
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -439,6 +467,8 @@ export type ExchangeSchoolAvailability = typeof exchangeSchoolAvailability.$infe
 export type InsertExchangeSchoolAvailability = typeof exchangeSchoolAvailability.$inferInsert;
 export type BatchExchangeSchool = typeof batchExchangeSchools.$inferSelect;
 export type InsertBatchExchangeSchool = typeof batchExchangeSchools.$inferInsert;
+export type Batch = typeof batches.$inferSelect;
+export type InsertBatch = typeof batches.$inferInsert;
 
 /**
  * 日程色塊表 - 排程總覽儀表板的核心數據

@@ -1,0 +1,26 @@
+{
+  "query": "SHOW COLUMNS FROM `groups` LIKE 'batch%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SHOW COLUMNS FROM `groups` LIKE 'batch%';",
+  "rows": [
+    {
+      "Field": "batch_code",
+      "Type": "varchar(32)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "batch_id",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nbatch_code\tvarchar(32)\tYES\t\tNULL\t\nbatch_id\tint\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 1638
+}
