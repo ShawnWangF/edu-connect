@@ -1,0 +1,78 @@
+{
+  "query": "-- 查看現有 hotels 和 restaurants ID\nSELECT id, name FROM hotels ORDER BY id;\nSELECT id, name FROM restaurants ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute -- 查看現有 hotels 和 restaurants ID\nSELECT id, name FROM hotels ORDER BY id;\nSELECT id, name FROM restaurants ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "香港九龍維景酒店"
+    },
+    {
+      "id": "2",
+      "name": "香港帝苑酒店"
+    },
+    {
+      "id": "3",
+      "name": "香港海景嘉福洲際酒店"
+    },
+    {
+      "id": "4",
+      "name": "香港諾富特世紀酒店"
+    },
+    {
+      "id": "5",
+      "name": "深圳福田皇冠假日酒店"
+    },
+    {
+      "id": "6",
+      "name": "深圳南山希爾頓酒店"
+    },
+    {
+      "id": "7",
+      "name": "深圳寶安維也納酒店"
+    },
+    {
+      "id": "id",
+      "name": "name"
+    },
+    {
+      "id": "30001",
+      "name": "香港翠園酒家（尖沙咀）"
+    },
+    {
+      "id": "30002",
+      "name": "香港美心皇宮（銅鑼灣）"
+    },
+    {
+      "id": "30003",
+      "name": "香港稻香超級漁港（旺角）"
+    },
+    {
+      "id": "30004",
+      "name": "香港大家樂（尖沙咀）"
+    },
+    {
+      "id": "30005",
+      "name": "香港海景餐廳（維港）"
+    },
+    {
+      "id": "30006",
+      "name": "深圳漁港海鮮酒家（福田）"
+    },
+    {
+      "id": "30007",
+      "name": "深圳皇廷海鮮酒家（南山）"
+    },
+    {
+      "id": "30008",
+      "name": "深圳萬象城美食廣場"
+    },
+    {
+      "id": "30009",
+      "name": "深圳福田喜粵8號"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n1\t香港九龍維景酒店\n2\t香港帝苑酒店\n3\t香港海景嘉福洲際酒店\n4\t香港諾富特世紀酒店\n5\t深圳福田皇冠假日酒店\n6\t深圳南山希爾頓酒店\n7\t深圳寶安維也納酒店\nid\tname\n30001\t香港翠園酒家（尖沙咀）\n30002\t香港美心皇宮（銅鑼灣）\n30003\t香港稻香超級漁港（旺角）\n30004\t香港大家樂（尖沙咀）\n30005\t香港海景餐廳（維港）\n30006\t深圳漁港海鮮酒家（福田）\n30007\t深圳皇廷海鮮酒家（南山）\n30008\t深圳萬象城美食廣場\n30009\t深圳福田喜粵8號\n",
+  "stderr": "",
+  "execution_time_ms": 1786
+}
