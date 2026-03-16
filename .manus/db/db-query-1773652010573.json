@@ -1,0 +1,25 @@
+{
+  "query": "SELECT COUNT(*) as school_count FROM schools;\nSELECT COUNT(*) as attraction_count FROM attractions;\nSELECT COUNT(*) as template_count FROM templates;\nSELECT id, name FROM schools LIMIT 10;\nSELECT id, name FROM attractions LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT COUNT(*) as school_count FROM schools;\nSELECT COUNT(*) as attraction_count FROM attractions;\nSELECT COUNT(*) as template_count FROM templates;\nSELECT id, name FROM schools LIMIT 10;\nSELECT id, name FROM attractions LIMIT 10;",
+  "rows": [
+    {
+      "school_count": "0"
+    },
+    {
+      "school_count": "attraction_count"
+    },
+    {
+      "school_count": "0"
+    },
+    {
+      "school_count": "template_count"
+    },
+    {
+      "school_count": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "school_count\n0\nattraction_count\n0\ntemplate_count\n0\n",
+  "stderr": "",
+  "execution_time_ms": 2516
+}

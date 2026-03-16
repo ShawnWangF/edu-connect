@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, name, start_date, end_date, group_type, start_city FROM `groups` ORDER BY id LIMIT 10;\nSELECT COUNT(*) as daily_card_count FROM dailyCards;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, start_date, end_date, group_type, start_city FROM `groups` ORDER BY id LIMIT 10;\nSELECT COUNT(*) as daily_card_count FROM dailyCards;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'start_date' in 'field list'"
+  ]
+}

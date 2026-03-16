@@ -1,0 +1,118 @@
+{
+  "query": "SELECT id, name, startDate, endDate, type, start_city, batch_code FROM `groups` ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, startDate, endDate, type, start_city, batch_code FROM `groups` ORDER BY id;",
+  "rows": [
+    {
+      "id": "180001",
+      "name": "P1",
+      "startDate": "2025-07-01",
+      "endDate": "2025-07-08",
+      "type": "[\"小學\"]",
+      "start_city": "hk",
+      "batch_code": "批次1"
+    },
+    {
+      "id": "180002",
+      "name": "P2",
+      "startDate": "2025-07-01",
+      "endDate": "2025-07-08",
+      "type": "[\"小學\"]",
+      "start_city": "hk",
+      "batch_code": "批次1"
+    },
+    {
+      "id": "180003",
+      "name": "P3",
+      "startDate": "2025-07-02",
+      "endDate": "2025-07-09",
+      "type": "[\"小學\"]",
+      "start_city": "sz",
+      "batch_code": "批次2"
+    },
+    {
+      "id": "180004",
+      "name": "P4",
+      "startDate": "2025-07-02",
+      "endDate": "2025-07-09",
+      "type": "[\"小學\"]",
+      "start_city": "sz",
+      "batch_code": "批次2"
+    },
+    {
+      "id": "180005",
+      "name": "S1",
+      "startDate": "2025-07-06",
+      "endDate": "2025-07-13",
+      "type": "[\"中學\"]",
+      "start_city": "hk",
+      "batch_code": "批次3"
+    },
+    {
+      "id": "180006",
+      "name": "P6",
+      "startDate": "2025-07-06",
+      "endDate": "2025-07-13",
+      "type": "[\"小學\"]",
+      "start_city": "hk",
+      "batch_code": "批次3"
+    },
+    {
+      "id": "180007",
+      "name": "P7",
+      "startDate": "2025-07-06",
+      "endDate": "2025-07-13",
+      "type": "[\"小學\"]",
+      "start_city": "sz",
+      "batch_code": "批次3"
+    },
+    {
+      "id": "180008",
+      "name": "S2",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "hk",
+      "batch_code": "批次4"
+    },
+    {
+      "id": "180009",
+      "name": "S3",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "hk",
+      "batch_code": "批次4"
+    },
+    {
+      "id": "180010",
+      "name": "S4",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "sz",
+      "batch_code": "批次4"
+    },
+    {
+      "id": "180011",
+      "name": "S5",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "sz",
+      "batch_code": "批次4"
+    },
+    {
+      "id": "180012",
+      "name": "P8",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"小學\"]",
+      "start_city": "sz",
+      "batch_code": "批次4"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tstartDate\tendDate\ttype\tstart_city\tbatch_code\n180001\tP1\t2025-07-01\t2025-07-08\t[\"小學\"]\thk\t批次1\n180002\tP2\t2025-07-01\t2025-07-08\t[\"小學\"]\thk\t批次1\n180003\tP3\t2025-07-02\t2025-07-09\t[\"小學\"]\tsz\t批次2\n180004\tP4\t2025-07-02\t2025-07-09\t[\"小學\"]\tsz\t批次2\n180005\tS1\t2025-07-06\t2025-07-13\t[\"中學\"]\thk\t批次3\n180006\tP6\t2025-07-06\t2025-07-13\t[\"小學\"]\thk\t批次3\n180007\tP7\t2025-07-06\t2025-07-13\t[\"小學\"]\tsz\t批次3\n180008\tS2\t2025-07-08\t2025-07-15\t[\"中學\"]\thk\t批次4\n180009\tS3\t2025-07-08\t2025-07-15\t[\"中學\"]\thk\t批次4\n180010\tS4\t2025-07-08\t2025-07-15\t[\"中學\"]\tsz\t批次4\n180011\tS5\t2025-07-08\t2025-07-15\t[\"中學\"]\tsz\t批次4\n180012\tP8\t2025-07-08\t2025-07-15\t[\"小學\"]\tsz\t批次4\n",
+  "stderr": "",
+  "execution_time_ms": 1583
+}

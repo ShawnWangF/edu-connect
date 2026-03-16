@@ -1,0 +1,66 @@
+{
+  "query": "SELECT id, name FROM attractions ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name FROM attractions ORDER BY id;",
+  "rows": [
+    {
+      "id": "30001",
+      "name": "香港大學"
+    },
+    {
+      "id": "30002",
+      "name": "太空館"
+    },
+    {
+      "id": "30003",
+      "name": "維多利亞港"
+    },
+    {
+      "id": "30004",
+      "name": "海洋公園"
+    },
+    {
+      "id": "30005",
+      "name": "叮叮車（電車）"
+    },
+    {
+      "id": "30006",
+      "name": "環保課程"
+    },
+    {
+      "id": "30007",
+      "name": "蓮花山公園"
+    },
+    {
+      "id": "30008",
+      "name": "華大基因"
+    },
+    {
+      "id": "30009",
+      "name": "基因庫"
+    },
+    {
+      "id": "30010",
+      "name": "比亞迪"
+    },
+    {
+      "id": "30011",
+      "name": "南方科技大學"
+    },
+    {
+      "id": "30012",
+      "name": "機器人展示館"
+    },
+    {
+      "id": "30013",
+      "name": "藝術館"
+    },
+    {
+      "id": "30014",
+      "name": "過關體驗"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n30001\t香港大學\n30002\t太空館\n30003\t維多利亞港\n30004\t海洋公園\n30005\t叮叮車（電車）\n30006\t環保課程\n30007\t蓮花山公園\n30008\t華大基因\n30009\t基因庫\n30010\t比亞迪\n30011\t南方科技大學\n30012\t機器人展示館\n30013\t藝術館\n30014\t過關體驗\n",
+  "stderr": "",
+  "execution_time_ms": 1641
+}

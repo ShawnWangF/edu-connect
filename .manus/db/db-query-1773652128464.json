@@ -1,0 +1,26 @@
+{
+  "query": "SELECT id, name FROM templates ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name FROM templates ORDER BY id;",
+  "rows": [
+    {
+      "id": "30001",
+      "name": "香港進 · 小學 6日行程"
+    },
+    {
+      "id": "30002",
+      "name": "香港進 · 中學 6日行程"
+    },
+    {
+      "id": "30003",
+      "name": "深圳進 · 小學 6日行程"
+    },
+    {
+      "id": "30004",
+      "name": "深圳進 · 中學 6日行程"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n30001\t香港進 · 小學 6日行程\n30002\t香港進 · 中學 6日行程\n30003\t深圳進 · 小學 6日行程\n30004\t深圳進 · 中學 6日行程\n",
+  "stderr": "",
+  "execution_time_ms": 1542
+}

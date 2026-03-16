@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO templates (name, description, days, applicableTypes, isActive, createdBy) VALUES\n('香港進 · 小學 6日行程', '香港落地，D1大學，D2姊妹校+太空館+維港，D3海洋公園，D4叮叮車+過關+比亞迪，D5華大基因+基因庫，D6蓮花山+深圳飛', 6, '[\"小學\"]', 1, 1),\n('香港進 · 中學 6日行程', '香港落地，D1大學+叮叮車，D2姊妹校+環保課程+維港，D3海洋公園，D4過關+南科大參觀+課程，D5華大基因+機器人展示館藝術館，D6蓮花山+深圳飛', 6, '[\"中學\"]', 1, 1),\n('深圳進 · 小學 6日行程', '深圳落地，D1蓮花山，D2華大基因+基因庫，D3比亞迪+過關+叮叮車，D4姊妹校+太空館+維港，D5海洋公園，D6大學+香港飛', 6, '[\"小學\"]', 1, 1),\n('深圳進 · 中學 6日行程', '深圳落地，D1蓮花山，D2華大基因+機器人展示館藝術館，D3南方科技大學+課程，D4過關+環保課程+維港，D5海洋公園，D6大學+香港飛', 6, '[\"中學\"]', 1, 1);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute INSERT INTO templates (name, description, days, applicableTypes, isActive, createdBy) VALUES\n('香港進 · 小學 6日行程', '香港落地，D1大學，D2姊妹校+太空館+維港，D3海洋公園，D4叮叮車+過關+比亞迪，D5華大基因+基因庫，D6蓮花山+深圳飛', 6, '[\"小學\"]', 1, 1),\n('香港進 · 中學 6日行程', '香港落地，D1大學+叮叮車，D2姊妹校+環保課程+維港，D3海洋公園，D4過關+南科大參觀+課程，D5華大基因+機器人展示館藝術館，D6蓮花山+深圳飛', 6, '[\"中學\"]', 1, 1),\n('深圳進 · 小學 6日行程', '深圳落地，D1蓮花山，D2華大基因+基因庫，D3比亞迪+過關+叮叮車，D4姊妹校+太空館+維港，D5海洋公園，D6大學+香港飛', 6, '[\"小學\"]', 1, 1),\n('深圳進 · 中學 6日行程', '深圳落地，D1蓮花山，D2華大基因+機器人展示館藝術館，D3南方科技大學+課程，D4過關+環保課程+維港，D5海洋公園，D6大學+香港飛', 6, '[\"中學\"]', 1, 1);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1587
+}

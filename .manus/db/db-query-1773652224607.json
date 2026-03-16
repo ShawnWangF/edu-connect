@@ -1,0 +1,93 @@
+{
+  "query": "SELECT id, name, startDate, endDate, type, start_city FROM `groups` ORDER BY id LIMIT 10;\nSELECT COUNT(*) as daily_card_count FROM dailyCards;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, startDate, endDate, type, start_city FROM `groups` ORDER BY id LIMIT 10;\nSELECT COUNT(*) as daily_card_count FROM dailyCards;",
+  "rows": [
+    {
+      "id": "180001",
+      "name": "P1",
+      "startDate": "2025-07-01",
+      "endDate": "2025-07-08",
+      "type": "[\"小學\"]",
+      "start_city": "hk"
+    },
+    {
+      "id": "180002",
+      "name": "P2",
+      "startDate": "2025-07-01",
+      "endDate": "2025-07-08",
+      "type": "[\"小學\"]",
+      "start_city": "hk"
+    },
+    {
+      "id": "180003",
+      "name": "P3",
+      "startDate": "2025-07-02",
+      "endDate": "2025-07-09",
+      "type": "[\"小學\"]",
+      "start_city": "sz"
+    },
+    {
+      "id": "180004",
+      "name": "P4",
+      "startDate": "2025-07-02",
+      "endDate": "2025-07-09",
+      "type": "[\"小學\"]",
+      "start_city": "sz"
+    },
+    {
+      "id": "180005",
+      "name": "S1",
+      "startDate": "2025-07-06",
+      "endDate": "2025-07-13",
+      "type": "[\"中學\"]",
+      "start_city": "hk"
+    },
+    {
+      "id": "180006",
+      "name": "P6",
+      "startDate": "2025-07-06",
+      "endDate": "2025-07-13",
+      "type": "[\"小學\"]",
+      "start_city": "hk"
+    },
+    {
+      "id": "180007",
+      "name": "P7",
+      "startDate": "2025-07-06",
+      "endDate": "2025-07-13",
+      "type": "[\"小學\"]",
+      "start_city": "sz"
+    },
+    {
+      "id": "180008",
+      "name": "S2",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "hk"
+    },
+    {
+      "id": "180009",
+      "name": "S3",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "hk"
+    },
+    {
+      "id": "180010",
+      "name": "S4",
+      "startDate": "2025-07-08",
+      "endDate": "2025-07-15",
+      "type": "[\"中學\"]",
+      "start_city": "sz"
+    }
+  ],
+  "messages": [
+    "daily_card_count",
+    "0"
+  ],
+  "stdout": "id\tname\tstartDate\tendDate\ttype\tstart_city\n180001\tP1\t2025-07-01\t2025-07-08\t[\"小學\"]\thk\n180002\tP2\t2025-07-01\t2025-07-08\t[\"小學\"]\thk\n180003\tP3\t2025-07-02\t2025-07-09\t[\"小學\"]\tsz\n180004\tP4\t2025-07-02\t2025-07-09\t[\"小學\"]\tsz\n180005\tS1\t2025-07-06\t2025-07-13\t[\"中學\"]\thk\n180006\tP6\t2025-07-06\t2025-07-13\t[\"小學\"]\thk\n180007\tP7\t2025-07-06\t2025-07-13\t[\"小學\"]\tsz\n180008\tS2\t2025-07-08\t2025-07-15\t[\"中學\"]\thk\n180009\tS3\t2025-07-08\t2025-07-15\t[\"中學\"]\thk\n180010\tS4\t2025-07-08\t2025-07-15\t[\"中學\"]\tsz\ndaily_card_count\n0\n",
+  "stderr": "",
+  "execution_time_ms": 1751
+}

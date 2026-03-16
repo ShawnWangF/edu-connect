@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO schools (name, address, region, schoolType, maxGroupSize, capacity, notes, isActive, createdBy) VALUES\n('香港聖公會小學（示例）', '香港九龍塘', '香港', '小學', 60, 120, '香港進小學項目姊妹校', 1, 1),\n('香港培道中學（示例）', '香港九龍', '香港', '中學', 60, 120, '香港進中學項目姊妹校', 1, 1),\n('香港道教聯合會小學（示例）', '香港新界', '香港', '小學', 60, 120, '備用姊妹小學', 1, 1),\n('香港英華書院（示例）', '香港九龍', '香港', '中學', 60, 120, '備用姊妹中學', 1, 1),\n('香港聖保羅男女中學（示例）', '香港港島', '香港', '中學', 60, 120, '備用姊妹中學', 1, 1);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute INSERT INTO schools (name, address, region, schoolType, maxGroupSize, capacity, notes, isActive, createdBy) VALUES\n('香港聖公會小學（示例）', '香港九龍塘', '香港', '小學', 60, 120, '香港進小學項目姊妹校', 1, 1),\n('香港培道中學（示例）', '香港九龍', '香港', '中學', 60, 120, '香港進中學項目姊妹校', 1, 1),\n('香港道教聯合會小學（示例）', '香港新界', '香港', '小學', 60, 120, '備用姊妹小學', 1, 1),\n('香港英華書院（示例）', '香港九龍', '香港', '中學', 60, 120, '備用姊妹中學', 1, 1),\n('香港聖保羅男女中學（示例）', '香港港島', '香港', '中學', 60, 120, '備用姊妹中學', 1, 1);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1648
+}
