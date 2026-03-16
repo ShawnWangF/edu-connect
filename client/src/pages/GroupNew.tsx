@@ -14,8 +14,15 @@ import { format, addDays } from "date-fns";
 
 export default function GroupNew() {
   const [, setLocation] = useLocation();
+  // 讀取 URL 查詢參數中的 projectId
+  const urlProjectId = (() => {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    const pid = params.get('projectId');
+    return pid ? parseInt(pid) : null;
+  })();
   const [formData, setFormData] = useState({
-    projectId: null as number | null,
+    projectId: urlProjectId as number | null,
     name: "",
     code: "",
     startDate: format(new Date(), "yyyy-MM-dd"),

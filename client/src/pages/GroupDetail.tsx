@@ -34,18 +34,24 @@ const typeMap = {
 export default function GroupDetail() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/groups/:id");
-  const groupId = params?.id ? parseInt(params.id) : 0;
+  const rawId = params?.id ? parseInt(params.id) : NaN;
+  const groupId = isNaN(rawId) ? 0 : rawId;
+  const isValidGroup = groupId > 0;
 
-  const { data: group, isLoading } = trpc.groups.get.useQuery({ id: groupId });
-  const { data: itineraries } = trpc.itineraries.listByGroup.useQuery({ groupId });
-  const { data: members } = trpc.members.listByGroup.useQuery({ groupId });
-  const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId });
-  const { data: files } = trpc.files.listByGroup.useQuery({ groupId });
+  const { data: group, isLoading } = trpc.groups.get.useQuery({ id: groupId }, { enabled: isValidGroup });
+  const { data: itineraries } = trpc.itineraries.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
+  const { data: members } = trpc.members.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
+  const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
+  const { data: files } = trpc.files.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: attractions } = trpc.locations.list.useQuery();
-  const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId });
+  const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: schools } = trpc.schools.list.useQuery();
 
   const utils = trpc.useUtils();
+
+  if (!isValidGroup) {
+    return <div className="text-center py-12">團組 ID 無效</div>;
+  }
 
   if (isLoading) {
     return <div className="text-center py-12">加載中...</div>;

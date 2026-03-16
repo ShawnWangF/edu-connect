@@ -171,7 +171,7 @@ export function ProjectDetail() {
             </Button>
             <Button
               className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
-              onClick={() => setLocation(`/groups/create?projectId=${projectId}`)}
+              onClick={() => setLocation(`/groups/new?projectId=${projectId}`)}
             >
               <Plus className="w-4 h-4 mr-2" />
               添加團組
