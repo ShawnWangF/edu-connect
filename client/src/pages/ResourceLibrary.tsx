@@ -22,7 +22,7 @@ export default function ResourceLibrary() {
   // 查詢所有資源
   const { data: attractions = [] } = trpc.locations.list.useQuery();
   const { data: restaurants = [] } = trpc.restaurants.list.useQuery();
-  const { data: schools = [] } = trpc.exchangeSchools.list.useQuery();
+  const { data: schools = [] } = trpc.schools.list.useQuery();
 
   // 景點 mutations
   const updateAttractionMutation = trpc.locations.update.useMutation({
@@ -61,29 +61,29 @@ export default function ResourceLibrary() {
     onError: (error) => toast.error(error.message),
   });
 
-  // 交流學校mutations
-  const createSchoolMutation = trpc.exchangeSchools.create.useMutation({
+  // 學校mutations
+  const createSchoolMutation = trpc.schools.create.useMutation({
     onSuccess: () => {
-      toast.success("交流學校創建成功");
-      utils.exchangeSchools.list.invalidate();
+      toast.success("學校創建成功");
+      utils.schools.list.invalidate();
       handleCloseDialog();
     },
     onError: (error) => toast.error(error.message),
   });
 
-  const updateSchoolMutation = trpc.exchangeSchools.update.useMutation({
+  const updateSchoolMutation = trpc.schools.update.useMutation({
     onSuccess: () => {
-      toast.success("交流學校更新成功");
-      utils.exchangeSchools.list.invalidate();
+      toast.success("學校更新成功");
+      utils.schools.list.invalidate();
       handleCloseDialog();
     },
     onError: (error) => toast.error(error.message),
   });
 
-  const deleteSchoolMutation = trpc.exchangeSchools.delete.useMutation({
+  const deleteSchoolMutation = trpc.schools.delete.useMutation({
     onSuccess: () => {
-      toast.success("交流學校刪除成功");
-      utils.exchangeSchools.list.invalidate();
+      toast.success("學校刪除成功");
+      utils.schools.list.invalidate();
     },
     onError: (error) => toast.error(error.message),
   });

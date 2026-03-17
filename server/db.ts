@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, exchangeSchools, domesticSchools, templateItineraries, schoolExchanges, scheduleBlocks, staff, batchStaff, exchangeSchoolAvailability, batchExchangeSchools } from "../drizzle/schema";
+import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, schools, templateItineraries, schoolExchanges, scheduleBlocks, staff, batchStaff, exchangeSchoolAvailability, batchExchangeSchools } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 
@@ -732,72 +732,33 @@ export async function deleteRestaurant(id: number) {
 }
 
 // 學校資源管理
-// 此函數已府简，請使用 getAllExchangeSchools 或 getDomesticSchoolsByProject
 export async function getAllSchools() {
   const db = await getDb();
   if (!db) return [];
 
-  return await db.select().from(exchangeSchools);
+  return await db.select().from(schools);
 }
 
-// 交流學校（港澳）管理
-export async function getAllExchangeSchools() {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db.select().from(exchangeSchools);
-}
-
-export async function createExchangeSchool(schoolData: any) {
+export async function createSchool(schoolData: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(exchangeSchools).values(schoolData);
+  const result = await db.insert(schools).values(schoolData);
   return result;
 }
 
-export async function updateExchangeSchool(id: number, schoolData: any) {
+export async function updateSchool(id: number, schoolData: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(exchangeSchools).set(schoolData).where(eq(exchangeSchools.id, id));
+  await db.update(schools).set(schoolData).where(eq(schools.id, id));
 }
 
-export async function deleteExchangeSchool(id: number) {
+export async function deleteSchool(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.delete(exchangeSchools).where(eq(exchangeSchools.id, id));
-}
-
-// 前來交流學校（內地）管理
-export async function getDomesticSchoolsByProject(projectId: number) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db.select().from(domesticSchools).where(eq(domesticSchools.projectId, projectId));
-}
-
-export async function createDomesticSchool(schoolData: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(domesticSchools).values(schoolData);
-  return result;
-}
-
-export async function updateDomesticSchool(id: number, schoolData: any) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.update(domesticSchools).set(schoolData).where(eq(domesticSchools.id, id));
-}
-
-export async function deleteDomesticSchool(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.delete(domesticSchools).where(eq(domesticSchools.id, id));
+  await db.delete(schools).where(eq(schools.id, id));
 }
 
 // 行程模板管理
