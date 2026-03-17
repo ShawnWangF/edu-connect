@@ -116,12 +116,14 @@
 - [x] 排程總覽已正確讀取並展示 school_list/flight_info/batch_code/studentCount
 
 
-## Phase 9：學校管理模塊重構（進行中 - 每個學校是最小單位）
+## Phase 9：學校管理模塊重構（進行中 - 每個學校是最小单位）
 - [x] 添加 exchangeSchools 和 domesticSchools 表到 schema
-- [x] 修復 TypeScript 編譯錯誤
-- [ ] 使用手動 SQL 在數據庫中創建 exchangeSchools 和 domesticSchools 表
-- [ ] 調整數據模型：groups.school_list 擴展為包含每個學校的 exchangeSchoolId
-- [ ] 更新 GroupDetail 頁面 UI：為每個學校獨立指定交流學校
+- [x] 修複 TypeScript 編譯錯誤
+- [x] 使用手動 SQL 在數據庫中創建 exchangeSchools 和 domesticSchools 表
+- [x] 調整數據模形：groups.school_list 擴展為包含每個學校的 exchangeSchoolId
+- [x] 更新 GroupDetail 頁面 UI：為每個學校獨立指定交流學校
+- [x] 修複后端 updateGroup 路由：將 schoolList 数组转换为字符串格式（"學校名（人数） · 學校名2（人数）"）
+- [x] 修複前端 GroupDetail.tsx：处理 school_list 字符串格式
 - [ ] 實現學校批量導入功能（支持 Excel 文件）
 - [ ] 創建交流學校（港澳）管理頁面
 - [ ] 創建前來交流學校（內地）管理頁面

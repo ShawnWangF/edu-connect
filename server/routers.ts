@@ -479,6 +479,20 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const { id, batchId, batchCode, startCity, crossingDate, sisterSchoolId, flightInfo, schoolList, ...rest } = input as any;
+        
+        // 將 schoolList 轉換為字符串格式
+        let schoolListStr: string | undefined;
+        if (schoolList !== undefined && Array.isArray(schoolList) && schoolList.length > 0) {
+          schoolListStr = schoolList
+            .map((school: any) => {
+              const schoolName = school.name || '';
+              const studentCount = school.studentCount || 0;
+              const result = `${schoolName}（${studentCount}人）`;
+              return result;
+            })
+            .join(' · ');
+        }
+        
         const updateData = {
           ...rest,
           ...(batchId !== undefined && { batch_id: batchId }),
@@ -487,7 +501,7 @@ export const appRouter = router({
           ...(crossingDate !== undefined && { crossing_date: crossingDate }),
           ...(sisterSchoolId !== undefined && { sister_school_id: sisterSchoolId }),
           ...(flightInfo !== undefined && { flight_info: flightInfo }),
-          ...(schoolList !== undefined && { school_list: schoolList }),
+          ...(schoolListStr !== undefined && { school_list: schoolListStr }),
         };
         
         // 獲取更新前的團組信息

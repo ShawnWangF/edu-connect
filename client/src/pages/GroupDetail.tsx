@@ -45,8 +45,9 @@ export default function GroupDetail() {
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: attractions } = trpc.locations.list.useQuery();
   // const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
-  const schoolExchanges = []; // 暫時移除，待後續實現
+  const schoolExchanges: any[] = []; // 暫時移除，待後續實現
   const { data: schools } = trpc.schools.list.useQuery();
+  const { data: exchangeSchools } = trpc.exchangeSchools.list.useQuery();
   // 批次列表（用於排程信息編輯）
   const { data: project } = trpc.projects.get.useQuery(
     { id: group?.projectId ?? 0 },
@@ -161,7 +162,7 @@ export default function GroupDetail() {
               <p className="text-sm font-semibold text-[#1F4E79] flex items-center gap-1.5">
                 <span>📅</span> 排程信息
               </p>
-              <ScheduleInfoDialog group={group} batches={batches || []} schools={schools || []} utils={utils} groupId={groupId} />
+              <ScheduleInfoDialog group={group} batches={batches || []} schools={schools || []} exchangeSchools={(exchangeSchools || []) as any[]} utils={utils} groupId={groupId} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 批次 */}
@@ -200,15 +201,21 @@ export default function GroupDetail() {
             {/* 學校分組 */}
             <div className="mt-3">
               <p className="text-xs text-gray-500 font-medium mb-2">🏫 學校分組（本次項目配置）</p>
-              {group.school_list && group.school_list.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {group.school_list.map((s: any, i: number) => (
-                    <div key={i} className="bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-sm">
-                      <span className="font-medium text-blue-800">{s.name}</span>
-                      <span className="text-blue-500 ml-2">學生 {s.studentCount} 人{s.teacherCount ? ` + 教師 ${s.teacherCount} 人` : ''}</span>
-                    </div>
-                  ))}
-                </div>
+              {group.school_list ? (
+                typeof group.school_list === 'string' ? (
+                  <p className="text-sm text-gray-600">{group.school_list}</p>
+                ) : Array.isArray(group.school_list) && group.school_list.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {group.school_list.map((s: any, i: number) => (
+                      <div key={i} className="bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-sm">
+                        <span className="font-medium text-blue-800">{s.name}</span>
+                        <span className="text-blue-500 ml-2">學生 {s.studentCount} 人{s.teacherCount ? ` + 教師 ${s.teacherCount} 人` : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">未配置學校分組 — 點擊右上角「編輯排程信息」設置</p>
+                )
               ) : (
                 <p className="text-sm text-gray-400 italic">未配置學校分組 — 點擊右上角「編輯排程信息」設置</p>
               )}
@@ -2291,10 +2298,11 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
 
 
 // 排程信息編輯對話框
-function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
+function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, groupId }: {
   group: any;
   batches: any[];
   schools: any[];
+  exchangeSchools: any[];
   utils: any;
   groupId: number;
 }) {
@@ -2308,12 +2316,13 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
   const [departureTime, setDepartureTime] = useState(group.flight_info?.departureTime || '');
   const [sisterSchoolId, setSisterSchoolId] = useState<string>(group.sister_school_id?.toString() || '');
   // 學校分組列表
-  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number }>>(
-    (group.school_list || []).map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0 }))
+  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }>>(
+    Array.isArray(group.school_list) ? group.school_list.map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0, exchangeSchoolId: s.exchangeSchoolId })) : []
   );
   const [newSchoolId, setNewSchoolId] = useState<string>('');
   const [newSchoolStudentCount, setNewSchoolStudentCount] = useState<number>(0);
   const [newSchoolTeacherCount, setNewSchoolTeacherCount] = useState<number>(0);
+  const [newSchoolExchangeSchoolId, setNewSchoolExchangeSchoolId] = useState<string>('__none');
 
   const updateGroup = trpc.groups.update.useMutation({
     onSuccess: () => {
@@ -2322,7 +2331,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
       setOpen(false);
     },
     onError: (err: any) => toast.error('保存失敗：' + err.message),
-  });
+  }) as any;
 
   const handleOpen = () => {
     // 每次打開重置為最新團組數據
@@ -2334,7 +2343,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
     setDepartureFlight(group.flight_info?.departureFlight || '');
     setDepartureTime(group.flight_info?.departureTime || '');
     setSisterSchoolId(group.sister_school_id?.toString() || '');
-    setSchoolList((group.school_list || []).map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0 })));
+    setSchoolList(Array.isArray(group.school_list) ? group.school_list.map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0, exchangeSchoolId: s.exchangeSchoolId })) : []);
     setOpen(true);
   };
 
@@ -2346,13 +2355,20 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
       toast.error('該學校已在分組列表中');
       return;
     }
-    setSchoolList([...schoolList, { name: school.name, studentCount: newSchoolStudentCount, teacherCount: newSchoolTeacherCount }]);
+    setSchoolList([...schoolList, { name: school.name, studentCount: newSchoolStudentCount, teacherCount: newSchoolTeacherCount, exchangeSchoolId: newSchoolExchangeSchoolId && newSchoolExchangeSchoolId !== '__none' ? parseInt(newSchoolExchangeSchoolId) : undefined }]);
     setNewSchoolId('');
     setNewSchoolStudentCount(0);
     setNewSchoolTeacherCount(0);
+    setNewSchoolExchangeSchoolId('__none');
   };
 
   const removeSchool = (idx: number) => setSchoolList(schoolList.filter((_, i) => i !== idx));
+
+  const updateSchoolExchangeSchoolId = (idx: number, exchangeSchoolId?: number) => {
+    const updated = [...schoolList];
+    updated[idx].exchangeSchoolId = exchangeSchoolId;
+    setSchoolList(updated);
+  };
 
   const handleSave = () => {
     const selectedBatch = batches.find((b: any) => b.id.toString() === batchId);
@@ -2451,13 +2467,28 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
             {schoolList.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {schoolList.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
-                    <span className="flex-1 text-sm font-medium text-blue-800">{s.name}</span>
-                    <span className="text-xs text-blue-500">學生 {s.studentCount}</span>
-                    {s.teacherCount > 0 && <span className="text-xs text-blue-400">教師 {s.teacherCount}</span>}
-                    <button onClick={() => removeSchool(i)} className="text-red-400 hover:text-red-600 ml-1">
-                      <span className="text-xs">×</span>
-                    </button>
+                  <div key={i} className="bg-blue-50 rounded-lg px-3 py-2 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-blue-800">{s.name}</span>
+                      <button onClick={() => removeSchool(i)} className="text-red-400 hover:text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="text-xs text-blue-600">學生 {s.studentCount} {s.teacherCount > 0 && `+ 教師 ${s.teacherCount}`}</div>
+                    <div>
+                      <Label className="text-xs text-gray-500">指定交流學校</Label>
+                      <Select value={s.exchangeSchoolId?.toString() || '__none'} onValueChange={(val) => updateSchoolExchangeSchoolId(i, val === '__none' ? undefined : (val ? parseInt(val) : undefined))}>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="選擇交流學校" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">不指定</SelectItem>
+                          {exchangeSchools?.map((ex: any) => (
+                            <SelectItem key={ex.id} value={ex.id.toString()}>{ex.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2484,6 +2515,20 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
                   <Label className="text-xs text-gray-500">教師人數</Label>
                   <Input type="number" min={0} className="h-7 text-sm mt-0.5" value={newSchoolTeacherCount} onChange={e => setNewSchoolTeacherCount(parseInt(e.target.value) || 0)} />
                 </div>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">指定交流學校（可選）</Label>
+                <Select value={newSchoolExchangeSchoolId} onValueChange={setNewSchoolExchangeSchoolId}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="選擇交流學校" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">不指定</SelectItem>
+                    {exchangeSchools?.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button type="button" variant="outline" size="sm" className="w-full h-7 text-xs" onClick={addSchoolToList} disabled={!newSchoolId}>
                 <Plus className="h-3 w-3 mr-1" /> 添加學校
@@ -2544,8 +2589,8 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
   //     },
   //   });
 
-  const createExchange = { mutate: () => {} };
-  const deleteExchange = { mutate: () => {} };
+  const createExchange = { mutate: () => {}, isPending: false } as any;
+  const deleteExchange = { mutate: () => {}, isPending: false } as any;
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);

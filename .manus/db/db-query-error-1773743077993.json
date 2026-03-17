@@ -1,0 +1,12 @@
+{
+  "query": "INSERT INTO exchangeSchools (name, location, type, createdAt, updatedAt) VALUES\n('香港英華書院', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),\n('香港培道中學', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),\n('香港聖公會小學', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),\n('澳門聖保祿學校', 'Macau', 'exchange', datetime('now'), datetime('now')),\n('澳門濠江中學', 'Macau', 'exchange', datetime('now'), datetime('now'));",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute INSERT INTO exchangeSchools (name, location, type, createdAt, updatedAt) VALUES\n('香港英華書院', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),\n('香港培道中學', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),\n('香港聖公會小學', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),\n('澳門聖保祿學校', 'Macau', 'exchange', datetime('now'), datetime('now')),\n('澳門濠江中學', 'Macau', 'exchange', datetime('now'), datetime('now'));",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 2 column 58 near \"('now'), datetime('now')),",
+    "('香港培道中學', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),",
+    "('香港聖公會小學', 'Hong Kong', 'exchange', datetime('now'), datetime('now')),",
+    "('澳門聖保祿學校', 'Macau', 'exchange', datetime('now'), datetime('now')),",
+    "('澳門濠江中學', 'Macau', 'exchange', datetime('now'), datetime('now'))\""
+  ]
+}
