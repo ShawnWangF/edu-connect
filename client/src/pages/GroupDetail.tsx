@@ -45,7 +45,8 @@ export default function GroupDetail() {
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: attractions } = trpc.locations.list.useQuery();
   const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
-  const { data: schools } = trpc.schools.list.useQuery();
+  const { data: exchangeSchools } = trpc.exchangeSchools.list.useQuery();
+  const { data: domesticSchools } = trpc.domesticSchools.list.useQuery();
   // 批次列表（用於排程信息編輯）
   const { data: project } = trpc.projects.get.useQuery(
     { id: group?.projectId ?? 0 },
@@ -160,7 +161,7 @@ export default function GroupDetail() {
               <p className="text-sm font-semibold text-[#1F4E79] flex items-center gap-1.5">
                 <span>📅</span> 排程信息
               </p>
-              <ScheduleInfoDialog group={group} batches={batches || []} schools={schools || []} utils={utils} groupId={groupId} />
+              <ScheduleInfoDialog group={group} batches={batches || []} exchangeSchools={exchangeSchools || []} utils={utils} groupId={groupId} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 批次 */}
@@ -217,7 +218,7 @@ export default function GroupDetail() {
               <div className="mt-3">
                 <p className="text-xs text-gray-500 font-medium mb-1">⭐ 指定交流學校</p>
                 <p className="text-sm font-medium text-purple-700">
-                  {schools?.find((s: any) => s.id === group.sister_school_id)?.name || `學校 ID: ${group.sister_school_id}`}
+                  {exchangeSchools?.find((s: any) => s.id === group.sister_school_id)?.name || `學校 ID: ${group.sister_school_id}`}
                 </p>
               </div>
             )}
@@ -288,7 +289,7 @@ export default function GroupDetail() {
         </TabsContent>
 
         <TabsContent value="school">
-          <SchoolExchangeTab groupId={groupId} schoolExchanges={schoolExchanges} schools={schools} utils={utils} />
+          <SchoolExchangeTab groupId={groupId} schoolExchanges={schoolExchanges} exchangeSchools={exchangeSchools} utils={utils} />
         </TabsContent>
       </Tabs>
     </div>
@@ -2290,10 +2291,10 @@ function RequiredItinerariesDialog({ groupId, currentItineraries, utils }: {
 
 
 // 排程信息編輯對話框
-function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
+function ScheduleInfoDialog({ group, batches, exchangeSchools, utils, groupId }: {
   group: any;
   batches: any[];
-  schools: any[];
+  exchangeSchools: any[];
   utils: any;
   groupId: number;
 }) {
@@ -2339,7 +2340,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
 
   const addSchoolToList = () => {
     if (!newSchoolId) return;
-    const school = schools.find((s: any) => s.id.toString() === newSchoolId);
+    const school = exchangeSchools.find((s: any) => s.id.toString() === newSchoolId);
     if (!school) return;
     if (schoolList.find(s => s.name === school.name)) {
       toast.error('該學校已在分組列表中');
@@ -2469,7 +2470,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
                   <SelectValue placeholder="選擇學校" />
                 </SelectTrigger>
                 <SelectContent>
-                  {schools.map((s: any) => (
+                  {exchangeSchools.map((s: any) => (
                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -2498,7 +2499,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none">不指定</SelectItem>
-                {schools.map((s: any) => (
+                {exchangeSchools.map((s: any) => (
                   <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -2517,7 +2518,7 @@ function ScheduleInfoDialog({ group, batches, schools, utils, groupId }: {
 }
 
 // 學校交流Tab
-function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
+function SchoolExchangeTab({ groupId, schoolExchanges, exchangeSchools, utils }: any) {
   const [open, setOpen] = useState(false);
   const [selectedExchange, setSelectedExchange] = useState<any>(null);
 
@@ -2582,7 +2583,7 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
                       <SelectValue placeholder="選擇學校" />
                     </SelectTrigger>
                     <SelectContent>
-                      {schools?.map((school: any) => (
+                      {exchangeSchools?.map((school: any) => (
                         <SelectItem key={school.id} value={school.id.toString()}>
                           {school.name}
                         </SelectItem>
@@ -2639,7 +2640,7 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
         ) : (
           <div className="space-y-4">
             {schoolExchanges.map((exchange: any) => {
-              const school = schools?.find((s: any) => s.id === exchange.schoolId);
+              const school = exchangeSchools?.find((s: any) => s.id === exchange.schoolId);
               return (
                 <div key={exchange.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">

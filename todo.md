@@ -116,11 +116,12 @@
 - [x] 排程總覽已正確讀取並展示 school_list/flight_info/batch_code/studentCount
 
 
-## Phase 9：學校管理模塊重構（當前）
-- [ ] 分析現有數據庫結構，區分交流學校和前來交流學校
-- [ ] 創建 exchangeSchools 表（港澳交流學校）：name, city, address, availableDates, contactInfo
-- [ ] 創建 domesticSchools 表（內地前來交流學校）：name, address, studentCount, teacherCount, contactInfo
+## Phase 9：學校管理模塊重構（進行中 - 每個學校是最小單位）
+- [ ] 調整數據模型：groups.school_list 擴展為包含每個學校的 exchangeSchoolId
+- [ ] 移除 groups.sister_school_id（不再在團組層級指定交流學校）
+- [ ] 更新 GroupDetail 頁面 UI：為每個學校獨立指定交流學校
+- [ ] 實現學校批量導入功能（支持 Excel 文件）
 - [ ] 創建交流學校（港澳）管理頁面
 - [ ] 創建前來交流學校（內地）管理頁面
-- [ ] 更新團組與學校的關聯邏輯
+- [ ] 更新排程總覽：根據每個學校的交流學校標記交流日
 - [ ] 驗證所有功能並保存檢查點
