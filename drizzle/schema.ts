@@ -337,21 +337,44 @@ export const restaurants = mysqlTable("restaurants", {
 });
 
 /**
- * 學校資源表
+ * 交流學校資源表（港澳）
+ * 用於存儲港澳地區的交流學校信息，包括可交流日期
  */
-export const schools = mysqlTable("schools", {
+export const exchangeSchools = mysqlTable("exchangeSchools", {
   id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  address: text("address"),
+  name: varchar("name", { length: 255 }).notNull(), // 學校名稱
+  address: text("address"), // 學校地址
   region: varchar("region", { length: 50 }), // 地區：香港/澳門
   contactPerson: varchar("contactPerson", { length: 100 }), // 聯繫人
   contactPhone: varchar("contactPhone", { length: 50 }),
   contactEmail: varchar("contactEmail", { length: 100 }),
   receptionProcess: text("receptionProcess"), // 接待流程
-  availableTimeSlots: json("availableTimeSlots"), // 可交流時段 JSON
+  availableDates: json("availableDates").$type<string[]>(), // 可交流日期數組（YYYY-MM-DD格式）
   schoolType: varchar("schoolType", { length: 50 }), // 學校類型：小學/中學/大學
   maxGroupSize: int("maxGroupSize").default(50), // 最大接待團組人數
   capacity: int("capacity").default(0), // 可接待人數
+  notes: text("notes"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 前來交流學校表（內地）
+ * 用於存儲內地前來交流的學校信息，包括人數統計
+ */
+export const domesticSchools = mysqlTable("domesticSchools", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(), // 所屬項目
+  name: varchar("name", { length: 255 }).notNull(), // 學校名稱
+  address: text("address"), // 學校地址
+  studentCount: int("studentCount").default(0).notNull(), // 學生人數
+  teacherCount: int("teacherCount").default(0).notNull(), // 教師人數
+  contactPerson: varchar("contactPerson", { length: 100 }), // 聯繫人
+  contactPhone: varchar("contactPhone", { length: 50 }),
+  contactEmail: varchar("contactEmail", { length: 100 }),
+  schoolType: varchar("schoolType", { length: 50 }), // 學校類型：小學/中學/大學
   notes: text("notes"),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy").notNull(),
@@ -448,14 +471,17 @@ export type Attraction = typeof attractions.$inferSelect;
 export type InsertAttraction = typeof attractions.$inferInsert;
 export type Guide = typeof guides.$inferSelect;
 export type InsertGuide = typeof guides.$inferInsert;
+export type ExchangeSchool = typeof exchangeSchools.$inferSelect;
+export type InsertExchangeSchool = typeof exchangeSchools.$inferInsert;
+export type DomesticSchool = typeof domesticSchools.$inferSelect;
+export type InsertDomesticSchool = typeof domesticSchools.$inferInsert;
 export type Security = typeof securities.$inferSelect;
 export type InsertSecurity = typeof securities.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
 export type Restaurant = typeof restaurants.$inferSelect;
 export type InsertRestaurant = typeof restaurants.$inferInsert;
-export type School = typeof schools.$inferSelect;
-export type InsertSchool = typeof schools.$inferInsert;
+// 已棄用：School 類型已改為 ExchangeSchool 和 DomesticSchool
 export type TemplateItinerary = typeof templateItineraries.$inferSelect;
 export type InsertTemplateItinerary = typeof templateItineraries.$inferInsert;
 export type ScheduleBlock = typeof scheduleBlocks.$inferSelect;

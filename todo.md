@@ -114,3 +114,13 @@
 - [x] GroupDetail 頁面添加「排程信息」區塊（批次、起始城市、航班、學校分組展示）
 - [x] GroupDetail 頁面添加「編輯排程信息」對話框（批次選擇、航班填寫、學校分組從資源庫添加）
 - [x] 排程總覽已正確讀取並展示 school_list/flight_info/batch_code/studentCount
+
+
+## Phase 9：學校管理模塊重構（當前）
+- [ ] 分析現有數據庫結構，區分交流學校和前來交流學校
+- [ ] 創建 exchangeSchools 表（港澳交流學校）：name, city, address, availableDates, contactInfo
+- [ ] 創建 domesticSchools 表（內地前來交流學校）：name, address, studentCount, teacherCount, contactInfo
+- [ ] 創建交流學校（港澳）管理頁面
+- [ ] 創建前來交流學校（內地）管理頁面
+- [ ] 更新團組與學校的關聯邏輯
+- [ ] 驗證所有功能並保存檢查點

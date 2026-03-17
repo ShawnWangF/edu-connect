@@ -1336,10 +1336,10 @@ export const appRouter = router({
       }),
   }),
   
-  // 學校資源管理
-  schools: router({
+  // 交流學校（港澳）管理
+  exchangeSchools: router({
     list: protectedProcedure.query(async () => {
-      return await db.getAllSchools();
+      return await db.getAllExchangeSchools();
     }),
     
     create: editorProcedure
@@ -1351,12 +1351,14 @@ export const appRouter = router({
         contactPhone: z.string().optional(),
         contactEmail: z.string().optional(),
         receptionProcess: z.string().optional(),
-        availableTimeSlots: z.any().optional(),
+        availableDates: z.array(z.string()).optional(),
+        schoolType: z.string().optional(),
+        maxGroupSize: z.number().optional(),
         capacity: z.number().optional(),
         notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        await db.createSchool({ ...input, createdBy: ctx.user.id });
+        await db.createExchangeSchool({ ...input, createdBy: ctx.user.id });
         return { success: true };
       }),
     
@@ -1370,25 +1372,82 @@ export const appRouter = router({
         contactPhone: z.string().optional(),
         contactEmail: z.string().optional(),
         receptionProcess: z.string().optional(),
-        availableTimeSlots: z.any().optional(),
+        availableDates: z.array(z.string()).optional(),
+        schoolType: z.string().optional(),
+        maxGroupSize: z.number().optional(),
         capacity: z.number().optional(),
         notes: z.string().optional(),
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...updateData } = input;
-        await db.updateSchool(id, updateData);
+        await db.updateExchangeSchool(id, updateData);
         return { success: true };
       }),
     
     delete: editorProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        await db.deleteSchool(input.id);
+        await db.deleteExchangeSchool(input.id);
         return { success: true };
       }),
   }),
   
+  // 前來交流學校（內地）管理
+  domesticSchools: router({
+    listByProject: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getDomesticSchoolsByProject(input.projectId);
+      }),
+    
+    create: editorProcedure
+      .input(z.object({
+        projectId: z.number(),
+        name: z.string(),
+        address: z.string().optional(),
+        studentCount: z.number().default(0),
+        teacherCount: z.number().default(0),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        contactEmail: z.string().optional(),
+        schoolType: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await db.createDomesticSchool({ ...input, createdBy: ctx.user.id });
+        return { success: true };
+      }),
+    
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        address: z.string().optional(),
+        studentCount: z.number().optional(),
+        teacherCount: z.number().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        contactEmail: z.string().optional(),
+        schoolType: z.string().optional(),
+        notes: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updateData } = input;
+        await db.updateDomesticSchool(id, updateData);
+        return { success: true };
+      }),
+    
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteDomesticSchool(input.id);
+        return { success: true };
+      }),
+  }),
+  
+  // 此路由已府简，請使用 exchangeSchools 或 domesticSchools
   // 學校交流管理
   schoolExchanges: router({
     listByGroup: protectedProcedure
