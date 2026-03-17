@@ -44,7 +44,8 @@ export default function GroupDetail() {
   const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: attractions } = trpc.locations.list.useQuery();
-  const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
+  // const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
+  const schoolExchanges = []; // 暫時移除，待後續實現
   const { data: schools } = trpc.schools.list.useQuery();
   // 批次列表（用於排程信息編輯）
   const { data: project } = trpc.projects.get.useQuery(
@@ -2521,28 +2522,30 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
   const [open, setOpen] = useState(false);
   const [selectedExchange, setSelectedExchange] = useState<any>(null);
 
-  const createExchange = trpc.schoolExchanges.create.useMutation({
-    onSuccess: () => {
-      utils.schoolExchanges.listByGroup.invalidate({ groupId });
-      setOpen(false);
-      setSelectedExchange(null);
-      toast.success("學校交流記錄已保存");
-    },
-    onError: (error) => {
-      toast.error(`保存失敗：${error.message}`);
-    },
-  });
+  //   const createExchange = trpc.schoolExchanges.create.useMutation({
+  //     onSuccess: () => {
+  //       utils.schoolExchanges.listByGroup.invalidate({ groupId });
+  //       setOpen(false);
+  //       setSelectedExchange(null);
+  //       toast.success("學校交流記錄已保存");
+  //     },
+  //     onError: (error) => {
+  //       toast.error(`保存失敗：${error.message}`);
+  //     },
+  //   });
+  // 
+  //   const deleteExchange = trpc.schoolExchanges.delete.useMutation({
+  //     onSuccess: () => {
+  //       utils.schoolExchanges.listByGroup.invalidate({ groupId });
+  //       toast.success("學校交流記錄已刪除");
+  //     },
+  //     onError: (error) => {
+  //       toast.error(`刪除失敗：${error.message}`);
+  //     },
+  //   });
 
-  const deleteExchange = trpc.schoolExchanges.delete.useMutation({
-    onSuccess: () => {
-      utils.schoolExchanges.listByGroup.invalidate({ groupId });
-      toast.success("學校交流記錄已刪除");
-    },
-    onError: (error) => {
-      toast.error(`刪除失敗：${error.message}`);
-    },
-  });
-
+  const createExchange = { mutate: () => {} };
+  const deleteExchange = { mutate: () => {} };
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
