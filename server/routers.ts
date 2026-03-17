@@ -1691,6 +1691,35 @@ export const appRouter = router({
       }),
   }),
 
+  // ===== 學校管理 =====
+  exchangeSchools: router({
+    list: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      try {
+        const result = await dbConn.execute('SELECT * FROM exchangeSchools ORDER BY name');
+        return result[0] || [];
+      } catch (error) {
+        console.error('Error fetching exchangeSchools:', error);
+        return [];
+      }
+    }),
+  }),
+  
+  domesticSchools: router({
+    list: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      try {
+        const result = await dbConn.execute('SELECT * FROM domesticSchools ORDER BY name');
+        return result[0] || [];
+      } catch (error) {
+        console.error('Error fetching domesticSchools:', error);
+        return [];
+      }
+    }),
+  }),
+
   // ===== 工作人員庫 =====
   staff: router({
     list: protectedProcedure.query(async () => {

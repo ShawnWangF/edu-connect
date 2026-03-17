@@ -180,6 +180,14 @@ export default function ResourceLibrary() {
             <School className="h-4 w-4" />
             學校資源
           </TabsTrigger>
+          <TabsTrigger value="exchangeSchools" className="gap-2">
+            <School className="h-4 w-4" />
+            交流學校
+          </TabsTrigger>
+          <TabsTrigger value="domesticSchools" className="gap-2">
+            <School className="h-4 w-4" />
+            前來交流學校
+          </TabsTrigger>
         </TabsList>
 
         {/* 景點資源 */}
