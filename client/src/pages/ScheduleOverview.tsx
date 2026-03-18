@@ -380,7 +380,20 @@ export default function ScheduleOverview() {
         }
       } else {
         // 普通字符串格式："学校名（人数） · 学校名2（人数）"
-        schoolList = [{ name: group.school_list, studentCount: 0 }];
+        // 按 · 分割多个学校
+        const schools = group.school_list.split('·').map((s: string) => s.trim());
+        schoolList = schools.map((school: string) => {
+          // 提取学校名和人数："蘇州一中（40+4人）" -> name: "蘇州一中", studentCount: 40, teacherCount: 4
+          const match = school.match(/^(.+?)（([0-9]+)(?:\+([0-9]+))?人）$/);
+          if (match) {
+            return {
+              name: match[1],
+              studentCount: parseInt(match[2], 10),
+              teacherCount: match[3] ? parseInt(match[3], 10) : 0
+            };
+          }
+          return { name: school, studentCount: 0 };
+        });
       }
     } else if (Array.isArray(group.school_list)) {
       // 处理数组格式，也需要处理两种字段名
