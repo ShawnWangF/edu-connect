@@ -360,7 +360,36 @@ export default function ScheduleOverview() {
     const types: string[] = Array.isArray(group.type) ? group.type : [];
     const isSecondary = types.some(t => t.includes('中學') || t.includes('中学'));
     const rowBg = isSecondary ? '#FFF4EC' : '#FFFFFF';
-    const schoolList: Array<{ name: string; studentCount: number; teacherCount?: number }> = group.school_list || [];
+    
+    // 处理 school_list 字符串或数组格式
+    let schoolList: Array<{ name: string; studentCount: number; teacherCount?: number }> = [];
+    if (typeof group.school_list === 'string' && group.school_list) {
+      // 尝试解析 JSON 格式
+      if (group.school_list.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(group.school_list);
+          // 处理两种字段名格式：studentCount/teacherCount 或 students/teachers
+          schoolList = parsed.map((item: any) => ({
+            name: item.name,
+            studentCount: item.studentCount ?? item.students ?? 0,
+            teacherCount: item.teacherCount ?? item.teachers ?? 0
+          }));
+        } catch {
+          // JSON 解析失败，作为普通字符串处理
+          schoolList = [{ name: group.school_list, studentCount: 0 }];
+        }
+      } else {
+        // 普通字符串格式："学校名（人数） · 学校名2（人数）"
+        schoolList = [{ name: group.school_list, studentCount: 0 }];
+      }
+    } else if (Array.isArray(group.school_list)) {
+      // 处理数组格式，也需要处理两种字段名
+      schoolList = (group.school_list as any[]).map((item: any) => ({
+        name: item.name,
+        studentCount: item.studentCount ?? item.students ?? 0,
+        teacherCount: item.teacherCount ?? item.teachers ?? 0
+      }));
+    }
     const flightInfo = group.flight_info || {};
     const startCityLabel = group.startCity === 'sz' ? '深圳' : group.startCity === 'hk' ? '香港' : group.startCity === 'macau' ? '澳門' : '-';
 
@@ -415,11 +444,17 @@ export default function ScheduleOverview() {
         {/* 學校分組列 */}
         <td className="border border-gray-200 px-1 py-0.5 align-top" style={{ width: LEFT_COL_WIDTHS.schoolList, minWidth: LEFT_COL_WIDTHS.schoolList, backgroundColor: rowBg }}>
           <div className="text-[9px] text-gray-700 leading-tight">
-            {schoolList.length > 0 ? schoolList.map((s, i) => (
-              <div key={i} className="truncate" title={s.name}>
-                {s.name}（{s.studentCount}{s.teacherCount ? `+${s.teacherCount}` : ''}人）
+            {schoolList.length > 0 ? (
+              schoolList.map((s, i) => (
+                <div key={i} className="truncate" title={`${s.name}（${s.studentCount}人）`}>
+                  {s.name}（{s.studentCount}{s.teacherCount ? `+${s.teacherCount}` : ''}人）
+                </div>
+              ))
+            ) : typeof group.school_list === 'string' && group.school_list && !group.school_list.startsWith('[') ? (
+              <div className="truncate" title={group.school_list}>
+                {group.school_list}
               </div>
-            )) : (
+            ) : (
               <div className="text-gray-400 italic">{group.name}</div>
             )}
           </div>
@@ -809,7 +844,36 @@ export default function ScheduleOverview() {
                     const types: string[] = Array.isArray(g.type) ? g.type : [];
                     const isSecondary = types.some(t => t.includes('中學') || t.includes('中学'));
                     const rowBg = isSecondary ? '#FFF4EC' : '#FFFFFF';
-                    const schoolList: Array<{ name: string; studentCount: number; teacherCount?: number }> = g.school_list || [];
+                    
+                    // 处理 school_list 字符串或数组格式
+                    let schoolList: Array<{ name: string; studentCount: number; teacherCount?: number }> = [];
+                    if (typeof g.school_list === 'string' && g.school_list) {
+                      // 尝试解析 JSON 格式
+                      if ((g.school_list as string).startsWith('[')) {
+                        try {
+                          const parsed = JSON.parse(g.school_list);
+                          // 处理两种字段名格式：studentCount/teacherCount 或 students/teachers
+                          schoolList = parsed.map((item: any) => ({
+                            name: item.name,
+                            studentCount: item.studentCount ?? item.students ?? 0,
+                            teacherCount: item.teacherCount ?? item.teachers ?? 0
+                          }));
+                        } catch {
+                          // JSON 解析失败，作为普通字符串处理
+                          schoolList = [{ name: g.school_list, studentCount: 0 }];
+                        }
+                      } else {
+                        // 普通字符串格式："学校名（人数） · 学校名2（人数）"
+                        schoolList = [{ name: g.school_list, studentCount: 0 }];
+                      }
+                    } else if (Array.isArray(g.school_list)) {
+                      // 处理数组格式，也需要处理两种字段名
+                      schoolList = (g.school_list as any[]).map((item: any) => ({
+                        name: item.name,
+                        studentCount: item.studentCount ?? item.students ?? 0,
+                        teacherCount: item.teacherCount ?? item.teachers ?? 0
+                      }));
+                    }
                     const flightInfo = g.flight_info || {};
                     return (
                       <tr key={g.id} style={{ backgroundColor: rowBg }}>
@@ -834,14 +898,17 @@ export default function ScheduleOverview() {
                           {g.teacherCount || 0}
                         </td>
                         <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                          {schoolList.length > 0
-                            ? schoolList.map((s, i) => (
-                                <span key={i} className="mr-1">
-                                  {s.name}（{s.studentCount}人）{i < schoolList.length - 1 ? '·' : ''}
-                                </span>
-                              ))
-                            : <span className="text-gray-400">{g.name}</span>
-                          }
+                          {typeof g.school_list === 'string' && g.school_list ? (
+                            <span>{g.school_list}</span>
+                          ) : schoolList.length > 0 ? (
+                            schoolList.map((s, i) => (
+                              <span key={i} className="mr-1">
+                                {s.name}（{s.studentCount}人）{i < schoolList.length - 1 ? '·' : ''}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">{g.name}</span>
+                          )}
                         </td>
                       </tr>
                     );

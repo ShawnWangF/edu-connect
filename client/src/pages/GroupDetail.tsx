@@ -2306,6 +2306,8 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
   utils: any;
   groupId: number;
 }) {
+  console.log('[ScheduleInfoDialog] group:', group);
+  console.log('[ScheduleInfoDialog] group.school_list:', group.school_list);
   const [open, setOpen] = useState(false);
   const [batchId, setBatchId] = useState<string>(group.batch_id?.toString() || '');
   const [startCity, setStartCity] = useState<string>(group.start_city || '');
@@ -2316,8 +2318,56 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
   const [departureTime, setDepartureTime] = useState(group.flight_info?.departureTime || '');
   const [sisterSchoolId, setSisterSchoolId] = useState<string>(group.sister_school_id?.toString() || '');
   // 學校分組列表
+  // 解析 school_list，支持字符串和数组格式
+  const parseSchoolList = (schoolList: any): Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }> => {
+    console.log('[parseSchoolList] Input:', schoolList, 'Type:', typeof schoolList);
+    if (Array.isArray(schoolList)) {
+      console.log('[parseSchoolList] Input is array');
+      return schoolList.map((s: any) => ({ 
+        name: s.name, 
+        studentCount: s.studentCount || 0, 
+        teacherCount: s.teacherCount || 0, 
+        exchangeSchoolId: s.exchangeSchoolId 
+      }));
+    } else if (typeof schoolList === 'string' && schoolList) {
+      // 从字符串格式解析学校列表
+      // 格式: "学校名（人数人） · 学校名2（人数人）" 或 "学校名（人） · 学校名2（人）"
+      console.log('[parseSchoolList] Input is string, parsing...');
+      const schools: Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }> = [];
+      schoolList.split(' · ').forEach((item: string) => {
+        console.log('[parseSchoolList] Parsing item:', item);
+        // 尝试匹配 "学校名（数字人）" 格式
+        let match = item.match(/^(.+?)\((\d+)人\)$/);
+        if (match) {
+          schools.push({
+            name: match[1],
+            studentCount: parseInt(match[2]) || 0,
+            teacherCount: 0,
+            exchangeSchoolId: undefined
+          });
+        } else {
+          // 尝试匹配 "学校名（人）" 格式（没有数字）
+          match = item.match(/^(.+?)\(人\)$/);
+          if (match) {
+            schools.push({
+              name: match[1],
+              studentCount: 0,
+              teacherCount: 0,
+              exchangeSchoolId: undefined
+            });
+          }
+        }
+        console.log('[parseSchoolList] Match result:', match);
+      });
+      console.log('[parseSchoolList] Parsed schools:', schools);
+      return schools;
+    }
+    console.log('[parseSchoolList] Returning empty array');
+    return [];
+  };
+  
   const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }>>(
-    Array.isArray(group.school_list) ? group.school_list.map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0, exchangeSchoolId: s.exchangeSchoolId })) : []
+    parseSchoolList(group.school_list)
   );
   const [newSchoolId, setNewSchoolId] = useState<string>('');
   const [newSchoolStudentCount, setNewSchoolStudentCount] = useState<number>(0);
@@ -2343,7 +2393,7 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
     setDepartureFlight(group.flight_info?.departureFlight || '');
     setDepartureTime(group.flight_info?.departureTime || '');
     setSisterSchoolId(group.sister_school_id?.toString() || '');
-    setSchoolList(Array.isArray(group.school_list) ? group.school_list.map((s: any) => ({ name: s.name, studentCount: s.studentCount || 0, teacherCount: s.teacherCount || 0, exchangeSchoolId: s.exchangeSchoolId })) : []);
+    setSchoolList(parseSchoolList(group.school_list));
     setOpen(true);
   };
 
@@ -2385,7 +2435,7 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
         departureFlight: departureFlight || undefined,
         departureTime: departureTime || undefined,
       },
-      schoolList: schoolList.length > 0 ? schoolList : undefined,
+      schoolList: schoolList, // 总是传递 schoolList，即使为空
     });
   };
 

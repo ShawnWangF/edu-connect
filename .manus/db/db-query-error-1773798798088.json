@@ -1,0 +1,8 @@
+{
+  "query": "UPDATE `groups` SET school_list = '蘇州一中（40人） · 香港英華書院（50人） · 香港培道中學（10人）' WHERE id = '210001';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute UPDATE `groups` SET school_list = '蘇州一中（40人） · 香港英華書院（50人） · 香港培道中學（10人）' WHERE id = '210001';",
+  "returncode": 1,
+  "logs": [
+    "ERROR 3140 (22032) at line 1: Invalid JSON text: ?"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "query": "SELECT id, name, school_list FROM `groups` WHERE id = 210001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, school_list FROM `groups` WHERE id = 210001;",
+  "rows": [
+    {
+      "id": "210001",
+      "name": "蘇州一中A組",
+      "school_list": "\"蘇州一中（0人） · 香港聖公會小學（示例）（50人） · 香港培道中學（示例）（10人）\""
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tschool_list\n210001\t蘇州一中A組\t\"蘇州一中（0人） · 香港聖公會小學（示例）（50人） · 香港培道中學（示例）（10人）\"\n",
+  "stderr": "",
+  "execution_time_ms": 1560
+}

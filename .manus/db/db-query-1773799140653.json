@@ -1,0 +1,15 @@
+{
+  "query": "SELECT id, name, school_list FROM `groups` WHERE id = 210001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute SELECT id, name, school_list FROM `groups` WHERE id = 210001;",
+  "rows": [
+    {
+      "id": "210001",
+      "name": "蘇州一中A組",
+      "school_list": "[{\"name\": \"蘇州一中\", \"studentCount\": 40, \"teacherCount\": 0}, {\"name\": \"香港英華書院\", \"studentCount\": 50, \"teacherCount\": 0}, {\"name\": \"香港培道中學\", \"studentCount\": 10, \"teacherCount\": 0}]"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tschool_list\n210001\t蘇州一中A組\t[{\"name\": \"蘇州一中\", \"studentCount\": 40, \"teacherCount\": 0}, {\"name\": \"香港英華書院\", \"studentCount\": 50, \"teacherCount\": 0}, {\"name\": \"香港培道中學\", \"studentCount\": 10, \"teacherCount\": 0}]\n",
+  "stderr": "",
+  "execution_time_ms": 1507
+}

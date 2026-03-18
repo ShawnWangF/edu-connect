@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE `groups` SET school_list = JSON_ARRAY(JSON_OBJECT('name', '蘇州一中', 'studentCount', 40), JSON_OBJECT('name', '香港英華書院', 'studentCount', 50), JSON_OBJECT('name', '香港培道中學', 'studentCount', 10)) WHERE id = '210001';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute UPDATE `groups` SET school_list = JSON_ARRAY(JSON_OBJECT('name', '蘇州一中', 'studentCount', 40), JSON_OBJECT('name', '香港英華書院', 'studentCount', 50), JSON_OBJECT('name', '香港培道中學', 'studentCount', 10)) WHERE id = '210001';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1653
+}
