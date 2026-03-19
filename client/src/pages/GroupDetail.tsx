@@ -2524,7 +2524,24 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="text-xs text-blue-600">學生 {s.studentCount} {s.teacherCount > 0 && `+ 教師 ${s.teacherCount}`}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-gray-500">學生人數</Label>
+                        <Input type="number" min={0} className="h-7 text-sm mt-0.5" value={s.studentCount} onChange={e => {
+                          const updated = [...schoolList];
+                          updated[i].studentCount = parseInt(e.target.value) || 0;
+                          setSchoolList(updated);
+                        }} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500">教師人數</Label>
+                        <Input type="number" min={0} className="h-7 text-sm mt-0.5" value={s.teacherCount} onChange={e => {
+                          const updated = [...schoolList];
+                          updated[i].teacherCount = parseInt(e.target.value) || 0;
+                          setSchoolList(updated);
+                        }} />
+                      </div>
+                    </div>
                     <div>
                       <Label className="text-xs text-gray-500">指定交流學校</Label>
                       <Select value={s.exchangeSchoolId?.toString() || '__none'} onValueChange={(val) => updateSchoolExchangeSchoolId(i, val === '__none' ? undefined : (val ? parseInt(val) : undefined))}>
