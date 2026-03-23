@@ -22,14 +22,30 @@ export default function ResourceLibrary() {
   // 查詢所有資源
   const { data: attractions = [] } = trpc.locations.list.useQuery();
   const { data: restaurants = [] } = trpc.restaurants.list.useQuery();
-  const { data: schools = [] } = trpc.schools.list.useQuery();
 
   // 景點 mutations
+  const createAttractionMutation = trpc.locations.create.useMutation({
+    onSuccess: () => {
+      toast.success("景點創建成功");
+      utils.locations.list.invalidate();
+      handleCloseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const updateAttractionMutation = trpc.locations.update.useMutation({
     onSuccess: () => {
       toast.success("景點更新成功");
       utils.locations.list.invalidate();
       handleCloseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteAttractionMutation = trpc.locations.delete.useMutation({
+    onSuccess: () => {
+      toast.success("景點刪除成功");
+      utils.locations.list.invalidate();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -61,32 +77,7 @@ export default function ResourceLibrary() {
     onError: (error) => toast.error(error.message),
   });
 
-  // 學校mutations
-  const createSchoolMutation = trpc.schools.create.useMutation({
-    onSuccess: () => {
-      toast.success("學校創建成功");
-      utils.schools.list.invalidate();
-      handleCloseDialog();
-    },
-    onError: (error) => toast.error(error.message),
-  });
 
-  const updateSchoolMutation = trpc.schools.update.useMutation({
-    onSuccess: () => {
-      toast.success("學校更新成功");
-      utils.schools.list.invalidate();
-      handleCloseDialog();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const deleteSchoolMutation = trpc.schools.delete.useMutation({
-    onSuccess: () => {
-      toast.success("學校刪除成功");
-      utils.schools.list.invalidate();
-    },
-    onError: (error) => toast.error(error.message),
-  });
 
   const handleOpenDialog = (type: string, item?: any) => {
     setActiveTab(type);
@@ -120,6 +111,8 @@ export default function ResourceLibrary() {
           data.requiresBooking = false;
         }
         updateAttractionMutation.mutate({ id: editingItem.id, ...data });
+      } else {
+        createAttractionMutation.mutate(data);
       }
     } else if (activeTab === "restaurants") {
       if (editingItem) {
@@ -127,22 +120,16 @@ export default function ResourceLibrary() {
       } else {
         createRestaurantMutation.mutate(data);
       }
-    } else if (activeTab === "schools") {
-      if (editingItem) {
-        updateSchoolMutation.mutate({ id: editingItem.id, ...data });
-      } else {
-        createSchoolMutation.mutate(data);
-      }
     }
   };
 
   const handleDelete = (type: string, id: number) => {
     if (!confirm("確定要刪除此資源嗎？")) return;
     
-    if (type === "restaurants") {
+    if (type === "attractions") {
+      deleteAttractionMutation.mutate({ id });
+    } else if (type === "restaurants") {
       deleteRestaurantMutation.mutate({ id });
-    } else if (type === "schools") {
-      deleteSchoolMutation.mutate({ id });
     }
   };
 
@@ -161,7 +148,7 @@ export default function ResourceLibrary() {
         <div>
           <h1 className="text-3xl font-bold">資源庫</h1>
           <p className="text-muted-foreground mt-1">
-            統一管理景點、餐廳、學校等資源，支持行程快速選擇
+            統一管理景點、餐廳、姊妹學校等資源，支持行程快速選擇
           </p>
         </div>
       </div>
@@ -176,13 +163,9 @@ export default function ResourceLibrary() {
             <UtensilsCrossed className="h-4 w-4" />
             餐廳資源
           </TabsTrigger>
-          <TabsTrigger value="schools" className="gap-2">
-            <School className="h-4 w-4" />
-            學校資源
-          </TabsTrigger>
           <TabsTrigger value="exchangeSchools" className="gap-2">
             <School className="h-4 w-4" />
-            交流學校
+            姊妹學校
           </TabsTrigger>
           <TabsTrigger value="domesticSchools" className="gap-2">
             <School className="h-4 w-4" />
@@ -206,27 +189,43 @@ export default function ResourceLibrary() {
                       className="pl-8 w-64"
                     />
                   </div>
+                  <Button onClick={() => handleOpenDialog("attractions")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    添加景點
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filterItems(attractions).map((item: any) => (
-                  <Card key={item.id} className="border-2">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center justify-between">
-                        <span>{item.name}</span>
-                        <div className="flex gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleOpenDialog("attractions", item)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </CardTitle>
+              {attractions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  暫無景點資源，點擊右上角「添加景點」開始創建
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filterItems(attractions).map((item: any) => (
+                    <Card key={item.id} className="border-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <span>{item.name}</span>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenDialog("attractions", item)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => handleDelete("attractions", item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       {item.address && (
@@ -241,10 +240,11 @@ export default function ResourceLibrary() {
                       {item.requiresBooking && (
                         <div className="text-xs text-amber-600">需要預約</div>
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -331,87 +331,6 @@ export default function ResourceLibrary() {
           </Card>
         </TabsContent>
 
-        {/* 學校資源 */}
-        <TabsContent value="schools">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>學校列表</CardTitle>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="搜索學校..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 w-64"
-                    />
-                  </div>
-                  <Button onClick={() => handleOpenDialog("schools")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    添加學校
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {schools.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  暫無學校資源，點擊右上角「添加學校」開始創建
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filterItems(schools).map((item: any) => (
-                    <Card key={item.id} className="border-2">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center justify-between">
-                          <span>{item.name}</span>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleOpenDialog("schools", item)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive"
-                              onClick={() => handleDelete("schools", item.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        {item.region && (
-                          <div className="inline-block px-2 py-1 rounded-full bg-primary/10 text-primary text-xs">
-                            {item.region}
-                          </div>
-                        )}
-                        {item.address && (
-                          <div className="text-muted-foreground">{item.address}</div>
-                        )}
-                        {item.contactPerson && (
-                          <div className="text-muted-foreground">
-                            聯繫人：{item.contactPerson}
-                            {item.contactPhone && ` (${item.contactPhone})`}
-                          </div>
-                        )}
-                        {item.capacity > 0 && (
-                          <div className="text-muted-foreground">可接待：{item.capacity}人</div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* 添加/編輯對話框 */}
@@ -420,7 +339,7 @@ export default function ResourceLibrary() {
           <DialogHeader>
             <DialogTitle>
               {editingItem ? "編輯" : "添加"}
-              {activeTab === "attractions" ? "景點" : activeTab === "restaurants" ? "餐廳" : "學校"}
+              {activeTab === "attractions" ? "景點" : activeTab === "restaurants" ? "餐廳" : ""}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -601,119 +520,7 @@ export default function ResourceLibrary() {
               </>
             )}
 
-            {activeTab === "schools" && (
-              <>
-                <div>
-                  <Label htmlFor="name">學校名稱 *</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    defaultValue={editingItem?.name}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="region">地區</Label>
-                  <Select name="region" defaultValue={editingItem?.region || "香港"}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="選擇地區" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="香港">香港</SelectItem>
-                      <SelectItem value="澳門">澳門</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="address">地址</Label>
-                  <Textarea
-                    id="address"
-                    name="address"
-                    defaultValue={editingItem?.address}
-                    rows={2}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="contactPerson">聯繫人</Label>
-                    <Input
-                      id="contactPerson"
-                      name="contactPerson"
-                      defaultValue={editingItem?.contactPerson}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="contactPhone">聯繫電話</Label>
-                    <Input
-                      id="contactPhone"
-                      name="contactPhone"
-                      defaultValue={editingItem?.contactPhone}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="contactEmail">聯繫郵箱</Label>
-                  <Input
-                    id="contactEmail"
-                    name="contactEmail"
-                    type="email"
-                    defaultValue={editingItem?.contactEmail}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="schoolType">學校類型</Label>
-                    <Select name="schoolType" defaultValue={editingItem?.schoolType || "小學"}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="選擇學校類型" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="小學">小學</SelectItem>
-                        <SelectItem value="中學">中學</SelectItem>
-                        <SelectItem value="大學">大學</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="maxGroupSize">最大接待團組人數</Label>
-                    <Input
-                      id="maxGroupSize"
-                      name="maxGroupSize"
-                      type="number"
-                      defaultValue={editingItem?.maxGroupSize || 50}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="capacity">可接待人數</Label>
-                  <Input
-                    id="capacity"
-                    name="capacity"
-                    type="number"
-                    defaultValue={editingItem?.capacity || 0}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="receptionProcess">接待流程</Label>
-                  <Textarea
-                    id="receptionProcess"
-                    name="receptionProcess"
-                    defaultValue={editingItem?.receptionProcess}
-                    rows={3}
-                    placeholder="描述接待流程、注意事項等"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="notes">備註</Label>
-                  <Textarea
-                    id="notes"
-                    name="notes"
-                    defaultValue={editingItem?.notes}
-                    rows={2}
-                  />
-                </div>
-              </>
-            )}
+
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCloseDialog}>

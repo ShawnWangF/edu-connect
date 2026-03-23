@@ -1,0 +1,9 @@
+{
+  "query": "\n-- 禁用外键检查\nSET FOREIGN_KEY_CHECKS = 0;\n\n-- 清空所有表\nDELETE FROM files;\nDELETE FROM snapshots;\nDELETE FROM members;\nDELETE FROM dailyCards;\nDELETE FROM itineraries;\nDELETE FROM `groups`;\nDELETE FROM batches;\nDELETE FROM projects;\nDELETE FROM attractions;\nDELETE FROM schools;\nDELETE FROM templates;\nDELETE FROM hotels;\nDELETE FROM vehicles;\nDELETE FROM locations;\n\n-- 重新启用外键检查\nSET FOREIGN_KEY_CHECKS = 1;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \n-- 禁用外键检查\nSET FOREIGN_KEY_CHECKS = 0;\n\n-- 清空所有表\nDELETE FROM files;\nDELETE FROM snapshots;\nDELETE FROM members;\nDELETE FROM dailyCards;\nDELETE FROM itineraries;\nDELETE FROM `groups`;\nDELETE FROM batches;\nDELETE FROM projects;\nDELETE FROM attractions;\nDELETE FROM schools;\nDELETE FROM templates;\nDELETE FROM hotels;\nDELETE FROM vehicles;\nDELETE FROM locations;\n\n-- 重新启用外键检查\nSET FOREIGN_KEY_CHECKS = 1;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 4923
+}

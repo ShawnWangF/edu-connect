@@ -1,0 +1,8 @@
+{
+  "query": "\n-- 禁用外键检查\nSET FOREIGN_KEY_CHECKS = 0;\n\n-- 清空所有表\nTRUNCATE TABLE files;\nTRUNCATE TABLE snapshots;\nTRUNCATE TABLE members;\nTRUNCATE TABLE dailyCards;\nTRUNCATE TABLE itineraries;\nTRUNCATE TABLE groups;\nTRUNCATE TABLE batches;\nTRUNCATE TABLE projects;\nTRUNCATE TABLE attractions;\nTRUNCATE TABLE schools;\nTRUNCATE TABLE templates;\nTRUNCATE TABLE hotels;\nTRUNCATE TABLE vehicles;\nTRUNCATE TABLE locations;\n\n-- 重新启用外键检查\nSET FOREIGN_KEY_CHECKS = 1;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \n-- 禁用外键检查\nSET FOREIGN_KEY_CHECKS = 0;\n\n-- 清空所有表\nTRUNCATE TABLE files;\nTRUNCATE TABLE snapshots;\nTRUNCATE TABLE members;\nTRUNCATE TABLE dailyCards;\nTRUNCATE TABLE itineraries;\nTRUNCATE TABLE groups;\nTRUNCATE TABLE batches;\nTRUNCATE TABLE projects;\nTRUNCATE TABLE attractions;\nTRUNCATE TABLE schools;\nTRUNCATE TABLE templates;\nTRUNCATE TABLE hotels;\nTRUNCATE TABLE vehicles;\nTRUNCATE TABLE locations;\n\n-- 重新启用外键检查\nSET FOREIGN_KEY_CHECKS = 1;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 11: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 21 near \"groups\""
+  ]
+}
