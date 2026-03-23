@@ -1853,6 +1853,103 @@ export const appRouter = router({
       }),
   }),
 
+  // ===== 人員管理 - 指派行程 & 狀態監控 =====
+  memberManagement: router({
+    // 獲取所有人員（含團組信息）
+    listAll: protectedProcedure.query(async () => {
+      return await db.getAllMembersWithGroups();
+    }),
+
+    // 獲取某行程的已指派人員
+    listByItinerary: protectedProcedure
+      .input(z.object({ itineraryId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getItineraryMembers(input.itineraryId);
+      }),
+
+    // 獲取某人員的所有行程指派
+    listByMember: protectedProcedure
+      .input(z.object({ memberId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getMemberItineraries(input.memberId);
+      }),
+
+    // 指派單個人員到行程
+    assign: editorProcedure
+      .input(z.object({
+        itineraryId: z.number(),
+        memberId: z.number(),
+        role: z.enum(['guide', 'staff', 'security', 'coordinator', 'other']).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await db.assignMemberToItinerary(input);
+        return result;
+      }),
+
+    // 批量指派多個人員到行程
+    batchAssign: editorProcedure
+      .input(z.object({
+        itineraryId: z.number(),
+        memberIds: z.array(z.number()),
+        role: z.enum(['guide', 'staff', 'security', 'coordinator', 'other']).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const results = await db.batchAssignMembersToItinerary(
+          input.itineraryId,
+          input.memberIds,
+          input.role
+        );
+        return { success: true, results };
+      }),
+
+    // 從行程移除人員
+    remove: editorProcedure
+      .input(z.object({
+        itineraryId: z.number(),
+        memberId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.removeMemberFromItinerary(input.itineraryId, input.memberId);
+        return { success: true };
+      }),
+
+    // 獲取某行程的人員狀態
+    getStatusByItinerary: protectedProcedure
+      .input(z.object({ itineraryId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getMemberStatusByItinerary(input.itineraryId);
+      }),
+
+    // 獲取某人員的所有狀態記錄
+    getStatusByMember: protectedProcedure
+      .input(z.object({ memberId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getMemberStatusByMember(input.memberId);
+      }),
+
+    // 更新人員狀態（簽到/簽退/狀態變更）
+    updateStatus: editorProcedure
+      .input(z.object({
+        memberId: z.number(),
+        itineraryId: z.number(),
+        status: z.enum(['pending', 'assigned', 'in_progress', 'completed', 'absent', 'cancelled']),
+        checkInTime: z.string().optional().nullable(),
+        checkOutTime: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await db.upsertMemberStatus({
+          memberId: input.memberId,
+          itineraryId: input.itineraryId,
+          status: input.status,
+          checkInTime: input.checkInTime ? new Date(input.checkInTime) : null,
+          checkOutTime: input.checkOutTime ? new Date(input.checkOutTime) : null,
+          notes: input.notes,
+        });
+        return result;
+      }),
+  }),
+
   // ===== 交流學校可用日管理 =====
   exchangeAvailability: router({
     listBySchool: protectedProcedure

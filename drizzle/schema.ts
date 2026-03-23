@@ -452,7 +452,35 @@ export const securities = mysqlTable("securities", {
 });
 
 /**
- * 通知表 - 存儲系統通知
+ * 行程人员关联表 - 记录人员与行程的关系
+ */
+export const itineraryMembers = mysqlTable("itineraryMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  itineraryId: int("itineraryId").notNull(), // 关联行程 ID
+  memberId: int("memberId").notNull(), // 关联人员 ID
+  role: mysqlEnum("role", ["guide", "staff", "security", "coordinator", "other"]).default("staff").notNull(), // 人员角色
+  assignedAt: timestamp("assignedAt").defaultNow().notNull(), // 指派时间
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 人员状态表 - 监控人员在行程中的状态
+ */
+export const memberStatus = mysqlTable("memberStatus", {
+  id: int("id").autoincrement().primaryKey(),
+  memberId: int("memberId").notNull(), // 关联人员 ID
+  itineraryId: int("itineraryId").notNull(), // 关联行程 ID
+  status: mysqlEnum("status", ["pending", "assigned", "in_progress", "completed", "absent", "cancelled"]).default("pending").notNull(), // 人员状态
+  checkInTime: timestamp("checkInTime"), // 签到时间
+  checkOutTime: timestamp("checkOutTime"), // 签退时间
+  notes: text("notes"), // 备注
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/**
+ * 通知表 - 存储系统通知
  */
 export const notifications = mysqlTable("notifications", {
   id: int("id").autoincrement().primaryKey(),

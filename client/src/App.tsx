@@ -25,6 +25,7 @@ import { ProjectDetail } from "./pages/ProjectDetail";
 import Templates from "./pages/Templates";
 import ScheduleOverview from "./pages/ScheduleOverview";
 import Batches from "./pages/Batches";
+import MemberManagement from "./pages/MemberManagement";
 
 function Router() {
   return (
@@ -124,6 +125,11 @@ function Router() {
       <Route path="/notifications">
         <DashboardLayout>
           <Notifications />
+        </DashboardLayout>
+      </Route>
+      <Route path="/members">
+        <DashboardLayout>
+          <MemberManagement />
         </DashboardLayout>
       </Route>
       <Route path="/404" component={NotFound} />

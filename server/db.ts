@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, schools, exchangeSchools, domesticSchools, templateItineraries, staff, batchStaff } from "../drizzle/schema";
+import { InsertUser, users, groups, projects, itineraries, dailyCards, members, locations, templates, hotels, vehicles, snapshots, files, notifications, attractions, guides, securities, restaurants, schools, exchangeSchools, domesticSchools, templateItineraries, staff, batchStaff, itineraryMembers, memberStatus } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { createHash } from 'crypto';
 
@@ -836,3 +836,158 @@ export async function createTemplateItinerary(itineraryData: any) {
 //   if (!db) throw new Error("Database not available");
 //   return await db.delete(schoolExchanges).where(eq(schoolExchanges.id, id));
 // }
+
+// ===== 人員管理 - 行程指派 =====
+export async function getItineraryMembers(itineraryId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { sql } = await import('drizzle-orm');
+  const rows = await db.execute(sql`
+    SELECT im.*, m.name, m.identity, m.gender, m.phone, m.idCard, m.groupId
+    FROM itineraryMembers im
+    JOIN members m ON im.memberId = m.id
+    WHERE im.itineraryId = ${itineraryId}
+  `);
+  return (rows as unknown as any[][])[0] ?? [];
+}
+
+export async function getMemberItineraries(memberId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { sql } = await import('drizzle-orm');
+  const rows = await db.execute(sql`
+    SELECT im.*, i.date, i.timeSlot, i.startTime, i.endTime, i.locationName, i.description, i.groupId
+    FROM itineraryMembers im
+    JOIN itineraries i ON im.itineraryId = i.id
+    WHERE im.memberId = ${memberId}
+    ORDER BY i.date, i.startTime
+  `);
+  return (rows as unknown as any[][])[0] ?? [];
+}
+
+export async function assignMemberToItinerary(data: { itineraryId: number; memberId: number; role?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // 檢查是否已存在
+  const { eq, and } = await import('drizzle-orm');
+  const existing = await db.select().from(itineraryMembers)
+    .where(and(
+      eq(itineraryMembers.itineraryId, data.itineraryId),
+      eq(itineraryMembers.memberId, data.memberId)
+    )).limit(1);
+  if (existing.length > 0) {
+    // 更新角色
+    await db.update(itineraryMembers)
+      .set({ role: (data.role as any) ?? 'staff' })
+      .where(eq(itineraryMembers.id, existing[0].id));
+    return { id: existing[0].id, updated: true };
+  }
+  const result = await db.insert(itineraryMembers).values({
+    itineraryId: data.itineraryId,
+    memberId: data.memberId,
+    role: (data.role as any) ?? 'staff',
+  });
+  return { id: Number(result[0].insertId), updated: false };
+}
+
+export async function removeMemberFromItinerary(itineraryId: number, memberId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { eq, and } = await import('drizzle-orm');
+  await db.delete(itineraryMembers)
+    .where(and(
+      eq(itineraryMembers.itineraryId, itineraryId),
+      eq(itineraryMembers.memberId, memberId)
+    ));
+}
+
+export async function batchAssignMembersToItinerary(itineraryId: number, memberIds: number[], role?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const results = [];
+  for (const memberId of memberIds) {
+    try {
+      const r = await assignMemberToItinerary({ itineraryId, memberId, role });
+      results.push({ memberId, success: true, ...r });
+    } catch (e) {
+      results.push({ memberId, success: false, error: String(e) });
+    }
+  }
+  return results;
+}
+
+// ===== 人員狀態監控 =====
+export async function getMemberStatusByItinerary(itineraryId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { sql } = await import('drizzle-orm');
+  const rows = await db.execute(sql`
+    SELECT ms.*, m.name, m.identity, m.gender, m.phone, m.groupId
+    FROM memberStatus ms
+    JOIN members m ON ms.memberId = m.id
+    WHERE ms.itineraryId = ${itineraryId}
+    ORDER BY ms.status, m.name
+  `);
+  return (rows as unknown as any[][])[0] ?? [];
+}
+
+export async function getMemberStatusByMember(memberId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { sql } = await import('drizzle-orm');
+  const rows = await db.execute(sql`
+    SELECT ms.*, i.date, i.timeSlot, i.startTime, i.endTime, i.locationName, i.groupId
+    FROM memberStatus ms
+    JOIN itineraries i ON ms.itineraryId = i.id
+    WHERE ms.memberId = ${memberId}
+    ORDER BY i.date, i.startTime
+  `);
+  return (rows as unknown as any[][])[0] ?? [];
+}
+
+export async function upsertMemberStatus(data: {
+  memberId: number;
+  itineraryId: number;
+  status: string;
+  checkInTime?: Date | null;
+  checkOutTime?: Date | null;
+  notes?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { eq, and } = await import('drizzle-orm');
+  const existing = await db.select().from(memberStatus)
+    .where(and(
+      eq(memberStatus.memberId, data.memberId),
+      eq(memberStatus.itineraryId, data.itineraryId)
+    )).limit(1);
+  const updateData: any = {
+    status: data.status as any,
+    notes: data.notes ?? null,
+  };
+  if (data.checkInTime !== undefined) updateData.checkInTime = data.checkInTime;
+  if (data.checkOutTime !== undefined) updateData.checkOutTime = data.checkOutTime;
+  if (existing.length > 0) {
+    await db.update(memberStatus).set(updateData).where(eq(memberStatus.id, existing[0].id));
+    return { id: existing[0].id, updated: true };
+  }
+  const result = await db.insert(memberStatus).values({
+    memberId: data.memberId,
+    itineraryId: data.itineraryId,
+    ...updateData,
+  });
+  return { id: Number(result[0].insertId), updated: false };
+}
+
+export async function getAllMembersWithGroups() {
+  const db = await getDb();
+  if (!db) return [];
+  const { sql } = await import('drizzle-orm');
+  const rows = await db.execute(sql`
+    SELECT m.*, g.name as groupName, g.groupCode
+    FROM members m
+    LEFT JOIN \`groups\` g ON m.groupId = g.id
+    ORDER BY g.name, m.identity, m.name
+  `);
+  return (rows as unknown as any[][])[0] ?? [];
+}

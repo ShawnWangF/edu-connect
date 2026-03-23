@@ -33,6 +33,7 @@ const menuItems = [
   { icon: Briefcase, label: "項目總覽", path: "/projects" },
   { icon: Layers, label: "批次管理", path: "/batches" },
   { icon: Users, label: "團組管理", path: "/groups" },
+  { icon: Users, label: "人員管理", path: "/members" },
   { icon: MapPin, label: "資源庫", path: "/resource-library" },
   { icon: Layers, label: "行程模板", path: "/templates" },
   { icon: Bell, label: "通知中心", path: "/notifications" },
