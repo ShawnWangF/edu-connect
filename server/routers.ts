@@ -1870,58 +1870,55 @@ export const appRouter = router({
         const { batchStaff, groups } = await import('../drizzle/schema');
         const { eq, sql } = await import('drizzle-orm');
         const assignments = await dbConn.select({
-          assignment: {
-            id: batchStaff.id,
-            groupId: batchStaff.groupId,
-            staffId: batchStaff.staffId,
-            role: batchStaff.role,
-            startDate: sql<string>`DATE_FORMAT(${batchStaff.startDate}, '%Y-%m-%d')`,
-            endDate: sql<string>`DATE_FORMAT(${batchStaff.endDate}, '%Y-%m-%d')`,
-            currentTask: batchStaff.currentTask,
-            notes: batchStaff.notes,
-          },
-          group: {
-            id: groups.id,
-            name: groups.name,
-            code: groups.code,
-            startDate: sql<string>`DATE_FORMAT(${groups.startDate}, '%Y-%m-%d')`,
-            endDate: sql<string>`DATE_FORMAT(${groups.endDate}, '%Y-%m-%d')`,
-          },
+          id: batchStaff.id,
+          groupId: batchStaff.groupId,
+          staffId: batchStaff.staffId,
+          role: batchStaff.role,
+          date: sql<string>`DATE_FORMAT(${batchStaff.date}, '%Y-%m-%d')`,
+          taskName: batchStaff.taskName,
+          startTime: batchStaff.startTime,
+          endTime: batchStaff.endTime,
+          notes: batchStaff.notes,
+          groupName: groups.name,
+          groupCode: groups.code,
+          groupStartDate: sql<string>`DATE_FORMAT(${groups.startDate}, '%Y-%m-%d')`,
+          groupEndDate: sql<string>`DATE_FORMAT(${groups.endDate}, '%Y-%m-%d')`,
         }).from(batchStaff)
           .leftJoin(groups, eq(batchStaff.groupId, groups.id))
-          .where(eq(batchStaff.staffId, input.staffId));
+          .where(eq(batchStaff.staffId, input.staffId))
+          .orderBy((await import('drizzle-orm')).asc(batchStaff.date), (await import('drizzle-orm')).asc(batchStaff.startTime));
         return assignments;
       }),
   }),
 
   // ===== 批次工作人員指派 =====
   batchStaff: router({
+    // 獲取某團組的所有指派（按日期分組）
     listByGroup: protectedProcedure
       .input(z.object({ groupId: z.number() }))
       .query(async ({ input }) => {
         const dbConn = await db.getDb();
         if (!dbConn) return [];
         const { batchStaff, staff } = await import('../drizzle/schema');
-        const { eq, sql } = await import('drizzle-orm');
+        const { eq, sql, asc } = await import('drizzle-orm');
         const result = await dbConn.select({
-          assignment: {
-            id: batchStaff.id,
-            groupId: batchStaff.groupId,
-            staffId: batchStaff.staffId,
-            role: batchStaff.role,
-            startDate: sql<string>`DATE_FORMAT(${batchStaff.startDate}, '%Y-%m-%d')`,
-            endDate: sql<string>`DATE_FORMAT(${batchStaff.endDate}, '%Y-%m-%d')`,
-            notes: batchStaff.notes,
-          },
-          staffMember: {
-            id: staff.id,
-            name: staff.name,
-            role: staff.role,
-            phone: staff.phone,
-          },
+          id: batchStaff.id,
+          groupId: batchStaff.groupId,
+          staffId: batchStaff.staffId,
+          role: batchStaff.role,
+          date: sql<string>`DATE_FORMAT(${batchStaff.date}, '%Y-%m-%d')`,
+          itineraryId: batchStaff.itineraryId,
+          taskName: batchStaff.taskName,
+          startTime: batchStaff.startTime,
+          endTime: batchStaff.endTime,
+          notes: batchStaff.notes,
+          staffName: staff.name,
+          staffPhone: staff.phone,
+          staffRole: staff.role,
         }).from(batchStaff)
           .leftJoin(staff, eq(batchStaff.staffId, staff.id))
-          .where(eq(batchStaff.groupId, input.groupId));
+          .where(eq(batchStaff.groupId, input.groupId))
+          .orderBy(asc(batchStaff.date), asc(batchStaff.startTime));
         return result;
       }),
 
@@ -1932,16 +1929,20 @@ export const appRouter = router({
         const dbConn = await db.getDb();
         if (!dbConn) return [];
         const { batchStaff, staff, groups } = await import('../drizzle/schema');
-        const { eq, inArray } = await import('drizzle-orm');
-        // 先獲取項目下所有團組 ID
+        const { eq, inArray, sql } = await import('drizzle-orm');
         const projectGroups = await dbConn.select({ id: groups.id }).from(groups)
           .where(eq(groups.projectId, input.projectId));
         if (projectGroups.length === 0) return [];
         const groupIds = projectGroups.map(g => g.id);
         const result = await dbConn.select({
+          id: batchStaff.id,
           groupId: batchStaff.groupId,
           staffId: batchStaff.staffId,
           role: batchStaff.role,
+          date: sql<string>`DATE_FORMAT(${batchStaff.date}, '%Y-%m-%d')`,
+          taskName: batchStaff.taskName,
+          startTime: batchStaff.startTime,
+          endTime: batchStaff.endTime,
           staffName: staff.name,
           staffRole: staff.role,
         }).from(batchStaff)
@@ -1950,13 +1951,17 @@ export const appRouter = router({
         return result;
       }),
 
+    // 指派工作人員到團組的某天某行程點
     assign: editorProcedure
       .input(z.object({
         groupId: z.number(),
         staffId: z.number(),
         role: z.enum(['coordinator','staff','guide','driver']),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
+        date: z.string(), // 具體日期 YYYY-MM-DD
+        itineraryId: z.number().optional(), // 關聯的行程點 ID（可選）
+        taskName: z.string().optional(), // 行程點名稱
+        startTime: z.string().optional(), // HH:mm
+        endTime: z.string().optional(), // HH:mm
         notes: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -1964,11 +1969,41 @@ export const appRouter = router({
         if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         const { batchStaff } = await import('../drizzle/schema');
         const result = await dbConn.insert(batchStaff).values({
-          ...input,
-          startDate: input.startDate as any,
-          endDate: input.endDate as any,
+          groupId: input.groupId,
+          staffId: input.staffId,
+          role: input.role,
+          date: input.date as any,
+          itineraryId: input.itineraryId ?? null,
+          taskName: input.taskName ?? null,
+          startTime: input.startTime ?? null,
+          endTime: input.endTime ?? null,
+          notes: input.notes ?? null,
         });
         return { id: Number(result[0].insertId) };
+      }),
+
+    // 更新指派信息
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        role: z.enum(['coordinator','staff','guide','driver']).optional(),
+        date: z.string().optional(),
+        taskName: z.string().optional(),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { batchStaff } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const { id, ...updateData } = input;
+        await dbConn.update(batchStaff).set({
+          ...updateData,
+          date: updateData.date as any,
+        }).where(eq(batchStaff.id, id));
+        return { success: true };
       }),
 
     remove: editorProcedure
@@ -2141,7 +2176,334 @@ export const appRouter = router({
         await dbConn.delete(exchangeSchoolAvailability).where(eq(exchangeSchoolAvailability.id, input.id));
         return { success: true };
       }),
+   }),
+
+  // ===== 实时运营仪表盘 =====
+  dashboard: router({
+    // 获取当前正在进行的项目和团组行程进度
+    overview: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return null;
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+
+      // 获取今天有行程的团组
+      const [todayItins] = await dbConn.execute(sql`
+        SELECT 
+          i.id as itinId,
+          i.groupId,
+          i.description,
+          i.startTime,
+          i.endTime,
+          i.locationName,
+          g.name as groupName,
+          g.code as groupCode,
+          g.studentCount,
+          g.teacherCount,
+          g.batch_code as batchCode,
+          DATE_FORMAT(i.date, '%Y-%m-%d') as date
+        FROM itineraries i
+        JOIN \`groups\` g ON i.groupId = g.id
+        WHERE DATE_FORMAT(i.date, '%Y-%m-%d') = ${todayStr}
+        ORDER BY i.startTime ASC
+      `);
+
+      // 获取明天有行程的团组（用于预告）
+      const tomorrowDate = new Date(now);
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+      const [tomorrowItins] = await dbConn.execute(sql`
+        SELECT 
+          i.id as itinId,
+          i.groupId,
+          i.description,
+          i.startTime,
+          i.locationName,
+          g.name as groupName,
+          g.code as groupCode,
+          DATE_FORMAT(i.date, '%Y-%m-%d') as date
+        FROM itineraries i
+        JOIN \`groups\` g ON i.groupId = g.id
+        WHERE DATE_FORMAT(i.date, '%Y-%m-%d') = ${tomorrowStr}
+        ORDER BY i.startTime ASC
+      `);
+
+      // 计算每个今日行程的状态
+      const itinsWithStatus = ((todayItins as unknown) as any[]).map((itin: any) => {
+        let status: 'upcoming' | 'in_progress' | 'completed' = 'upcoming';
+        let progressPercent = 0;
+        if (itin.startTime && itin.endTime) {
+          const [sh, sm] = itin.startTime.split(':').map(Number);
+          const [eh, em] = itin.endTime.split(':').map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          const nowMins = currentHour * 60 + currentMinute;
+          if (nowMins < startMins) {
+            status = 'upcoming';
+            progressPercent = 0;
+          } else if (nowMins >= endMins) {
+            status = 'completed';
+            progressPercent = 100;
+          } else {
+            status = 'in_progress';
+            progressPercent = Math.round(((nowMins - startMins) / (endMins - startMins)) * 100);
+          }
+        }
+        return { ...itin, status, progressPercent, currentTime: currentTimeStr };
+      });
+
+      return {
+        today: todayStr,
+        currentTime: currentTimeStr,
+        todayItineraries: itinsWithStatus,
+        tomorrowItineraries: (tomorrowItins as unknown) as any[],
+      };
+    }),
+
+    // 获取工作人员实时状态
+    staffStatus: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+
+      // 获取所有工作人员
+      const [allStaff] = await dbConn.execute(sql`SELECT id, name, role, phone FROM staff ORDER BY role, name`);
+
+      // 获取今天的工作人员指派
+      const [todayAssignments] = await dbConn.execute(sql`
+        SELECT 
+          bs.staffId,
+          bs.groupId,
+          bs.role as assignedRole,
+          bs.taskName,
+          bs.startTime,
+          bs.endTime,
+          g.name as groupName,
+          g.code as groupCode,
+          DATE_FORMAT(bs.date, '%Y-%m-%d') as date
+        FROM batchStaff bs
+        JOIN \`groups\` g ON bs.groupId = g.id
+        WHERE DATE_FORMAT(bs.date, '%Y-%m-%d') = ${todayStr}
+        ORDER BY bs.startTime ASC
+      `);
+
+      const assignmentMap = new Map<number, any[]>();
+      for (const a of (todayAssignments as unknown) as any[]) {
+        if (!assignmentMap.has(a.staffId)) assignmentMap.set(a.staffId, []);
+        assignmentMap.get(a.staffId)!.push(a);
+      }
+
+      return ((allStaff as unknown) as any[]).map((s: any) => {
+        const assignments = assignmentMap.get(s.id) || [];
+        // 检查当前是否在岗
+        const currentAssignment = assignments.find((a: any) => {
+          if (!a.startTime || !a.endTime) return false;
+          const [sh, sm] = a.startTime.split(':').map(Number);
+          const [eh, em] = a.endTime.split(':').map(Number);
+          const nowMins = currentHour * 60 + currentMinute;
+          return nowMins >= sh * 60 + sm && nowMins < eh * 60 + em;
+        });
+        const nextAssignment = assignments.find((a: any) => {
+          if (!a.startTime) return false;
+          const [sh, sm] = a.startTime.split(':').map(Number);
+          const nowMins = currentHour * 60 + currentMinute;
+          return sh * 60 + sm > nowMins;
+        });
+        return {
+          ...s,
+          status: currentAssignment ? 'busy' : (assignments.length > 0 ? 'scheduled' : 'free'),
+          currentAssignment: currentAssignment || null,
+          nextAssignment: nextAssignment || null,
+          todayAssignments: assignments,
+        };
+      });
+    }),
+
+    // 获取景点人流预警
+    venueAlert: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      // 获取今天所有行程的景点信息
+      const [venueItins] = await dbConn.execute(sql`
+        SELECT 
+          i.locationName,
+          i.startTime,
+          i.endTime,
+          i.groupId,
+          g.name as groupName,
+          g.code as groupCode,
+          COALESCE(g.studentCount, 0) + COALESCE(g.teacherCount, 0) as headcount,
+          a.maxCapacity,
+          a.id as attractionId
+        FROM itineraries i
+        JOIN \`groups\` g ON i.groupId = g.id
+        LEFT JOIN attractions a ON a.name = i.locationName
+        WHERE DATE_FORMAT(i.date, '%Y-%m-%d') = ${todayStr}
+          AND i.locationName IS NOT NULL
+          AND i.locationName != ''
+        ORDER BY i.startTime ASC
+      `);
+
+      // 按景点分组，计算当前人数和预计到达
+      const venueMap = new Map<string, any>();
+      for (const itin of (venueItins as unknown) as any[]) {
+        const key = itin.locationName;
+        if (!venueMap.has(key)) {
+          venueMap.set(key, {
+            name: key,
+            maxCapacity: itin.maxCapacity || 500,
+            currentGroups: [],
+            upcomingGroups: [],
+          });
+        }
+        const venue = venueMap.get(key)!;
+        const nowMins = currentHour * 60 + currentMinute;
+        if (itin.startTime && itin.endTime) {
+          const [sh, sm] = itin.startTime.split(':').map(Number);
+          const [eh, em] = itin.endTime.split(':').map(Number);
+          if (nowMins >= sh * 60 + sm && nowMins < eh * 60 + em) {
+            venue.currentGroups.push({ ...itin, hoursUntil: 0 });
+          } else if (sh * 60 + sm > nowMins) {
+            const hoursUntil = ((sh * 60 + sm) - nowMins) / 60;
+            venue.upcomingGroups.push({ ...itin, hoursUntil: Math.round(hoursUntil * 10) / 10 });
+          }
+        }
+      }
+
+      return Array.from(venueMap.values()).map(v => {
+        const currentPax = v.currentGroups.reduce((sum: number, g: any) => sum + (g.headcount || 0), 0);
+        const totalWithUpcoming = v.upcomingGroups.reduce((sum: number, g: any) => sum + (g.headcount || 0), 0) + currentPax;
+        const alertLevel = currentPax > v.maxCapacity * 0.9 ? 'critical' :
+          totalWithUpcoming > v.maxCapacity * 0.85 ? 'warning' : 'healthy';
+        return { ...v, currentPax, totalWithUpcoming, alertLevel };
+      }).filter(v => v.currentGroups.length > 0 || v.upcomingGroups.length > 0);
+    }),
+
+    // 获取餐饮预备提醒
+    diningAlert: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const tomorrowDate = new Date(now);
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      const [bookings] = await dbConn.execute(sql`
+        SELECT 
+          r.id,
+          r.name as restaurantName,
+          r.address,
+          r.bookingTime,
+          r.bookingPax,
+          DATE_FORMAT(r.bookingDate, '%Y-%m-%d') as bookingDate,
+          g.name as groupName,
+          g.code as groupCode
+        FROM restaurants r
+        LEFT JOIN \`groups\` g ON r.bookingGroupId = g.id
+        WHERE DATE_FORMAT(r.bookingDate, '%Y-%m-%d') IN (${todayStr}, ${tomorrowStr})
+          AND r.bookingTime IS NOT NULL
+        ORDER BY r.bookingDate ASC, r.bookingTime ASC
+      `);
+
+      return ((bookings as unknown) as any[]).map((b: any) => {
+        let hoursUntil = 0;
+        let urgency: 'now' | 'soon' | 'later' | 'tomorrow' = 'later';
+        if (b.bookingDate === todayStr && b.bookingTime) {
+          const [bh, bm] = b.bookingTime.split(':').map(Number);
+          const nowMins = currentHour * 60 + currentMinute;
+          const bookingMins = bh * 60 + bm;
+          hoursUntil = (bookingMins - nowMins) / 60;
+          if (hoursUntil <= 0) urgency = 'now';
+          else if (hoursUntil <= 1) urgency = 'soon';
+          else urgency = 'later';
+        } else {
+          urgency = 'tomorrow';
+          hoursUntil = 24;
+        }
+        return { ...b, hoursUntil: Math.round(hoursUntil * 10) / 10, urgency };
+      });
+    }),
+
+    // 获取今日住宿统计
+    accommodationStats: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { hk: 0, sz: 0, total: 0, groups: [] };
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+
+      // 通过 scheduleBlocks 判断今天各团组在哪个城市
+      const [blocks] = await dbConn.execute(sql`
+        SELECT 
+          sb.groupId,
+          sb.blockType,
+          g.name as groupName,
+          g.code as groupCode,
+          COALESCE(g.studentCount, 0) + COALESCE(g.teacherCount, 0) as headcount
+        FROM scheduleBlocks sb
+        JOIN \`groups\` g ON sb.groupId = g.id
+        WHERE DATE_FORMAT(sb.date, '%Y-%m-%d') = ${todayStr}
+      `);
+
+      let hkCount = 0, szCount = 0;
+      const groupDetails: any[] = [];
+      for (const b of (blocks as unknown) as any[]) {
+        const isHK = ['hk', 'hk_arrive', 'exchange', 'departure_hk'].includes(b.blockType);
+        const isSZ = ['sz', 'sz_arrive', 'border_cross', 'departure_sz'].includes(b.blockType);
+        if (isHK) hkCount += b.headcount || 0;
+        if (isSZ) szCount += b.headcount || 0;
+        groupDetails.push({ ...b, city: isHK ? 'hk' : isSZ ? 'sz' : 'transit' });
+      }
+      return { hk: hkCount, sz: szCount, total: hkCount + szCount, groups: groupDetails };
+    }),
+
+    // 获取航班信息
+    flightInfo: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { arrivals: [], departures: [] };
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const tomorrowDate = new Date(now);
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+
+      // 获取今明两天的抵达/离开团组
+      const [arrivals] = await dbConn.execute(sql`
+        SELECT g.id, g.name, g.code, g.flight_info as flightInfo, g.studentCount, g.teacherCount,
+          DATE_FORMAT(g.startDate, '%Y-%m-%d') as startDate
+        FROM \`groups\` g
+        WHERE DATE_FORMAT(g.startDate, '%Y-%m-%d') IN (${todayStr}, ${tomorrowStr})
+        ORDER BY g.startDate ASC
+      `);
+      const [departures] = await dbConn.execute(sql`
+        SELECT g.id, g.name, g.code, g.flight_info as flightInfo, g.studentCount, g.teacherCount,
+          DATE_FORMAT(g.endDate, '%Y-%m-%d') as endDate
+        FROM \`groups\` g
+        WHERE DATE_FORMAT(g.endDate, '%Y-%m-%d') IN (${todayStr}, ${tomorrowStr})
+        ORDER BY g.endDate ASC
+      `);
+      return { arrivals: (arrivals as unknown) as any[], departures: (departures as unknown) as any[] };
+    }),
   }),
 });
-
 export type AppRouter = typeof appRouter;

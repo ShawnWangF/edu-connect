@@ -26,6 +26,7 @@ import Templates from "./pages/Templates";
 import ScheduleOverview from "./pages/ScheduleOverview";
 import Batches from "./pages/Batches";
 import MemberManagement from "./pages/MemberManagement";
+import OperationsDashboard from "./pages/OperationsDashboard";
 
 function Router() {
   return (
@@ -48,7 +49,12 @@ function Router() {
       </Route>
       <Route path="/">
         <DashboardLayout>
-          <ScheduleOverview />
+          <OperationsDashboard />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard">
+        <DashboardLayout>
+          <OperationsDashboard />
         </DashboardLayout>
       </Route>
       <Route path="/groups">

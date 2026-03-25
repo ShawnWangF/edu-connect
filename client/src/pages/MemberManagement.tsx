@@ -65,23 +65,19 @@ type StaffMember = {
 };
 
 type Assignment = {
-  assignment: {
-    id: number;
-    groupId: number;
-    staffId: number;
-    role: "coordinator" | "staff" | "guide" | "driver";
-    startDate?: string | null;
-    endDate?: string | null;
-    currentTask?: string | null;
-    notes?: string | null;
-  };
-  group: {
-    id: number;
-    name: string;
-    code: string;
-    startDate?: string | null;
-    endDate?: string | null;
-  } | null;
+  id: number;
+  groupId: number;
+  staffId: number;
+  role: "coordinator" | "staff" | "guide" | "driver";
+  date?: string | null;
+  taskName?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  notes?: string | null;
+  groupName?: string | null;
+  groupCode?: string | null;
+  groupStartDate?: string | null;
+  groupEndDate?: string | null;
 };
 
 type FormData = {
@@ -147,8 +143,10 @@ export default function MemberManagement() {
   const [assignForm, setAssignForm] = useState({
     groupId: "",
     role: "staff" as "coordinator" | "staff" | "guide" | "driver",
-    startDate: "",
-    endDate: "",
+    date: "",
+    taskName: "",
+    startTime: "",
+    endTime: "",
     notes: "",
   });
 
@@ -195,7 +193,7 @@ export default function MemberManagement() {
     onSuccess: () => {
       toast.success("指派成功");
       setShowAssignDialog(false);
-      setAssignForm({ groupId: "", role: "staff", startDate: "", endDate: "", notes: "" });
+      setAssignForm({ groupId: "", role: "staff", date: "", taskName: "", startTime: "", endTime: "", notes: "" });
       refetchAssignments();
     },
     onError: (err) => toast.error(`指派失敗：${err.message}`),
@@ -292,12 +290,18 @@ export default function MemberManagement() {
       toast.error("請選擇團組");
       return;
     }
+    if (!assignForm.date) {
+      toast.error("請選擇具體日期");
+      return;
+    }
     assignStaff.mutate({
       staffId: selectedStaff.id,
       groupId: Number(assignForm.groupId),
       role: assignForm.role,
-      startDate: assignForm.startDate || undefined,
-      endDate: assignForm.endDate || undefined,
+      date: assignForm.date,
+      taskName: assignForm.taskName || undefined,
+      startTime: assignForm.startTime || undefined,
+      endTime: assignForm.endTime || undefined,
       notes: assignForm.notes || undefined,
     });
   };
@@ -560,35 +564,37 @@ export default function MemberManagement() {
                   ) : (
                     <div className="space-y-3">
                       {(assignments as Assignment[]).map((item) => (
-                        <Card key={item.assignment.id}>
+                        <Card key={item.id}>
                           <CardContent className="pt-4">
                             <div className="flex items-start justify-between">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-sm">
-                                    {item.group?.name ?? `團組 #${item.assignment.groupId}`}
+                                    {item.groupName ?? `團組 #${item.groupId}`}
                                   </span>
-                                  <Badge
-                                    className={`${roleColor[item.assignment.role]} border-0 text-xs`}
-                                  >
-                                    {roleLabel[item.assignment.role]}
+                                  <Badge className={`${roleColor[item.role]} border-0 text-xs`}>
+                                    {roleLabel[item.role]}
                                   </Badge>
                                 </div>
-                                {item.group?.code && (
-                                  <p className="text-xs text-muted-foreground">{item.group.code}</p>
+                                {item.groupCode && (
+                                  <p className="text-xs text-muted-foreground">{item.groupCode}</p>
                                 )}
-                                {(item.assignment.startDate || item.assignment.endDate) && (
+                                {item.date && (
                                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Clock className="w-3 h-3" />
-                                    {item.assignment.startDate ?? "—"}
-                                    {" → "}
-                                    {item.assignment.endDate ?? "—"}
+                                    <CalendarDays className="w-3 h-3" />
+                                    {item.date}
+                                    {item.startTime && ` ${item.startTime}`}
+                                    {item.endTime && ` → ${item.endTime}`}
                                   </div>
                                 )}
-                                {item.assignment.notes && (
-                                  <p className="text-xs text-muted-foreground">
-                                    備注：{item.assignment.notes}
-                                  </p>
+                                {item.taskName && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <MapPin className="w-3 h-3" />
+                                    {item.taskName}
+                                  </div>
+                                )}
+                                {item.notes && (
+                                  <p className="text-xs text-muted-foreground">備注：{item.notes}</p>
                                 )}
                               </div>
                               <Button
@@ -596,7 +602,7 @@ export default function MemberManagement() {
                                 size="sm"
                                 onClick={() => {
                                   if (confirm("確定要取消此指派嗎？")) {
-                                    removeAssignment.mutate({ id: item.assignment.id });
+                                    removeAssignment.mutate({ id: item.id });
                                   }
                                 }}
                                 className="text-destructive hover:text-destructive"
@@ -707,25 +713,39 @@ export default function MemberManagement() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label>具體日期 *</Label>
+              <Input
+                type="date"
+                value={assignForm.date}
+                onChange={(e) => setAssignForm((f) => ({ ...f, date: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>行程點名稱</Label>
+              <Input
+                placeholder="如：太空館、海洋公園、接機"
+                value={assignForm.taskName}
+                onChange={(e) => setAssignForm((f) => ({ ...f, taskName: e.target.value }))}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>開始日期</Label>
+                <Label>開始時間</Label>
                 <Input
-                  type="date"
-                  value={assignForm.startDate}
-                  onChange={(e) =>
-                    setAssignForm((f) => ({ ...f, startDate: e.target.value }))
-                  }
+                  type="time"
+                  value={assignForm.startTime}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, startTime: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label>結束日期</Label>
+                <Label>結束時間</Label>
                 <Input
-                  type="date"
-                  value={assignForm.endDate}
-                  onChange={(e) =>
-                    setAssignForm((f) => ({ ...f, endDate: e.target.value }))
-                  }
+                  type="time"
+                  value={assignForm.endTime}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, endTime: e.target.value }))}
                 />
               </div>
             </div>

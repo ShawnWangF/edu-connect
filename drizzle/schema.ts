@@ -597,12 +597,15 @@ export const staff = mysqlTable("staff", {
  */
 export const batchStaff = mysqlTable("batchStaff", {
   id: int("id").autoincrement().primaryKey(),
-  groupId: int("groupId").notNull(), // 關聯批次
+  groupId: int("groupId").notNull(), // 關聯團組（groups 表）
   staffId: int("staffId").notNull(), // 關聯工作人員
-  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver"]).notNull(), // 在此批次的角色
-  startDate: date("startDate"), // 指派開始日期
-  endDate: date("endDate"), // 指派結束日期
-  currentTask: varchar("currentTask", { length: 255 }), // 當前任務描述
+  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver"]).notNull(), // 在此任務的角色
+  // 行程點級別指派字段
+  date: date("date"), // 具體指派日期（必填）
+  itineraryId: int("itineraryId"), // 關聯 itineraries 表（可為空，空表示全天指派）
+  taskName: varchar("taskName", { length: 255 }), // 行程點名稱（如「太空館」「海洋公園」）
+  startTime: varchar("startTime", { length: 10 }), // 任務開始時間 HH:mm（可選）
+  endTime: varchar("endTime", { length: 10 }), // 任務結束時間 HH:mm（可選）
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
