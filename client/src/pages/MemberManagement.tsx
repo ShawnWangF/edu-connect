@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -27,614 +27,727 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Users, CalendarDays, CheckCircle, XCircle, Clock, Search, UserCheck, AlertCircle } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  CalendarDays,
+  Search,
+  Edit,
+  Trash2,
+  Plus,
+  MapPin,
+  Phone,
+  Mail,
+  MessageCircle,
+  Award,
+  Car,
+  Briefcase,
+  UserCheck,
+  Clock,
+  X,
+} from "lucide-react";
 
 // ===== 類型定義 =====
-type Member = {
+type StaffMember = {
   id: number;
   name: string;
-  identity: string;
-  gender?: string;
-  phone?: string;
-  groupId: number;
-  groupName?: string;
-  groupCode?: string;
-};
-
-type ItineraryMember = {
-  id: number;
-  itineraryId: number;
-  memberId: number;
-  role: string;
-  name: string;
-  identity: string;
-  gender?: string;
-  phone?: string;
-  groupId: number;
-};
-
-type MemberStatus = {
-  id: number;
-  memberId: number;
-  itineraryId: number;
-  status: string;
-  checkInTime?: string | null;
-  checkOutTime?: string | null;
+  role: "coordinator" | "staff" | "guide" | "driver";
+  phone?: string | null;
+  email?: string | null;
+  wechat?: string | null;
+  languages?: string | null;
+  licenseNumber?: string | null;
   notes?: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type Assignment = {
+  assignment: {
+    id: number;
+    groupId: number;
+    staffId: number;
+    role: "coordinator" | "staff" | "guide" | "driver";
+    startDate?: string | null;
+    endDate?: string | null;
+    currentTask?: string | null;
+    notes?: string | null;
+  };
+  group: {
+    id: number;
+    name: string;
+    code: string;
+    startDate?: string | null;
+    endDate?: string | null;
+  } | null;
+};
+
+type FormData = {
   name: string;
-  identity: string;
-  gender?: string;
-  phone?: string;
-  groupId: number;
+  role: "coordinator" | "staff" | "guide" | "driver";
+  phone: string;
+  email: string;
+  wechat: string;
+  languages: string;
+  licenseNumber: string;
+  notes: string;
 };
 
 // ===== 工具函數 =====
-const identityLabel: Record<string, string> = {
-  student: "學生",
-  teacher: "教師",
-  staff: "工作人員",
-  other: "其他",
-};
-
-const genderLabel: Record<string, string> = {
-  male: "男",
-  female: "女",
-  other: "其他",
-};
-
 const roleLabel: Record<string, string> = {
-  guide: "導遊",
+  coordinator: "總統籌",
   staff: "工作人員",
-  security: "安保",
-  coordinator: "協調員",
-  other: "其他",
+  guide: "導遊",
+  driver: "司機",
 };
 
-const statusLabel: Record<string, string> = {
-  pending: "待指派",
-  assigned: "已指派",
-  in_progress: "進行中",
-  completed: "已完成",
-  absent: "缺席",
-  cancelled: "已取消",
+const roleColor: Record<string, string> = {
+  coordinator: "bg-purple-100 text-purple-800",
+  staff: "bg-blue-100 text-blue-800",
+  guide: "bg-green-100 text-green-800",
+  driver: "bg-orange-100 text-orange-800",
 };
 
-const statusColor: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-700",
-  assigned: "bg-blue-100 text-blue-700",
-  in_progress: "bg-yellow-100 text-yellow-700",
-  completed: "bg-green-100 text-green-700",
-  absent: "bg-red-100 text-red-700",
-  cancelled: "bg-gray-100 text-gray-500 line-through",
+const roleIcon: Record<string, React.ReactNode> = {
+  coordinator: <Award className="w-4 h-4" />,
+  staff: <Briefcase className="w-4 h-4" />,
+  guide: <MapPin className="w-4 h-4" />,
+  driver: <Car className="w-4 h-4" />,
 };
 
-// ===== 主頁面 =====
+const defaultForm: FormData = {
+  name: "",
+  role: "staff",
+  phone: "",
+  email: "",
+  wechat: "",
+  languages: "",
+  licenseNumber: "",
+  notes: "",
+};
+
+// ===== 主組件 =====
 export default function MemberManagement() {
-  const [activeTab, setActiveTab] = useState("members");
+  const [activeTab, setActiveTab] = useState("staff-list");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
 
-  // 獲取所有人員
-  const { data: allMembers = [], isLoading: membersLoading, refetch: refetchMembers } =
-    trpc.memberManagement.listAll.useQuery();
+  // 對話框狀態
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
 
-  // 計算團組列表（去重）
-  const groupOptions = useMemo(() => {
-    const groups = new Map<number, { id: number; name: string; code: string }>();
-    allMembers.forEach((m: Member) => {
-      if (m.groupId && m.groupName) {
-        groups.set(m.groupId, { id: m.groupId, name: m.groupName, code: m.groupCode || "" });
-      }
+  // 表單狀態
+  const [formData, setFormData] = useState<FormData>(defaultForm);
+
+  // 指派表單狀態
+  const [assignForm, setAssignForm] = useState({
+    groupId: "",
+    role: "staff" as "coordinator" | "staff" | "guide" | "driver",
+    startDate: "",
+    endDate: "",
+    notes: "",
+  });
+
+  // ===== 數據查詢 =====
+  const { data: staffList = [], refetch: refetchStaff } = trpc.staff.list.useQuery();
+  const { data: groups = [] } = trpc.groups.list.useQuery();
+
+  // 獲取選中工作人員的指派列表
+  const { data: assignments = [], refetch: refetchAssignments } =
+    trpc.staff.getAssignments.useQuery(
+      { staffId: selectedStaff?.id ?? 0 },
+      { enabled: !!selectedStaff }
+    );
+
+  // ===== Mutations =====
+  const createStaff = trpc.staff.create.useMutation({
+    onSuccess: () => {
+      toast.success("工作人員已添加");
+      setShowAddDialog(false);
+      setFormData(defaultForm);
+      refetchStaff();
+    },
+    onError: (err) => toast.error(`添加失敗：${err.message}`),
+  });
+
+  const updateStaff = trpc.staff.update.useMutation({
+    onSuccess: () => {
+      toast.success("工作人員信息已更新");
+      setShowEditDialog(false);
+      refetchStaff();
+    },
+    onError: (err) => toast.error(`更新失敗：${err.message}`),
+  });
+
+  const deleteStaff = trpc.staff.delete.useMutation({
+    onSuccess: () => {
+      toast.success("工作人員已停用");
+      refetchStaff();
+    },
+    onError: (err) => toast.error(`操作失敗：${err.message}`),
+  });
+
+  const assignStaff = trpc.batchStaff.assign.useMutation({
+    onSuccess: () => {
+      toast.success("指派成功");
+      setShowAssignDialog(false);
+      setAssignForm({ groupId: "", role: "staff", startDate: "", endDate: "", notes: "" });
+      refetchAssignments();
+    },
+    onError: (err) => toast.error(`指派失敗：${err.message}`),
+  });
+
+  const removeAssignment = trpc.batchStaff.remove.useMutation({
+    onSuccess: () => {
+      toast.success("已取消指派");
+      refetchAssignments();
+    },
+    onError: (err) => toast.error(`操作失敗：${err.message}`),
+  });
+
+  // ===== 過濾邏輯 =====
+  const filteredStaff = useMemo(() => {
+    return (staffList as StaffMember[]).filter((s) => {
+      const matchesSearch =
+        !searchQuery ||
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.phone && s.phone.includes(searchQuery)) ||
+        (s.email && s.email.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesRole = roleFilter === "all" || s.role === roleFilter;
+      return matchesSearch && matchesRole;
     });
-    return Array.from(groups.values());
-  }, [allMembers]);
+  }, [staffList, searchQuery, roleFilter]);
 
-  // 過濾人員列表
-  const filteredMembers = useMemo(() => {
-    return allMembers.filter((m: Member) => {
-      const matchSearch = !searchQuery ||
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (m.phone && m.phone.includes(searchQuery));
-      const matchGroup = selectedGroupFilter === "all" || String(m.groupId) === selectedGroupFilter;
-      return matchSearch && matchGroup;
-    });
-  }, [allMembers, searchQuery, selectedGroupFilter]);
-
-  // 統計數據
+  // ===== 統計數據 =====
   const stats = useMemo(() => {
-    const total = allMembers.length;
-    const students = allMembers.filter((m: Member) => m.identity === "student").length;
-    const teachers = allMembers.filter((m: Member) => m.identity === "teacher").length;
-    const staff = allMembers.filter((m: Member) => m.identity === "staff").length;
-    return { total, students, teachers, staff };
-  }, [allMembers]);
+    const list = staffList as StaffMember[];
+    return {
+      total: list.length,
+      coordinator: list.filter((s) => s.role === "coordinator").length,
+      staff: list.filter((s) => s.role === "staff").length,
+      guide: list.filter((s) => s.role === "guide").length,
+      driver: list.filter((s) => s.role === "driver").length,
+    };
+  }, [staffList]);
 
+  // ===== 操作函數 =====
+  const openEditDialog = (staff: StaffMember) => {
+    setSelectedStaff(staff);
+    setFormData({
+      name: staff.name,
+      role: staff.role,
+      phone: staff.phone ?? "",
+      email: staff.email ?? "",
+      wechat: staff.wechat ?? "",
+      languages: staff.languages ?? "",
+      licenseNumber: staff.licenseNumber ?? "",
+      notes: staff.notes ?? "",
+    });
+    setShowEditDialog(true);
+  };
+
+  const openAssignDialog = (staff: StaffMember) => {
+    setSelectedStaff(staff);
+    setShowAssignDialog(true);
+  };
+
+  const handleCreate = () => {
+    if (!formData.name.trim()) {
+      toast.error("請輸入姓名");
+      return;
+    }
+    createStaff.mutate({
+      name: formData.name.trim(),
+      role: formData.role,
+      phone: formData.phone || undefined,
+      email: formData.email || undefined,
+      wechat: formData.wechat || undefined,
+      languages: formData.languages || undefined,
+      licenseNumber: formData.licenseNumber || undefined,
+      notes: formData.notes || undefined,
+    });
+  };
+
+  const handleUpdate = () => {
+    if (!selectedStaff) return;
+    updateStaff.mutate({
+      id: selectedStaff.id,
+      name: formData.name.trim(),
+      role: formData.role,
+      phone: formData.phone || null,
+      email: formData.email || null,
+      wechat: formData.wechat || null,
+      languages: formData.languages || null,
+      licenseNumber: formData.licenseNumber || null,
+      notes: formData.notes || null,
+    });
+  };
+
+  const handleAssign = () => {
+    if (!selectedStaff || !assignForm.groupId) {
+      toast.error("請選擇團組");
+      return;
+    }
+    assignStaff.mutate({
+      staffId: selectedStaff.id,
+      groupId: Number(assignForm.groupId),
+      role: assignForm.role,
+      startDate: assignForm.startDate || undefined,
+      endDate: assignForm.endDate || undefined,
+      notes: assignForm.notes || undefined,
+    });
+  };
+
+  // ===== 渲染 =====
   return (
     <div className="p-6 space-y-6">
       {/* 頁面標題 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">人員管理</h1>
-          <p className="text-sm text-gray-500 mt-1">管理所有團組人員，支援指派行程及狀態監控</p>
+          <h1 className="text-2xl font-bold text-foreground">工作人員管理</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            管理工作人員信息，指派至團組行程，監控出勤狀態
+          </p>
         </div>
+        <Button
+          onClick={() => {
+            setFormData(defaultForm);
+            setShowAddDialog(true);
+          }}
+        >
+          <UserPlus className="w-4 h-4 mr-2" />
+          添加工作人員
+        </Button>
       </div>
 
       {/* 統計卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <Users className="h-5 w-5 text-blue-600" />
-              </div>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-muted-foreground" />
               <div>
-                <p className="text-xs text-gray-500">總人數</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">總計</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-50 rounded-lg">
-                <UserCheck className="h-5 w-5 text-green-600" />
+        {(["coordinator", "staff", "guide", "driver"] as const).map((role) => (
+          <Card key={role}>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">{roleIcon[role]}</span>
+                <div>
+                  <p className="text-xs text-muted-foreground">{roleLabel[role]}</p>
+                  <p className="text-2xl font-bold">{stats[role]}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">學生</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.students}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-50 rounded-lg">
-                <Users className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">教師</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.teachers}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-50 rounded-lg">
-                <Users className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">工作人員</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.staff}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* 主要內容 */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="members">
-            <Users className="h-4 w-4 mr-2" />
-            人員列表
+          <TabsTrigger value="staff-list">
+            <Users className="w-4 h-4 mr-2" />
+            工作人員列表
           </TabsTrigger>
-          <TabsTrigger value="assign">
-            <CalendarDays className="h-4 w-4 mr-2" />
-            指派行程
-          </TabsTrigger>
-          <TabsTrigger value="status">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            狀態監控
+          <TabsTrigger value="assignments">
+            <CalendarDays className="w-4 h-4 mr-2" />
+            指派管理
           </TabsTrigger>
         </TabsList>
 
-        {/* 人員列表 Tab */}
-        <TabsContent value="members" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="搜尋姓名或電話..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <Select value={selectedGroupFilter} onValueChange={setSelectedGroupFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="篩選團組" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部團組</SelectItem>
-                    {groupOptions.map((g) => (
-                      <SelectItem key={g.id} value={String(g.id)}>
-                        {g.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {membersLoading ? (
-                <div className="p-8 text-center text-gray-500">載入中...</div>
-              ) : filteredMembers.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <Users className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                  <p>暫無人員資料</p>
-                  <p className="text-xs mt-1">請先在團組詳情頁面匯入人員名單</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>姓名</TableHead>
-                      <TableHead>身份</TableHead>
-                      <TableHead>性別</TableHead>
-                      <TableHead>電話</TableHead>
-                      <TableHead>所屬團組</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMembers.map((member: Member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-medium">{member.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {identityLabel[member.identity] ?? member.identity}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-gray-500 text-sm">
-                          {member.gender ? genderLabel[member.gender] ?? member.gender : "-"}
-                        </TableCell>
-                        <TableCell className="text-gray-500 text-sm">{member.phone || "-"}</TableCell>
-                        <TableCell>
-                          {member.groupName ? (
-                            <span className="text-sm text-blue-600">{member.groupName}</span>
-                          ) : (
-                            <span className="text-gray-400 text-sm">未分配</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 指派行程 Tab */}
-        <TabsContent value="assign" className="mt-4">
-          <AssignItineraryTab members={allMembers} groupOptions={groupOptions} />
-        </TabsContent>
-
-        {/* 狀態監控 Tab */}
-        <TabsContent value="status" className="mt-4">
-          <StatusMonitorTab />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// ===== 指派行程 Tab =====
-function AssignItineraryTab({
-  members,
-  groupOptions,
-}: {
-  members: Member[];
-  groupOptions: { id: number; name: string; code: string }[];
-}) {
-  const [selectedItineraryId, setSelectedItineraryId] = useState<number | null>(null);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
-  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<number>>(new Set());
-  const [selectedRole, setSelectedRole] = useState<string>("staff");
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
-
-  // 獲取所有行程（通過所有團組）
-  const { data: allGroups = [] } = trpc.groups.list.useQuery();
-
-  // 獲取選定團組的行程
-  const groupIdForItinerary = selectedGroupId !== "all" ? parseInt(selectedGroupId) : undefined;
-  const { data: itineraries = [], isLoading: itinerariesLoading } = trpc.itineraries.listByGroup.useQuery(
-    { groupId: groupIdForItinerary! },
-    { enabled: !!groupIdForItinerary }
-  );
-
-  // 獲取選定行程的已指派人員
-  const { data: assignedMembers = [], refetch: refetchAssigned } = trpc.memberManagement.listByItinerary.useQuery(
-    { itineraryId: selectedItineraryId! },
-    { enabled: !!selectedItineraryId }
-  );
-
-  // 批量指派 mutation
-  const batchAssign = trpc.memberManagement.batchAssign.useMutation({
-    onSuccess: () => {
-      toast.success("人員指派成功");
-      setSelectedMemberIds(new Set());
-      setShowAssignDialog(false);
-      refetchAssigned();
-    },
-    onError: (err) => toast.error("指派失敗：" + err.message),
-  });
-
-  // 移除指派 mutation
-  const removeMember = trpc.memberManagement.remove.useMutation({
-    onSuccess: () => {
-      toast.success("已移除指派");
-      refetchAssigned();
-    },
-    onError: (err) => toast.error("移除失敗：" + err.message),
-  });
-
-  // 過濾可選人員（排除已指派的）
-  const assignedMemberIds = new Set(assignedMembers.map((m: ItineraryMember) => m.memberId));
-  const availableMembers = members.filter((m) => {
-    const matchGroup = selectedGroupId === "all" || String(m.groupId) === selectedGroupId;
-    return matchGroup && !assignedMemberIds.has(m.id);
-  });
-
-  const toggleMember = (id: number) => {
-    setSelectedMemberIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleAssign = () => {
-    if (!selectedItineraryId || selectedMemberIds.size === 0) return;
-    batchAssign.mutate({
-      itineraryId: selectedItineraryId,
-      memberIds: Array.from(selectedMemberIds),
-      role: selectedRole as any,
-    });
-  };
-
-  // 選定行程的詳情
-  const selectedItinerary = itineraries.find((i: any) => i.id === selectedItineraryId);
-
-  return (
-    <div className="space-y-4">
-      {/* 選擇行程 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">選擇行程</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+        {/* ===== Tab 1：工作人員列表 ===== */}
+        <TabsContent value="staff-list" className="space-y-4">
           <div className="flex gap-3">
-            <Select value={selectedGroupId} onValueChange={(v) => { setSelectedGroupId(v); setSelectedItineraryId(null); }}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="選擇團組" />
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索姓名、電話、郵箱..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="全部角色" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">全部團組</SelectItem>
-                {groupOptions.map((g) => (
-                  <SelectItem key={g.id} value={String(g.id)}>
-                    {g.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">全部角色</SelectItem>
+                <SelectItem value="coordinator">總統籌</SelectItem>
+                <SelectItem value="staff">工作人員</SelectItem>
+                <SelectItem value="guide">導遊</SelectItem>
+                <SelectItem value="driver">司機</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {selectedGroupId !== "all" && (
-            <div>
-              {itinerariesLoading ? (
-                <p className="text-sm text-gray-500">載入行程中...</p>
-              ) : itineraries.length === 0 ? (
-                <p className="text-sm text-gray-500">該團組暫無行程</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {itineraries.map((itin: any) => (
-                    <button
-                      key={itin.id}
-                      onClick={() => setSelectedItineraryId(itin.id)}
-                      className={`text-left p-3 rounded-lg border transition-colors ${
-                        selectedItineraryId === itin.id
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      <p className="font-medium text-sm">{itin.locationName || "未命名行程"}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {itin.date ? new Date(itin.date).toLocaleDateString("zh-TW") : "-"}
-                        {itin.startTime ? ` ${itin.startTime}` : ""}
-                        {itin.timeSlot ? ` (${itin.timeSlot === "morning" ? "上午" : itin.timeSlot === "afternoon" ? "下午" : itin.timeSlot === "evening" ? "晚上" : itin.timeSlot})` : ""}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
+          {filteredStaff.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">暫無工作人員</p>
+              <p className="text-sm">點擊右上角「添加工作人員」開始創建</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 已指派人員 & 可指派人員 */}
-      {selectedItineraryId && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* 已指派人員 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  已指派人員
-                  <Badge variant="secondary" className="ml-2">{assignedMembers.length}</Badge>
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {assignedMembers.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 text-sm">
-                  <UserCheck className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  尚未指派任何人員
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>姓名</TableHead>
-                      <TableHead>角色</TableHead>
-                      <TableHead>身份</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {assignedMembers.map((m: ItineraryMember) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="font-medium">{m.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {roleLabel[m.role] ?? m.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-gray-500">
-                          {identityLabel[m.identity] ?? m.identity}
-                        </TableCell>
-                        <TableCell>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>姓名</TableHead>
+                    <TableHead>角色</TableHead>
+                    <TableHead>聯繫方式</TableHead>
+                    <TableHead>語言/資質</TableHead>
+                    <TableHead>備注</TableHead>
+                    <TableHead className="text-right">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStaff.map((staff) => (
+                    <TableRow key={staff.id}>
+                      <TableCell className="font-medium">{staff.name}</TableCell>
+                      <TableCell>
+                        <Badge className={`${roleColor[staff.role]} border-0`}>
+                          <span className="flex items-center gap-1">
+                            {roleIcon[staff.role]}
+                            {roleLabel[staff.role]}
+                          </span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 text-sm">
+                          {staff.phone && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Phone className="w-3 h-3" />
+                              {staff.phone}
+                            </div>
+                          )}
+                          {staff.email && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Mail className="w-3 h-3" />
+                              {staff.email}
+                            </div>
+                          )}
+                          {staff.wechat && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <MessageCircle className="w-3 h-3" />
+                              {staff.wechat}
+                            </div>
+                          )}
+                          {!staff.phone && !staff.email && !staff.wechat && (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          {staff.languages && <div>語言：{staff.languages}</div>}
+                          {staff.licenseNumber && <div>證號：{staff.licenseNumber}</div>}
+                          {!staff.languages && !staff.licenseNumber && <span>—</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                        {staff.notes || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2"
-                            onClick={() => removeMember.mutate({ itineraryId: selectedItineraryId, memberId: m.memberId })}
+                            onClick={() => openAssignDialog(staff)}
+                            title="指派行程"
                           >
-                            移除
+                            <CalendarDays className="w-4 h-4" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(staff)}
+                            title="編輯"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`確定要停用「${staff.name}」嗎？`)) {
+                                deleteStaff.mutate({ id: staff.id });
+                              }
+                            }}
+                            title="停用"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
 
-          {/* 可指派人員 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  可指派人員
-                  <Badge variant="secondary" className="ml-2">{availableMembers.length}</Badge>
-                </CardTitle>
-                {selectedMemberIds.size > 0 && (
-                  <Button
-                    size="sm"
-                    onClick={() => setShowAssignDialog(true)}
-                    className="h-8"
-                  >
-                    指派選中 ({selectedMemberIds.size})
-                  </Button>
+        {/* ===== Tab 2：指派管理 ===== */}
+        <TabsContent value="assignments" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 左側：工作人員選擇 */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-muted-foreground">選擇工作人員</h3>
+              <div className="border rounded-md divide-y max-h-[500px] overflow-y-auto">
+                {(staffList as StaffMember[]).length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    暫無工作人員
+                  </div>
+                ) : (
+                  (staffList as StaffMember[]).map((staff) => (
+                    <button
+                      key={staff.id}
+                      onClick={() => setSelectedStaff(staff)}
+                      className={`w-full text-left px-4 py-3 hover:bg-muted transition-colors ${
+                        selectedStaff?.id === staff.id ? "bg-muted" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{staff.name}</span>
+                        <Badge className={`${roleColor[staff.role]} border-0 text-xs`}>
+                          {roleLabel[staff.role]}
+                        </Badge>
+                      </div>
+                      {staff.phone && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{staff.phone}</p>
+                      )}
+                    </button>
+                  ))
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {availableMembers.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 text-sm">
-                  <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  所有人員均已指派
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={selectedMemberIds.size === availableMembers.length && availableMembers.length > 0}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedMemberIds(new Set(availableMembers.map((m) => m.id)));
-                            } else {
-                              setSelectedMemberIds(new Set());
-                            }
-                          }}
-                        />
-                      </TableHead>
-                      <TableHead>姓名</TableHead>
-                      <TableHead>身份</TableHead>
-                      <TableHead>所屬團組</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {availableMembers.map((m: Member) => (
-                      <TableRow
-                        key={m.id}
-                        className={selectedMemberIds.has(m.id) ? "bg-blue-50" : ""}
-                        onClick={() => toggleMember(m.id)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedMemberIds.has(m.id)}
-                            onCheckedChange={() => toggleMember(m.id)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{m.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {identityLabel[m.identity] ?? m.identity}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-gray-500">
-                          {m.groupName || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
 
-      {/* 指派確認對話框 */}
-      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent>
+            {/* 右側：指派詳情 */}
+            <div className="md:col-span-2 space-y-4">
+              {selectedStaff ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold">{selectedStaff.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {roleLabel[selectedStaff.role]}
+                        {selectedStaff.phone && ` · ${selectedStaff.phone}`}
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={() => openAssignDialog(selectedStaff)}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      新增指派
+                    </Button>
+                  </div>
+
+                  {(assignments as Assignment[]).length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground border rounded-md">
+                      <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">尚未指派任何行程</p>
+                      <p className="text-xs mt-1">點擊「新增指派」開始指派</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {(assignments as Assignment[]).map((item) => (
+                        <Card key={item.assignment.id}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm">
+                                    {item.group?.name ?? `團組 #${item.assignment.groupId}`}
+                                  </span>
+                                  <Badge
+                                    className={`${roleColor[item.assignment.role]} border-0 text-xs`}
+                                  >
+                                    {roleLabel[item.assignment.role]}
+                                  </Badge>
+                                </div>
+                                {item.group?.code && (
+                                  <p className="text-xs text-muted-foreground">{item.group.code}</p>
+                                )}
+                                {(item.assignment.startDate || item.assignment.endDate) && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock className="w-3 h-3" />
+                                    {item.assignment.startDate ?? "—"}
+                                    {" → "}
+                                    {item.assignment.endDate ?? "—"}
+                                  </div>
+                                )}
+                                {item.assignment.notes && (
+                                  <p className="text-xs text-muted-foreground">
+                                    備注：{item.assignment.notes}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm("確定要取消此指派嗎？")) {
+                                    removeAssignment.mutate({ id: item.assignment.id });
+                                  }
+                                }}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-16 text-muted-foreground border rounded-md">
+                  <UserCheck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">請從左側選擇工作人員</p>
+                  <p className="text-xs mt-1">查看和管理其行程指派</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* ===== 添加工作人員對話框 ===== */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>確認指派</DialogTitle>
+            <DialogTitle>添加工作人員</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              將 <strong>{selectedMemberIds.size}</strong> 名人員指派至：
-              <br />
-              <span className="text-blue-600 font-medium">
-                {selectedItinerary?.locationName || "選定行程"}
-              </span>
-            </p>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">指派角色</label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
+          <StaffForm formData={formData} setFormData={setFormData} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreate} disabled={createStaff.isPending}>
+              {createStaff.isPending ? "添加中..." : "確認添加"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== 編輯工作人員對話框 ===== */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>編輯工作人員 — {selectedStaff?.name}</DialogTitle>
+          </DialogHeader>
+          <StaffForm formData={formData} setFormData={setFormData} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateStaff.isPending}>
+              {updateStaff.isPending ? "保存中..." : "保存修改"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== 指派行程對話框 ===== */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>指派行程 — {selectedStaff?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>選擇團組 *</Label>
+              <Select
+                value={assignForm.groupId}
+                onValueChange={(v) => setAssignForm((f) => ({ ...f, groupId: v }))}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="請選擇團組" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(roleLabel).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  {(groups as any[]).map((g: any) => (
+                    <SelectItem key={g.id} value={String(g.id)}>
+                      {g.name} ({g.code})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>在此團組的角色</Label>
+              <Select
+                value={assignForm.role}
+                onValueChange={(v) =>
+                  setAssignForm((f) => ({
+                    ...f,
+                    role: v as "coordinator" | "staff" | "guide" | "driver",
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="coordinator">總統籌</SelectItem>
+                  <SelectItem value="staff">工作人員</SelectItem>
+                  <SelectItem value="guide">導遊</SelectItem>
+                  <SelectItem value="driver">司機</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>開始日期</Label>
+                <Input
+                  type="date"
+                  value={assignForm.startDate}
+                  onChange={(e) =>
+                    setAssignForm((f) => ({ ...f, startDate: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>結束日期</Label>
+                <Input
+                  type="date"
+                  value={assignForm.endDate}
+                  onChange={(e) =>
+                    setAssignForm((f) => ({ ...f, endDate: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>備注</Label>
+              <Textarea
+                placeholder="指派備注（可選）"
+                value={assignForm.notes}
+                onChange={(e) => setAssignForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>取消</Button>
-            <Button
-              onClick={handleAssign}
-              disabled={batchAssign.isPending}
-            >
-              {batchAssign.isPending ? "指派中..." : "確認指派"}
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={handleAssign} disabled={assignStaff.isPending}>
+              {assignStaff.isPending ? "指派中..." : "確認指派"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -643,302 +756,108 @@ function AssignItineraryTab({
   );
 }
 
-// ===== 狀態監控 Tab =====
-function StatusMonitorTab() {
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
-  const [selectedItineraryId, setSelectedItineraryId] = useState<number | null>(null);
-  const [editingStatus, setEditingStatus] = useState<MemberStatus | null>(null);
-  const [newStatus, setNewStatus] = useState<string>("assigned");
-  const [checkInTime, setCheckInTime] = useState<string>("");
-  const [checkOutTime, setCheckOutTime] = useState<string>("");
-  const [statusNotes, setStatusNotes] = useState<string>("");
-
-  // 獲取所有人員（用於取得團組列表）
-  const { data: allMembers = [] } = trpc.memberManagement.listAll.useQuery();
-  const groupOptions = useMemo(() => {
-    const groups = new Map<number, { id: number; name: string; code: string }>();
-    allMembers.forEach((m: Member) => {
-      if (m.groupId && m.groupName) {
-        groups.set(m.groupId, { id: m.groupId, name: m.groupName, code: m.groupCode || "" });
-      }
-    });
-    return Array.from(groups.values());
-  }, [allMembers]);
-
-  // 獲取選定團組的行程
-  const groupIdForItinerary = selectedGroupId !== "all" ? parseInt(selectedGroupId) : undefined;
-  const { data: itineraries = [] } = trpc.itineraries.listByGroup.useQuery(
-    { groupId: groupIdForItinerary! },
-    { enabled: !!groupIdForItinerary }
-  );
-
-  // 獲取選定行程的人員狀態
-  const { data: memberStatuses = [], refetch: refetchStatuses } = trpc.memberManagement.getStatusByItinerary.useQuery(
-    { itineraryId: selectedItineraryId! },
-    { enabled: !!selectedItineraryId }
-  );
-
-  // 獲取選定行程的已指派人員（用於顯示未有狀態記錄的人員）
-  const { data: assignedMembers = [] } = trpc.memberManagement.listByItinerary.useQuery(
-    { itineraryId: selectedItineraryId! },
-    { enabled: !!selectedItineraryId }
-  );
-
-  // 更新狀態 mutation
-  const updateStatus = trpc.memberManagement.updateStatus.useMutation({
-    onSuccess: () => {
-      toast.success("狀態更新成功");
-      setEditingStatus(null);
-      refetchStatuses();
-    },
-    onError: (err) => toast.error("更新失敗：" + err.message),
-  });
-
-  // 合併已指派人員和狀態記錄
-  const memberStatusMap = new Map<number, MemberStatus>(
-    memberStatuses.map((s: MemberStatus) => [s.memberId, s])
-  );
-
-  // 統計
-  const statusStats = useMemo(() => {
-    const counts: Record<string, number> = {
-      pending: 0, assigned: 0, in_progress: 0, completed: 0, absent: 0, cancelled: 0,
-    };
-    assignedMembers.forEach((m: ItineraryMember) => {
-      const status = memberStatusMap.get(m.memberId);
-      const s = status?.status ?? "pending";
-      counts[s] = (counts[s] || 0) + 1;
-    });
-    return counts;
-  }, [assignedMembers, memberStatuses]);
-
-  const openEditDialog = (member: ItineraryMember) => {
-    const status = memberStatusMap.get(member.memberId);
-    setEditingStatus(status ?? {
-      id: 0,
-      memberId: member.memberId,
-      itineraryId: selectedItineraryId!,
-      status: "pending",
-      name: member.name,
-      identity: member.identity,
-      groupId: member.groupId,
-    } as MemberStatus);
-    setNewStatus(status?.status ?? "pending");
-    setCheckInTime(status?.checkInTime ? new Date(status.checkInTime).toISOString().slice(0, 16) : "");
-    setCheckOutTime(status?.checkOutTime ? new Date(status.checkOutTime).toISOString().slice(0, 16) : "");
-    setStatusNotes(status?.notes ?? "");
-  };
-
-  const handleUpdateStatus = () => {
-    if (!editingStatus || !selectedItineraryId) return;
-    updateStatus.mutate({
-      memberId: editingStatus.memberId,
-      itineraryId: selectedItineraryId,
-      status: newStatus as any,
-      checkInTime: checkInTime || null,
-      checkOutTime: checkOutTime || null,
-      notes: statusNotes || null,
-    });
-  };
-
+// ===== 工作人員表單組件 =====
+function StaffForm({
+  formData,
+  setFormData,
+}: {
+  formData: FormData;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+}) {
   return (
-    <div className="space-y-4">
-      {/* 選擇行程 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">選擇監控行程</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Select value={selectedGroupId} onValueChange={(v) => { setSelectedGroupId(v); setSelectedItineraryId(null); }}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="選擇團組" />
+    <div className="space-y-4 py-2">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>姓名 *</Label>
+          <Input
+            placeholder="請輸入姓名"
+            value={formData.name}
+            onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>角色 *</Label>
+          <Select
+            value={formData.role}
+            onValueChange={(v) =>
+              setFormData((f) => ({
+                ...f,
+                role: v as "coordinator" | "staff" | "guide" | "driver",
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">全部團組</SelectItem>
-              {groupOptions.map((g) => (
-                <SelectItem key={g.id} value={String(g.id)}>
-                  {g.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="coordinator">總統籌</SelectItem>
+              <SelectItem value="staff">工作人員</SelectItem>
+              <SelectItem value="guide">導遊</SelectItem>
+              <SelectItem value="driver">司機</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
 
-          {selectedGroupId !== "all" && itineraries.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {itineraries.map((itin: any) => (
-                <button
-                  key={itin.id}
-                  onClick={() => setSelectedItineraryId(itin.id)}
-                  className={`text-left p-3 rounded-lg border transition-colors ${
-                    selectedItineraryId === itin.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  <p className="font-medium text-sm">{itin.locationName || "未命名行程"}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {itin.date ? new Date(itin.date).toLocaleDateString("zh-TW") : "-"}
-                    {itin.startTime ? ` ${itin.startTime}` : ""}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>電話</Label>
+          <Input
+            placeholder="聯繫電話"
+            value={formData.phone}
+            onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>微信</Label>
+          <Input
+            placeholder="微信號"
+            value={formData.wechat}
+            onChange={(e) => setFormData((f) => ({ ...f, wechat: e.target.value }))}
+          />
+        </div>
+      </div>
 
-      {/* 狀態統計 */}
-      {selectedItineraryId && (
-        <>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-            {Object.entries(statusLabel).map(([key, label]) => (
-              <Card key={key}>
-                <CardContent className="p-3 text-center">
-                  <p className="text-lg font-bold text-gray-900">{statusStats[key] ?? 0}</p>
-                  <p className="text-xs text-gray-500">{label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <div className="space-y-2">
+        <Label>郵箱</Label>
+        <Input
+          type="email"
+          placeholder="電子郵箱"
+          value={formData.email}
+          onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
+        />
+      </div>
 
-          {/* 人員狀態列表 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                人員狀態列表
-                <Badge variant="secondary" className="ml-2">{assignedMembers.length} 人</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {assignedMembers.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 text-sm">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  此行程尚未指派人員
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>姓名</TableHead>
-                      <TableHead>身份</TableHead>
-                      <TableHead>角色</TableHead>
-                      <TableHead>狀態</TableHead>
-                      <TableHead>簽到時間</TableHead>
-                      <TableHead>簽退時間</TableHead>
-                      <TableHead>備註</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {assignedMembers.map((m: ItineraryMember) => {
-                      const status = memberStatusMap.get(m.memberId);
-                      const currentStatus = status?.status ?? "pending";
-                      return (
-                        <TableRow key={m.id}>
-                          <TableCell className="font-medium">{m.name}</TableCell>
-                          <TableCell className="text-xs text-gray-500">
-                            {identityLabel[m.identity] ?? m.identity}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {roleLabel[m.role] ?? m.role}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[currentStatus]}`}>
-                              {statusLabel[currentStatus] ?? currentStatus}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-gray-500">
-                            {status?.checkInTime
-                              ? new Date(status.checkInTime).toLocaleString("zh-TW", { hour: "2-digit", minute: "2-digit" })
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-xs text-gray-500">
-                            {status?.checkOutTime
-                              ? new Date(status.checkOutTime).toLocaleString("zh-TW", { hour: "2-digit", minute: "2-digit" })
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-xs text-gray-500 max-w-32 truncate">
-                            {status?.notes || "-"}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => openEditDialog(m)}
-                            >
-                              更新
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>語言能力</Label>
+          <Input
+            placeholder="如：普通話、廣東話、英語"
+            value={formData.languages}
+            onChange={(e) => setFormData((f) => ({ ...f, languages: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>證件號碼</Label>
+          <Input
+            placeholder="導遊證/駕照號碼"
+            value={formData.licenseNumber}
+            onChange={(e) =>
+              setFormData((f) => ({ ...f, licenseNumber: e.target.value }))
+            }
+          />
+        </div>
+      </div>
 
-      {/* 更新狀態對話框 */}
-      <Dialog open={!!editingStatus} onOpenChange={(open) => !open && setEditingStatus(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>更新人員狀態 - {editingStatus?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">狀態</label>
-              <Select value={newStatus} onValueChange={setNewStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(statusLabel).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">簽到時間</label>
-              <Input
-                type="datetime-local"
-                value={checkInTime}
-                onChange={(e) => setCheckInTime(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">簽退時間</label>
-              <Input
-                type="datetime-local"
-                value={checkOutTime}
-                onChange={(e) => setCheckOutTime(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">備註</label>
-              <Input
-                placeholder="輸入備註..."
-                value={statusNotes}
-                onChange={(e) => setStatusNotes(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingStatus(null)}>取消</Button>
-            <Button
-              onClick={handleUpdateStatus}
-              disabled={updateStatus.isPending}
-            >
-              {updateStatus.isPending ? "更新中..." : "確認更新"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="space-y-2">
+        <Label>備注</Label>
+        <Textarea
+          placeholder="其他備注信息"
+          value={formData.notes}
+          onChange={(e) => setFormData((f) => ({ ...f, notes: e.target.value }))}
+          rows={2}
+        />
+      </div>
     </div>
   );
 }
