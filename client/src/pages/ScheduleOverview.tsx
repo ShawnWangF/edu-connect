@@ -126,6 +126,7 @@ export default function ScheduleOverview() {
   const { data: project } = trpc.projects.get.useQuery({ id: pid! }, { enabled: !!pid });
   const { data: groups = [], refetch: refetchGroups } = trpc.projects.getGroups.useQuery({ projectId: pid! }, { enabled: !!pid });
   const { data: blocks = [], refetch: refetchBlocks } = trpc.scheduleBlocks.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
+  const { data: staffAssignments = [] } = trpc.batchStaff.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
 
   const upsertBlock = trpc.scheduleBlocks.upsert.useMutation();
   const shiftBatch = trpc.scheduleBlocks.shiftBatch.useMutation();
@@ -850,6 +851,7 @@ export default function ScheduleOverview() {
                     <th className="border border-gray-300 px-2 py-1 text-center text-[10px]">學生人數</th>
                     <th className="border border-gray-300 px-2 py-1 text-center text-[10px]">教師人數</th>
                     <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">學校（學生人數）</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">工作人員</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -922,6 +924,20 @@ export default function ScheduleOverview() {
                           ) : (
                             <span className="text-gray-400">{g.name}</span>
                           )}
+                        </td>
+                      {/* 工作人員列 */}
+                        <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
+                          {(() => {
+                            const groupStaff = staffAssignments.filter(s => s.groupId === g.id);
+                            if (groupStaff.length === 0) return <span className="text-gray-400">-</span>;
+                            const roleLabels: Record<string, string> = { coordinator: '總統籌', staff: '工作人員', guide: '導遊', driver: '司機' };
+                            return groupStaff.map((s, i) => (
+                              <div key={i} className="leading-tight">
+                                <span className="font-medium">{s.staffName || '-'}</span>
+                                <span className="text-gray-400 ml-0.5">({roleLabels[s.role] || s.role})</span>
+                              </div>
+                            ));
+                          })()}
                         </td>
                       </tr>
                     );

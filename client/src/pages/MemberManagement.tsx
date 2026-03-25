@@ -62,8 +62,6 @@ type StaffMember = {
   licenseNumber?: string | null;
   notes?: string | null;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 type Assignment = {

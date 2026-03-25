@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Users, Calendar, MapPin, TrendingUp, Clock } from "lucide-react";
+import { Users, Calendar, MapPin, TrendingUp, Clock, Award, Briefcase, Car, UserCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -14,6 +15,7 @@ export default function Home() {
   const { data: locations } = trpc.locations.list.useQuery();
   const { data: allItineraries } = trpc.itineraries.listAll.useQuery();
   const { data: allDailyCards } = trpc.dailyCards.listAll.useQuery();
+  const { data: staffStats } = trpc.staff.stats.useQuery();
   
   // 獲取本週關注事項（本週的行程）
   const thisWeekItineraries = allItineraries?.filter((item: any) => {
@@ -145,6 +147,44 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 工作人員概覽 */}
+      {staffStats && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">工作人員概覽</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setLocation('/members')} className="text-xs">
+                查看全部
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                <p className="text-2xl font-bold">{staffStats.total}</p>
+                <p className="text-xs text-muted-foreground mt-1">工作人員總數</p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                <p className="text-2xl font-bold text-purple-700">{staffStats.coordinator}</p>
+                <p className="text-xs text-purple-600 mt-1">總統籌</p>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-700">{staffStats.guide}</p>
+                <p className="text-xs text-green-600 mt-1">導遊</p>
+              </div>
+              <div className="text-center p-3 bg-orange-50 rounded-lg">
+                <p className="text-2xl font-bold text-orange-700">{staffStats.driver}</p>
+                <p className="text-xs text-orange-600 mt-1">司機</p>
+              </div>
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <p className="text-2xl font-bold text-blue-700">{staffStats.assigned}</p>
+                <p className="text-xs text-blue-600 mt-1">已指派</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 最近團組 - 橫向滾動時間軸視圖 */}
       <Card>

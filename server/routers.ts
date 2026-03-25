@@ -1728,7 +1728,19 @@ export const appRouter = router({
       if (!dbConn) return [];
       const { staff } = await import('../drizzle/schema');
       const { eq } = await import('drizzle-orm');
-      return await dbConn.select().from(staff).where(eq(staff.isActive, true));
+      const rows = await dbConn.select({
+        id: staff.id,
+        name: staff.name,
+        role: staff.role,
+        phone: staff.phone,
+        email: staff.email,
+        wechat: staff.wechat,
+        languages: staff.languages,
+        licenseNumber: staff.licenseNumber,
+        notes: staff.notes,
+        isActive: staff.isActive,
+      }).from(staff).where(eq(staff.isActive, true));
+      return rows;
     }),
 
     create: editorProcedure
@@ -1784,6 +1796,37 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    // 獲取工作人員統計數據
+    stats: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { total: 0, coordinator: 0, staff: 0, guide: 0, driver: 0, assigned: 0 };
+      const { staff, batchStaff } = await import('../drizzle/schema');
+      const { eq, count, countDistinct } = await import('drizzle-orm');
+      // 按角色統計
+      const staffRows = await dbConn.select({
+        role: staff.role,
+        count: count(),
+      }).from(staff).where(eq(staff.isActive, true)).groupBy(staff.role);
+      // 已指派工作人員數量（去重）
+      const assignedRows = await dbConn.select({
+        count: countDistinct(batchStaff.staffId),
+      }).from(batchStaff);
+      const roleMap: Record<string, number> = {};
+      let total = 0;
+      for (const row of staffRows) {
+        roleMap[row.role] = Number(row.count);
+        total += Number(row.count);
+      }
+      return {
+        total,
+        coordinator: roleMap['coordinator'] || 0,
+        staff: roleMap['staff'] || 0,
+        guide: roleMap['guide'] || 0,
+        driver: roleMap['driver'] || 0,
+        assigned: Number(assignedRows[0]?.count || 0),
+      };
+    }),
+
     // 獲取工作人員的指派列表
     getAssignments: protectedProcedure
       .input(z.object({ staffId: z.number() }))
@@ -1793,8 +1836,23 @@ export const appRouter = router({
         const { batchStaff, groups } = await import('../drizzle/schema');
         const { eq } = await import('drizzle-orm');
         const assignments = await dbConn.select({
-          assignment: batchStaff,
-          group: groups,
+          assignment: {
+            id: batchStaff.id,
+            groupId: batchStaff.groupId,
+            staffId: batchStaff.staffId,
+            role: batchStaff.role,
+            startDate: batchStaff.startDate,
+            endDate: batchStaff.endDate,
+            currentTask: batchStaff.currentTask,
+            notes: batchStaff.notes,
+          },
+          group: {
+            id: groups.id,
+            name: groups.name,
+            code: groups.code,
+            startDate: groups.startDate,
+            endDate: groups.endDate,
+          },
         }).from(batchStaff)
           .leftJoin(groups, eq(batchStaff.groupId, groups.id))
           .where(eq(batchStaff.staffId, input.staffId));
@@ -1812,11 +1870,49 @@ export const appRouter = router({
         const { batchStaff, staff } = await import('../drizzle/schema');
         const { eq } = await import('drizzle-orm');
         const result = await dbConn.select({
-          assignment: batchStaff,
-          staffMember: staff,
+          assignment: {
+            id: batchStaff.id,
+            groupId: batchStaff.groupId,
+            staffId: batchStaff.staffId,
+            role: batchStaff.role,
+            startDate: batchStaff.startDate,
+            endDate: batchStaff.endDate,
+            notes: batchStaff.notes,
+          },
+          staffMember: {
+            id: staff.id,
+            name: staff.name,
+            role: staff.role,
+            phone: staff.phone,
+          },
         }).from(batchStaff)
           .leftJoin(staff, eq(batchStaff.staffId, staff.id))
           .where(eq(batchStaff.groupId, input.groupId));
+        return result;
+      }),
+
+    // 獲取項目中所有團組的工作人員指派（用於排程總覽）
+    listByProject: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const { batchStaff, staff, groups } = await import('../drizzle/schema');
+        const { eq, inArray } = await import('drizzle-orm');
+        // 先獲取項目下所有團組 ID
+        const projectGroups = await dbConn.select({ id: groups.id }).from(groups)
+          .where(eq(groups.projectId, input.projectId));
+        if (projectGroups.length === 0) return [];
+        const groupIds = projectGroups.map(g => g.id);
+        const result = await dbConn.select({
+          groupId: batchStaff.groupId,
+          staffId: batchStaff.staffId,
+          role: batchStaff.role,
+          staffName: staff.name,
+          staffRole: staff.role,
+        }).from(batchStaff)
+          .leftJoin(staff, eq(batchStaff.staffId, staff.id))
+          .where(inArray(batchStaff.groupId, groupIds));
         return result;
       }),
 
