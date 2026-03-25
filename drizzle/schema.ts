@@ -160,10 +160,13 @@ export const dailyCards = mysqlTable("dailyCards", {
   securityPhone: varchar("securityPhone", { length: 50 }),
   
   // 餐飲安排
+  breakfastRestaurantId: int("breakfastRestaurantId"), // 關聯餐廳資源ID
   breakfastRestaurant: varchar("breakfastRestaurant", { length: 255 }),
   breakfastAddress: text("breakfastAddress"),
+  lunchRestaurantId: int("lunchRestaurantId"), // 關聯餐廳資源ID
   lunchRestaurant: varchar("lunchRestaurant", { length: 255 }),
   lunchAddress: text("lunchAddress"),
+  dinnerRestaurantId: int("dinnerRestaurantId"), // 關聯餐廳資源ID
   dinnerRestaurant: varchar("dinnerRestaurant", { length: 255 }),
   dinnerAddress: text("dinnerAddress"),
   

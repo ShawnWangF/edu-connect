@@ -1,0 +1,16 @@
+{
+  "query": "\n-- 查看 P1 团组的 groupId 和日期\nSELECT id, name, code, startDate FROM `groups` WHERE code = 'P1' LIMIT 1;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \n-- 查看 P1 团组的 groupId 和日期\nSELECT id, name, code, startDate FROM `groups` WHERE code = 'P1' LIMIT 1;\n",
+  "rows": [
+    {
+      "id": "360001",
+      "name": "P1 太倉市實驗小學組",
+      "code": "P1",
+      "startDate": "2026-07-01"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcode\tstartDate\n360001\tP1 太倉市實驗小學組\tP1\t2026-07-01\n",
+  "stderr": "",
+  "execution_time_ms": 1685
+}

@@ -898,13 +898,18 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
 function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({});
+  const [cardFormState, setCardFormState] = useState<any>({});
 
   // 查詢所有資源
   const { data: hotels = [] } = trpc.hotels.list.useQuery();
   const { data: vehicles = [] } = trpc.vehicles.list.useQuery();
   const { data: guides = [] } = trpc.guides.list.useQuery();
   const { data: securities = [] } = trpc.securities.list.useQuery();
+  const { data: restaurantList = [] } = trpc.restaurants.list.useQuery();
+  // 餐廳選擇狀態
+  const [selectedBreakfastRestaurantId, setSelectedBreakfastRestaurantId] = useState<string>('');
+  const [selectedLunchRestaurantId, setSelectedLunchRestaurantId] = useState<string>('');
+  const [selectedDinnerRestaurantId, setSelectedDinnerRestaurantId] = useState<string>('');
 
   const upsertMutation = trpc.dailyCards.upsert.useMutation({
     onSuccess: () => {
@@ -948,13 +953,17 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
       guidePhone: formData.get("guidePhone") as string,
       securityName: formData.get("securityName") as string,
       securityPhone: formData.get("securityPhone") as string,
+      breakfastRestaurantId: selectedBreakfastRestaurantId ? parseInt(selectedBreakfastRestaurantId) : undefined,
       breakfastRestaurant: formData.get("breakfastRestaurant") as string,
       breakfastAddress: formData.get("breakfastAddress") as string,
+      lunchRestaurantId: selectedLunchRestaurantId ? parseInt(selectedLunchRestaurantId) : undefined,
       lunchRestaurant: formData.get("lunchRestaurant") as string,
       lunchAddress: formData.get("lunchAddress") as string,
+      dinnerRestaurantId: selectedDinnerRestaurantId ? parseInt(selectedDinnerRestaurantId) : undefined,
       dinnerRestaurant: formData.get("dinnerRestaurant") as string,
       dinnerAddress: formData.get("dinnerAddress") as string,
       specialNotes: formData.get("specialNotes") as string,
+      hotelId: cardFormState.hotelId || undefined,
     });
   };
 
@@ -1034,11 +1043,11 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                   <div className="space-y-2">
                     <Label>選擇酒店資源</Label>
                     <Select
-                      value={formData.hotelId?.toString() || ""}
+                      value={cardFormState.hotelId?.toString() || ""}
                       onValueChange={(value) => {
                         const hotel = hotels.find((h: any) => h.id.toString() === value);
                         if (hotel) {
-                          setFormData((prev: any) => ({
+                          setCardFormState((prev: any) => ({
                             ...prev,
                             hotelId: hotel.id,
                             hotelName: hotel.name,
@@ -1081,11 +1090,11 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                   <div className="space-y-2">
                     <Label>選擇車輛資源</Label>
                     <Select
-                      value={formData.vehicleId?.toString() || ""}
+                      value={cardFormState.vehicleId?.toString() || ""}
                       onValueChange={(value) => {
                         const vehicle = vehicles.find((v: any) => v.id.toString() === value);
                         if (vehicle) {
-                          setFormData((prev: any) => ({
+                          setCardFormState((prev: any) => ({
                             ...prev,
                             vehicleId: vehicle.id,
                             vehiclePlate: vehicle.plate,
@@ -1134,11 +1143,11 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                     <div className="space-y-2">
                       <Label>選擇導遊資源</Label>
                       <Select
-                        value={formData.guideId?.toString() || ""}
+                        value={cardFormState.guideId?.toString() || ""}
                         onValueChange={(value) => {
                           const guide = guides.find((g: any) => g.id.toString() === value);
                           if (guide) {
-                            setFormData((prev: any) => ({
+                            setCardFormState((prev: any) => ({
                               ...prev,
                               guideId: guide.id,
                               guideName: guide.name,
@@ -1164,11 +1173,11 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                     <div className="space-y-2">
                       <Label>選擇安保資源</Label>
                       <Select
-                        value={formData.securityId?.toString() || ""}
+                        value={cardFormState.securityId?.toString() || ""}
                         onValueChange={(value) => {
                           const security = securities.find((s: any) => s.id.toString() === value);
                           if (security) {
-                            setFormData((prev: any) => ({
+                            setCardFormState((prev: any) => ({
                               ...prev,
                               securityId: security.id,
                               securityName: security.name,
@@ -1216,9 +1225,31 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">餐飲安排</h3>
                 <div className="space-y-3">
+                  {/* 早餐 */}
+                  <div className="space-y-2">
+                    <Label>早餐餐廳（從資源庫選擇）</Label>
+                    <Select
+                      value={selectedBreakfastRestaurantId}
+                      onValueChange={(value) => {
+                        setSelectedBreakfastRestaurantId(value);
+                        const r = restaurantList.find((r: any) => r.id.toString() === value);
+                        if (r) {
+                          (document.getElementById('breakfastRestaurant') as HTMLInputElement).value = r.name;
+                          (document.getElementById('breakfastAddress') as HTMLInputElement).value = r.address || '';
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="從資源庫選擇餐廳" /></SelectTrigger>
+                      <SelectContent>
+                        {restaurantList.filter((r: any) => r.isActive !== false).map((r: any) => (
+                          <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="breakfastRestaurant">早餐餐廳</Label>
+                      <Label htmlFor="breakfastRestaurant">早餐餐廳名稱</Label>
                       <Input id="breakfastRestaurant" name="breakfastRestaurant" defaultValue={selectedCard?.breakfastRestaurant} />
                     </div>
                     <div className="space-y-2">
@@ -1226,9 +1257,31 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                       <Input id="breakfastAddress" name="breakfastAddress" defaultValue={selectedCard?.breakfastAddress} />
                     </div>
                   </div>
+                  {/* 午餐 */}
+                  <div className="space-y-2">
+                    <Label>午餐餐廳（從資源庫選擇）</Label>
+                    <Select
+                      value={selectedLunchRestaurantId}
+                      onValueChange={(value) => {
+                        setSelectedLunchRestaurantId(value);
+                        const r = restaurantList.find((r: any) => r.id.toString() === value);
+                        if (r) {
+                          (document.getElementById('lunchRestaurant') as HTMLInputElement).value = r.name;
+                          (document.getElementById('lunchAddress') as HTMLInputElement).value = r.address || '';
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="從資源庫選擇餐廳" /></SelectTrigger>
+                      <SelectContent>
+                        {restaurantList.filter((r: any) => r.isActive !== false).map((r: any) => (
+                          <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="lunchRestaurant">午餐餐廳</Label>
+                      <Label htmlFor="lunchRestaurant">午餐餐廳名稱</Label>
                       <Input id="lunchRestaurant" name="lunchRestaurant" defaultValue={selectedCard?.lunchRestaurant} />
                     </div>
                     <div className="space-y-2">
@@ -1236,9 +1289,31 @@ function DailyCardTab({ groupId, group, dailyCards, utils }: any) {
                       <Input id="lunchAddress" name="lunchAddress" defaultValue={selectedCard?.lunchAddress} />
                     </div>
                   </div>
+                  {/* 晚餐 */}
+                  <div className="space-y-2">
+                    <Label>晚餐餐廳（從資源庫選擇）</Label>
+                    <Select
+                      value={selectedDinnerRestaurantId}
+                      onValueChange={(value) => {
+                        setSelectedDinnerRestaurantId(value);
+                        const r = restaurantList.find((r: any) => r.id.toString() === value);
+                        if (r) {
+                          (document.getElementById('dinnerRestaurant') as HTMLInputElement).value = r.name;
+                          (document.getElementById('dinnerAddress') as HTMLInputElement).value = r.address || '';
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="從資源庫選擇餐廳" /></SelectTrigger>
+                      <SelectContent>
+                        {restaurantList.filter((r: any) => r.isActive !== false).map((r: any) => (
+                          <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="dinnerRestaurant">晚餐餐廳</Label>
+                      <Label htmlFor="dinnerRestaurant">晚餐餐廳名稱</Label>
                       <Input id="dinnerRestaurant" name="dinnerRestaurant" defaultValue={selectedCard?.dinnerRestaurant} />
                     </div>
                     <div className="space-y-2">

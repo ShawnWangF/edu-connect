@@ -1,0 +1,9 @@
+{
+  "query": "\n-- 为 P1 团组的第一天（2026-07-01）添加食行卡片，关联餐厅资源\nINSERT INTO dailyCards (groupId, date, hotelName, hotelAddress, breakfastRestaurantId, breakfastRestaurant, breakfastAddress, lunchRestaurantId, lunchRestaurant, lunchAddress, dinnerRestaurantId, dinnerRestaurant, dinnerAddress, specialNotes)\nVALUES (\n  360001, \n  '2026-07-01',\n  '柏寧酒店',\n  '香港銅鑼灣告士打道38號',\n  60002,  -- 金鳳茶餐廳（早餐）\n  '金鳳茶餐廳',\n  '香港灣仔軒尼詩道',\n  60001,  -- 翠園酒家（午餐）\n  '翠園酒家（尖沙咀）',\n  '香港尖沙咀漢口道',\n  60003,  -- 海景軒（晚餐）\n  '海景軒',\n  '香港尖沙咀廣東道',\n  '首日歡迎晚宴'\n)\nON DUPLICATE KEY UPDATE\n  breakfastRestaurantId = 60002,\n  lunchRestaurantId = 60001,\n  dinnerRestaurantId = 60003;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \n-- 为 P1 团组的第一天（2026-07-01）添加食行卡片，关联餐厅资源\nINSERT INTO dailyCards (groupId, date, hotelName, hotelAddress, breakfastRestaurantId, breakfastRestaurant, breakfastAddress, lunchRestaurantId, lunchRestaurant, lunchAddress, dinnerRestaurantId, dinnerRestaurant, dinnerAddress, specialNotes)\nVALUES (\n  360001, \n  '2026-07-01',\n  '柏寧酒店',\n  '香港銅鑼灣告士打道38號',\n  60002,  -- 金鳳茶餐廳（早餐）\n  '金鳳茶餐廳',\n  '香港灣仔軒尼詩道',\n  60001,  -- 翠園酒家（午餐）\n  '翠園酒家（尖沙咀）',\n  '香港尖沙咀漢口道',\n  60003,  -- 海景軒（晚餐）\n  '海景軒',\n  '香港尖沙咀廣東道',\n  '首日歡迎晚宴'\n)\nON DUPLICATE KEY UPDATE\n  breakfastRestaurantId = 60002,\n  lunchRestaurantId = 60001,\n  dinnerRestaurantId = 60003;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1601
+}

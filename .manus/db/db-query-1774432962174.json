@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE dailyCards \n  ADD COLUMN breakfastRestaurantId INT NULL AFTER securityPhone,\n  ADD COLUMN lunchRestaurantId INT NULL AFTER breakfastRestaurant,\n  ADD COLUMN dinnerRestaurantId INT NULL AFTER lunchRestaurant;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \nALTER TABLE dailyCards \n  ADD COLUMN breakfastRestaurantId INT NULL AFTER securityPhone,\n  ADD COLUMN lunchRestaurantId INT NULL AFTER breakfastRestaurant,\n  ADD COLUMN dinnerRestaurantId INT NULL AFTER lunchRestaurant;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2174
+}

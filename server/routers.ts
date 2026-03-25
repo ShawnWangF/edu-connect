@@ -705,13 +705,17 @@ export const appRouter = router({
         guidePhone: z.string().optional(),
         securityName: z.string().optional(),
         securityPhone: z.string().optional(),
+        breakfastRestaurantId: z.number().optional(),
         breakfastRestaurant: z.string().optional(),
         breakfastAddress: z.string().optional(),
+        lunchRestaurantId: z.number().optional(),
         lunchRestaurant: z.string().optional(),
         lunchAddress: z.string().optional(),
+        dinnerRestaurantId: z.number().optional(),
         dinnerRestaurant: z.string().optional(),
         dinnerAddress: z.string().optional(),
         specialNotes: z.string().optional(),
+        hotelId: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
         await db.upsertDailyCard(input);
@@ -2186,10 +2190,29 @@ export const appRouter = router({
       if (!dbConn) return null;
       const { sql } = await import('drizzle-orm');
       const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+
+      // 智能日期逻辑：优先用今天，若今天无数据则找最近有行程的日期
+      const realTodayStr = now.toISOString().slice(0, 10);
+      const [todayCheck] = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM itineraries WHERE DATE_FORMAT(date, '%Y-%m-%d') = ${realTodayStr}`);
+      const todayCount = ((todayCheck as unknown) as any[])[0]?.cnt ?? 0;
+      let todayStr = realTodayStr;
+      let isSimulatedDate = false;
+      if (todayCount === 0) {
+        // 找最近有数据的日期（优先找未来，其次找过去）
+        const [nearestFuture] = await dbConn.execute(sql`SELECT DATE_FORMAT(MIN(date), '%Y-%m-%d') as d FROM itineraries WHERE date >= NOW()`);
+        const futureDate = ((nearestFuture as unknown) as any[])[0]?.d;
+        if (futureDate) {
+          todayStr = futureDate;
+          isSimulatedDate = true;
+        } else {
+          const [nearestPast] = await dbConn.execute(sql`SELECT DATE_FORMAT(MAX(date), '%Y-%m-%d') as d FROM itineraries WHERE date < NOW()`);
+          const pastDate = ((nearestPast as unknown) as any[])[0]?.d;
+          if (pastDate) { todayStr = pastDate; isSimulatedDate = true; }
+        }
+      }
 
       // 获取今天有行程的团组
       const [todayItins] = await dbConn.execute(sql`
@@ -2258,6 +2281,8 @@ export const appRouter = router({
 
       return {
         today: todayStr,
+        realToday: realTodayStr,
+        isSimulatedDate,
         currentTime: currentTimeStr,
         todayItineraries: itinsWithStatus,
         tomorrowItineraries: (tomorrowItins as unknown) as any[],
@@ -2270,10 +2295,24 @@ export const appRouter = router({
       if (!dbConn) return [];
       const { sql } = await import('drizzle-orm');
       const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+      // 智能日期逻辑
+      const realTodayStr = now.toISOString().slice(0, 10);
+      const [chk] = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM batchStaff WHERE DATE_FORMAT(date, '%Y-%m-%d') = ${realTodayStr}`);
+      const chkCnt = ((chk as unknown) as any[])[0]?.cnt ?? 0;
+      let todayStr = realTodayStr;
+      if (chkCnt === 0) {
+        const [nf] = await dbConn.execute(sql`SELECT DATE_FORMAT(MIN(date), '%Y-%m-%d') as d FROM batchStaff WHERE date >= NOW()`);
+        const fd = ((nf as unknown) as any[])[0]?.d;
+        if (fd) { todayStr = fd; }
+        else {
+          const [np] = await dbConn.execute(sql`SELECT DATE_FORMAT(MAX(date), '%Y-%m-%d') as d FROM batchStaff WHERE date < NOW()`);
+          const pd = ((np as unknown) as any[])[0]?.d;
+          if (pd) todayStr = pd;
+        }
+      }
 
       // 获取所有工作人员
       const [allStaff] = await dbConn.execute(sql`SELECT id, name, role, phone FROM staff ORDER BY role, name`);
@@ -2334,28 +2373,36 @@ export const appRouter = router({
       if (!dbConn) return [];
       const { sql } = await import('drizzle-orm');
       const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
+      // 智能日期逻辑
+      const realTodayStr = now.toISOString().slice(0, 10);
+      const [vc] = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM itineraries WHERE DATE_FORMAT(date, '%Y-%m-%d') = ${realTodayStr}`);
+      let todayStr = realTodayStr;
+      if (((vc as unknown) as any[])[0]?.cnt === 0) {
+        const [nf] = await dbConn.execute(sql`SELECT DATE_FORMAT(MIN(date), '%Y-%m-%d') as d FROM itineraries WHERE date >= NOW()`);
+        const fd = ((nf as unknown) as any[])[0]?.d;
+        if (fd) todayStr = fd;
+        else { const [np] = await dbConn.execute(sql`SELECT DATE_FORMAT(MAX(date), '%Y-%m-%d') as d FROM itineraries WHERE date < NOW()`); const pd = ((np as unknown) as any[])[0]?.d; if (pd) todayStr = pd; }
+      }
 
-      // 获取今天所有行程的景点信息
+      // 获取今天所有行程的景点信息（优先通过 locationId JOIN，其次通过名称匹配）
       const [venueItins] = await dbConn.execute(sql`
         SELECT 
-          i.locationName,
+          COALESCE(a.name, i.locationName) as locationName,
           i.startTime,
           i.endTime,
           i.groupId,
           g.name as groupName,
           g.code as groupCode,
           COALESCE(g.studentCount, 0) + COALESCE(g.teacherCount, 0) as headcount,
-          a.maxCapacity,
+          COALESCE(a.maxCapacity, a.capacity, 500) as maxCapacity,
           a.id as attractionId
         FROM itineraries i
         JOIN \`groups\` g ON i.groupId = g.id
-        LEFT JOIN attractions a ON a.name = i.locationName
+        LEFT JOIN attractions a ON (i.locationId = a.id OR (i.locationId IS NULL AND a.name = i.locationName))
         WHERE DATE_FORMAT(i.date, '%Y-%m-%d') = ${todayStr}
-          AND i.locationName IS NOT NULL
-          AND i.locationName != ''
+          AND (i.locationId IS NOT NULL OR (i.locationName IS NOT NULL AND i.locationName != ''))
         ORDER BY i.startTime ASC
       `);
 
@@ -2407,40 +2454,131 @@ export const appRouter = router({
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
 
-      const [bookings] = await dbConn.execute(sql`
+      // 智能日期逻辑：优先用今天，若无数据则找最近有数据的日期
+      const realTodayStr2 = now.toISOString().slice(0, 10);
+      const [dc] = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM dailyCards WHERE DATE_FORMAT(date, '%Y-%m-%d') = ${realTodayStr2}`);
+      let smartTodayStr = realTodayStr2;
+      if (((dc as unknown) as any[])[0]?.cnt === 0) {
+        const [nf2] = await dbConn.execute(sql`SELECT DATE_FORMAT(MIN(date), '%Y-%m-%d') as d FROM dailyCards WHERE date >= NOW()`);
+        const fd2 = ((nf2 as unknown) as any[])[0]?.d;
+        if (fd2) smartTodayStr = fd2;
+        else { const [np2] = await dbConn.execute(sql`SELECT DATE_FORMAT(MAX(date), '%Y-%m-%d') as d FROM dailyCards WHERE date < NOW()`); const pd2 = ((np2 as unknown) as any[])[0]?.d; if (pd2) smartTodayStr = pd2; }
+      }
+      const smartTomorrowDate = new Date(smartTodayStr);
+      smartTomorrowDate.setDate(smartTomorrowDate.getDate() + 1);
+      const smartTomorrowStr = smartTomorrowDate.toISOString().slice(0, 10);
+
+      // 从 dailyCards 关联 restaurants 获取餐饮安排
+      const [diningCards] = await dbConn.execute(sql`
         SELECT 
-          r.id,
-          r.name as restaurantName,
-          r.address,
-          r.bookingTime,
-          r.bookingPax,
-          DATE_FORMAT(r.bookingDate, '%Y-%m-%d') as bookingDate,
+          dc.id as cardId,
+          DATE_FORMAT(dc.date, '%Y-%m-%d') as bookingDate,
+          dc.groupId,
           g.name as groupName,
-          g.code as groupCode
-        FROM restaurants r
-        LEFT JOIN \`groups\` g ON r.bookingGroupId = g.id
-        WHERE DATE_FORMAT(r.bookingDate, '%Y-%m-%d') IN (${todayStr}, ${tomorrowStr})
-          AND r.bookingTime IS NOT NULL
-        ORDER BY r.bookingDate ASC, r.bookingTime ASC
+          g.code as groupCode,
+          COALESCE(g.studentCount, 0) + COALESCE(g.teacherCount, 0) as pax,
+          -- 早餐
+          br.id as breakfastId,
+          COALESCE(br.name, dc.breakfastRestaurant) as breakfastName,
+          COALESCE(br.address, dc.breakfastAddress) as breakfastAddr,
+          -- 午餐
+          lr.id as lunchId,
+          COALESCE(lr.name, dc.lunchRestaurant) as lunchName,
+          COALESCE(lr.address, dc.lunchAddress) as lunchAddr,
+          -- 晚餐
+          dr.id as dinnerId,
+          COALESCE(dr.name, dc.dinnerRestaurant) as dinnerName,
+          COALESCE(dr.address, dc.dinnerAddress) as dinnerAddr
+        FROM dailyCards dc
+        JOIN \`groups\` g ON dc.groupId = g.id
+        LEFT JOIN restaurants br ON dc.breakfastRestaurantId = br.id
+        LEFT JOIN restaurants lr ON dc.lunchRestaurantId = lr.id
+        LEFT JOIN restaurants dr ON dc.dinnerRestaurantId = dr.id
+        WHERE DATE_FORMAT(dc.date, '%Y-%m-%d') IN (${smartTodayStr}, ${smartTomorrowStr})
+          AND (dc.breakfastRestaurant IS NOT NULL OR dc.lunchRestaurant IS NOT NULL OR dc.dinnerRestaurant IS NOT NULL
+               OR dc.breakfastRestaurantId IS NOT NULL OR dc.lunchRestaurantId IS NOT NULL OR dc.dinnerRestaurantId IS NOT NULL)
+        ORDER BY dc.date ASC
       `);
 
-      return ((bookings as unknown) as any[]).map((b: any) => {
-        let hoursUntil = 0;
-        let urgency: 'now' | 'soon' | 'later' | 'tomorrow' = 'later';
-        if (b.bookingDate === todayStr && b.bookingTime) {
-          const [bh, bm] = b.bookingTime.split(':').map(Number);
-          const nowMins = currentHour * 60 + currentMinute;
-          const bookingMins = bh * 60 + bm;
-          hoursUntil = (bookingMins - nowMins) / 60;
-          if (hoursUntil <= 0) urgency = 'now';
-          else if (hoursUntil <= 1) urgency = 'soon';
-          else urgency = 'later';
-        } else {
-          urgency = 'tomorrow';
-          hoursUntil = 24;
+      // 将每天的三餐展开为独立餐饮记录
+      const result: any[] = [];
+      const mealTimes: Record<string, string> = { breakfast: '08:00', lunch: '12:00', dinner: '18:30' };
+      for (const card of (diningCards as unknown) as any[]) {
+        const meals = [
+          { type: 'breakfast', name: card.breakfastName, addr: card.breakfastAddr, time: mealTimes.breakfast },
+          { type: 'lunch', name: card.lunchName, addr: card.lunchAddr, time: mealTimes.lunch },
+          { type: 'dinner', name: card.dinnerName, addr: card.dinnerAddr, time: mealTimes.dinner },
+        ];
+        for (const meal of meals) {
+          if (!meal.name) continue;
+          let hoursUntil = 0;
+          let urgency: 'now' | 'soon' | 'later' | 'tomorrow' = 'later';
+          if (card.bookingDate === smartTodayStr) {
+            const [mh, mm] = meal.time.split(':').map(Number);
+            const nowMins = currentHour * 60 + currentMinute;
+            const mealMins = mh * 60 + mm;
+            hoursUntil = (mealMins - nowMins) / 60;
+            if (hoursUntil <= 0) urgency = 'now';
+            else if (hoursUntil <= 1) urgency = 'soon';
+            else urgency = 'later';
+          } else {
+            urgency = 'tomorrow';
+            hoursUntil = 24;
+          }
+          result.push({
+            id: `${card.cardId}-${meal.type}`,
+            restaurantName: meal.name,
+            address: meal.addr,
+            bookingTime: meal.time,
+            bookingPax: card.pax,
+            bookingDate: card.bookingDate,
+            groupName: card.groupName,
+            groupCode: card.groupCode,
+            mealType: meal.type,
+            hoursUntil: Math.round(hoursUntil * 10) / 10,
+            urgency,
+          });
         }
-        return { ...b, hoursUntil: Math.round(hoursUntil * 10) / 10, urgency };
-      });
+      }
+
+      // 如果 dailyCards 无数据，尝试从 restaurants.bookingDate 获取
+      if (result.length === 0) {
+        const [bookings] = await dbConn.execute(sql`
+          SELECT 
+            r.id,
+            r.name as restaurantName,
+            r.address,
+            r.bookingTime,
+            r.bookingPax,
+            DATE_FORMAT(r.bookingDate, '%Y-%m-%d') as bookingDate,
+            g.name as groupName,
+            g.code as groupCode
+          FROM restaurants r
+          LEFT JOIN \`groups\` g ON r.bookingGroupId = g.id
+          WHERE DATE_FORMAT(r.bookingDate, '%Y-%m-%d') IN (${todayStr}, ${tomorrowStr})
+            AND r.bookingTime IS NOT NULL
+          ORDER BY r.bookingDate ASC, r.bookingTime ASC
+        `);
+        return ((bookings as unknown) as any[]).map((b: any) => {
+          let hoursUntil = 0;
+          let urgency: 'now' | 'soon' | 'later' | 'tomorrow' = 'later';
+          if (b.bookingDate === todayStr && b.bookingTime) {
+            const [bh, bm] = b.bookingTime.split(':').map(Number);
+            const nowMins = currentHour * 60 + currentMinute;
+            const bookingMins = bh * 60 + bm;
+            hoursUntil = (bookingMins - nowMins) / 60;
+            if (hoursUntil <= 0) urgency = 'now';
+            else if (hoursUntil <= 1) urgency = 'soon';
+            else urgency = 'later';
+          } else {
+            urgency = 'tomorrow';
+            hoursUntil = 24;
+          }
+          return { ...b, hoursUntil: Math.round(hoursUntil * 10) / 10, urgency };
+        });
+      }
+
+      return result;
     }),
 
     // 获取今日住宿统计
@@ -2449,7 +2587,16 @@ export const appRouter = router({
       if (!dbConn) return { hk: 0, sz: 0, total: 0, groups: [] };
       const { sql } = await import('drizzle-orm');
       const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
+      // 智能日期逻辑
+      const realTodayStr = now.toISOString().slice(0, 10);
+      const [ac] = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM scheduleBlocks WHERE DATE_FORMAT(date, '%Y-%m-%d') = ${realTodayStr}`);
+      let todayStr = realTodayStr;
+      if (((ac as unknown) as any[])[0]?.cnt === 0) {
+        const [nf] = await dbConn.execute(sql`SELECT DATE_FORMAT(MIN(date), '%Y-%m-%d') as d FROM scheduleBlocks WHERE date >= NOW()`);
+        const fd = ((nf as unknown) as any[])[0]?.d;
+        if (fd) todayStr = fd;
+        else { const [np] = await dbConn.execute(sql`SELECT DATE_FORMAT(MAX(date), '%Y-%m-%d') as d FROM scheduleBlocks WHERE date < NOW()`); const pd = ((np as unknown) as any[])[0]?.d; if (pd) todayStr = pd; }
+      }
 
       // 通过 scheduleBlocks 判断今天各团组在哪个城市
       const [blocks] = await dbConn.execute(sql`

@@ -7,7 +7,7 @@ import {
   Users, MapPin, Clock, AlertTriangle, CheckCircle2, Circle,
   Utensils, Plane, Building2, UserCheck, UserX, Activity,
   TrendingUp, Navigation, CalendarClock, ChevronRight, RefreshCw,
-  Hotel, Bus, Star, Zap, Bell, BellRing, Edit3
+  Hotel, Bus, Star, Zap, Bell, BellRing, Edit3, Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -469,9 +469,286 @@ function UrgentAdjustPanel({ allItins }: { allItins: any[] }) {
   );
 }
 
+// ===== 详情弹窗：工作人员 =====
+function StaffDetailDialog({ open, onClose, staffStatus }: { open: boolean; onClose: () => void; staffStatus: any[] }) {
+  const busyStaff = staffStatus.filter(s => s.status === 'busy');
+  const scheduledStaff = staffStatus.filter(s => s.status === 'scheduled');
+  const freeStaff = staffStatus.filter(s => s.status === 'free');
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-blue-500" />
+            工作人員實時狀態詳情
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="p-3 bg-emerald-50 rounded-lg">
+              <div className="text-2xl font-bold text-emerald-600">{busyStaff.length}</div>
+              <div className="text-xs text-emerald-700">當前在崗</div>
+            </div>
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{scheduledStaff.length}</div>
+              <div className="text-xs text-blue-700">今日待命</div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-2xl font-bold text-gray-600">{freeStaff.length}</div>
+              <div className="text-xs text-gray-700">空閒可指派</div>
+            </div>
+          </div>
+          {busyStaff.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-emerald-700 mb-2 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />當前在崗
+              </div>
+              <div className="space-y-2">{busyStaff.map((s: any) => <StaffStatusCard key={s.id} staff={s} />)}</div>
+            </div>
+          )}
+          {scheduledStaff.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-blue-400" />今日待命
+              </div>
+              <div className="space-y-2">{scheduledStaff.map((s: any) => <StaffStatusCard key={s.id} staff={s} />)}</div>
+            </div>
+          )}
+          {freeStaff.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-gray-300" />空閒可指派
+              </div>
+              <div className="space-y-2">{freeStaff.map((s: any) => <StaffStatusCard key={s.id} staff={s} />)}</div>
+            </div>
+          )}
+          {staffStatus.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <UserX className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">暫無工作人員指派數據</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===== 详情弹窗：景点容量 =====
+function VenueDetailDialog({ open, onClose, venueAlerts }: { open: boolean; onClose: () => void; venueAlerts: any[] }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Navigation className="w-5 h-5 text-orange-500" />
+            景點容量監控詳情
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {venueAlerts.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400" />
+              <p className="text-sm text-emerald-600 font-medium">今日所有景點容量均正常</p>
+              <p className="text-xs mt-1">無超負荷風險</p>
+            </div>
+          ) : (
+            venueAlerts.map((v: any) => (
+              <div key={v.name} className={`border rounded-lg p-4 ${
+                v.alertLevel === 'critical' ? 'bg-red-50 border-red-200' :
+                v.alertLevel === 'warning' ? 'bg-amber-50 border-amber-200' :
+                'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-slate-600" />
+                    <span className="font-semibold">{v.name}</span>
+                  </div>
+                  <Badge variant="outline" className={`${
+                    v.alertLevel === 'critical' ? 'text-red-600 border-red-300' :
+                    v.alertLevel === 'warning' ? 'text-amber-600 border-amber-300' :
+                    'text-emerald-600 border-emerald-300'
+                  }`}>
+                    {v.alertLevel === 'critical' ? '超負荷預警' : v.alertLevel === 'warning' ? '即將滿員' : '容量健康'}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+                  <div className="bg-white rounded p-2">
+                    <div className="text-lg font-bold text-slate-800">{v.currentPax}</div>
+                    <div className="text-xs text-muted-foreground">當前人數</div>
+                  </div>
+                  <div className="bg-white rounded p-2">
+                    <div className="text-lg font-bold text-slate-800">{v.maxCapacity}</div>
+                    <div className="text-xs text-muted-foreground">最大容量</div>
+                  </div>
+                  <div className="bg-white rounded p-2">
+                    <div className={`text-lg font-bold ${
+                      v.alertLevel === 'critical' ? 'text-red-600' :
+                      v.alertLevel === 'warning' ? 'text-amber-600' : 'text-emerald-600'
+                    }`}>
+                      {v.maxCapacity > 0 ? Math.round(v.currentPax / v.maxCapacity * 100) : 0}%
+                    </div>
+                    <div className="text-xs text-muted-foreground">使用率</div>
+                  </div>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      v.alertLevel === 'critical' ? 'bg-red-500' :
+                      v.alertLevel === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(v.maxCapacity > 0 ? Math.round(v.currentPax / v.maxCapacity * 100) : 0, 100)}%` }}
+                  />
+                </div>
+                {v.currentGroups?.length > 0 && (
+                  <div className="mb-2">
+                    <div className="text-xs font-semibold text-slate-600 mb-1">當前在場團組：</div>
+                    <div className="flex flex-wrap gap-1">
+                      {v.currentGroups.map((g: any) => (
+                        <span key={g.groupId} className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                          {g.groupCode}（{g.headcount}人）
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {v.upcomingGroups?.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-slate-600 mb-1">即將抵達：</div>
+                    <div className="flex flex-wrap gap-1">
+                      {v.upcomingGroups.map((g: any) => (
+                        <span key={g.groupId} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                          {g.groupCode}（{g.headcount}人）{g.hoursUntil > 0 ? ` · ${hoursLabel(g.hoursUntil)}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===== 详情弹窗：餐饮预备 =====
+function DiningDetailDialog({ open, onClose, diningAlerts }: { open: boolean; onClose: () => void; diningAlerts: any[] }) {
+  const urgencyConfig = {
+    now: { label: '立即準備', color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
+    soon: { label: '即將到達', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
+    later: { label: '稍後準備', color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
+    tomorrow: { label: '明日預訂', color: 'text-slate-600', bg: 'bg-slate-50 border-slate-200' },
+  };
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Utensils className="w-5 h-5 text-rose-500" />
+            餐飲預備詳情
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {diningAlerts.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Utensils className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">今明兩日無餐廳預訂</p>
+            </div>
+          ) : (
+            diningAlerts.map((d: any, idx: number) => {
+              const cfg = urgencyConfig[d.urgency as keyof typeof urgencyConfig] || urgencyConfig.later;
+              return (
+                <div key={`${d.id}-${idx}`} className={`border rounded-lg p-4 ${cfg.bg}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Utensils className="w-4 h-4 text-rose-500" />
+                        <span className="font-semibold">{d.restaurantName}</span>
+                        <Badge variant="outline" className={`text-xs ${cfg.color} border-current`}>{cfg.label}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {d.groupCode} · {d.headcount} 人 · {d.mealType === 'lunch' ? '午餐' : d.mealType === 'dinner' ? '晚餐' : '早餐'}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-slate-700">{d.mealTime ? formatTime(d.mealTime) : '--'}</div>
+                      <div className="text-xs text-muted-foreground">{d.date}</div>
+                    </div>
+                  </div>
+                  {d.hoursUntil !== undefined && d.hoursUntil > 0 && (
+                    <div className="text-xs text-slate-600 mt-1">
+                      <Clock className="w-3 h-3 inline mr-1" />
+                      預計 {hoursLabel(d.hoursUntil)} 抵達
+                    </div>
+                  )}
+                  {d.notes && <div className="text-xs text-muted-foreground mt-1 italic">{d.notes}</div>}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===== 详情弹窗：住宿统计 =====
+function AccomDetailDialog({ open, onClose, accommodation }: { open: boolean; onClose: () => void; accommodation: any }) {
+  const groups = accommodation?.groups || [];
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Hotel className="w-5 h-5 text-purple-500" />
+            今日住宿統計詳情
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-4 bg-purple-50 rounded-lg text-center">
+              <div className="text-3xl font-bold text-purple-600">{accommodation?.hk || 0}</div>
+              <div className="text-sm text-purple-700 mt-1">香港住宿人數</div>
+            </div>
+            <div className="p-4 bg-indigo-50 rounded-lg text-center">
+              <div className="text-3xl font-bold text-indigo-600">{accommodation?.sz || 0}</div>
+              <div className="text-sm text-indigo-700 mt-1">深圳住宿人數</div>
+            </div>
+          </div>
+          {groups.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-2">各團組住宿詳情</div>
+              <div className="space-y-2">
+                {groups.map((g: any) => (
+                  <div key={g.groupId} className="flex items-center gap-3 p-3 bg-white border rounded-lg">
+                    <span className="text-xs font-bold text-slate-700 w-10">{g.groupCode}</span>
+                    <span className="flex-1 text-xs text-slate-600 truncate">{g.groupName}</span>
+                    <Badge variant="outline" className={`text-xs ${
+                      g.location === 'hk' ? 'text-purple-600 border-purple-300' : 'text-indigo-600 border-indigo-300'
+                    }`}>
+                      {g.location === 'hk' ? '香港' : '深圳'}
+                    </Badge>
+                    <span className="text-xs font-semibold text-slate-700">{g.headcount} 人</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ===== 主仪表盘组件 =====
 export default function OperationsDashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [staffDetailOpen, setStaffDetailOpen] = useState(false);
+  const [venueDetailOpen, setVenueDetailOpen] = useState(false);
+  const [diningDetailOpen, setDiningDetailOpen] = useState(false);
+  const [accomDetailOpen, setAccomDetailOpen] = useState(false);
 
   const { data: overview, refetch: refetchOverview } = trpc.dashboard.overview.useQuery(undefined, {
     refetchInterval: 60000, // 每分钟刷新
@@ -530,6 +807,16 @@ export default function OperationsDashboard() {
         </Button>
       </div>
 
+      {/* 模拟日期提示横幅 */}
+      {overview?.isSimulatedDate && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+          <Info className="w-4 h-4 flex-shrink-0 text-amber-500" />
+          <span className="text-xs">
+            <span className="font-semibold">模擬展示模式</span> · 今日（{new Date().toLocaleDateString('zh-HK')}）暫無活躍行程，目前展示的是最近項目活躍日期 <span className="font-semibold">{overview.today}</span> 的數據。項目正式啟動後將自動切換為實時數據。
+          </span>
+        </div>
+      )}
+
       <StatusBar
         currentTime={overview?.currentTime || ""}
         today={overview?.today || ""}
@@ -537,8 +824,9 @@ export default function OperationsDashboard() {
         activeGroups={activeGroups}
       />
 
-      {/* 顶部概览数字 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      {/* 顶部概览数字 — 满屏6列，可点击展开详情 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* 进行中行程 */}
         <Card className="bg-white border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -549,55 +837,99 @@ export default function OperationsDashboard() {
             <div className="text-xs text-muted-foreground">共 {todayItins.length} 個今日行程</div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-0 shadow-sm">
+
+        {/* 在岗人员 — 可点击 */}
+        <Card
+          className="bg-white border-0 shadow-sm cursor-pointer hover:shadow-md hover:border-blue-200 border transition-all"
+          onClick={() => setStaffDetailOpen(true)}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <UserCheck className="w-4 h-4 text-blue-500" />
               <span className="text-xs text-muted-foreground">在崗人員</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto" />
             </div>
-            <div className="text-2xl font-bold text-blue-600">{busyStaff.length}</div>
+            <div className="text-2xl font-bold text-blue-600">{busyStaff.length + scheduledStaff.length}</div>
             <div className="text-xs text-muted-foreground">{freeStaff.length} 人空閒可指派</div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-0 shadow-sm">
+
+        {/* 香港住宿 — 可点击 */}
+        <Card
+          className="bg-white border-0 shadow-sm cursor-pointer hover:shadow-md hover:border-purple-200 border transition-all"
+          onClick={() => setAccomDetailOpen(true)}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <Hotel className="w-4 h-4 text-purple-500" />
               <span className="text-xs text-muted-foreground">今日香港住宿</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto" />
             </div>
             <div className="text-2xl font-bold text-purple-600">{accommodation?.hk || 0}</div>
             <div className="text-xs text-muted-foreground">人</div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-0 shadow-sm">
+
+        {/* 深圳住宿 — 可点击 */}
+        <Card
+          className="bg-white border-0 shadow-sm cursor-pointer hover:shadow-md hover:border-indigo-200 border transition-all"
+          onClick={() => setAccomDetailOpen(true)}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <Building2 className="w-4 h-4 text-indigo-500" />
               <span className="text-xs text-muted-foreground">今日深圳住宿</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto" />
             </div>
             <div className="text-2xl font-bold text-indigo-600">{accommodation?.sz || 0}</div>
             <div className="text-xs text-muted-foreground">人</div>
           </CardContent>
         </Card>
-        <Card className={`border-0 shadow-sm ${criticalVenues.length > 0 ? 'bg-red-50' : warningVenues.length > 0 ? 'bg-amber-50' : 'bg-white'}`}>
+
+        {/* 景点预警 — 可点击 */}
+        <Card
+          className={`border shadow-sm cursor-pointer hover:shadow-md transition-all ${
+            criticalVenues.length > 0 ? 'bg-red-50 border-red-200 hover:border-red-400' :
+            warningVenues.length > 0 ? 'bg-amber-50 border-amber-200 hover:border-amber-400' :
+            'bg-white border-transparent hover:border-emerald-200'
+          }`}
+          onClick={() => setVenueDetailOpen(true)}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className={`w-4 h-4 ${criticalVenues.length > 0 ? 'text-red-500' : warningVenues.length > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
+              <AlertTriangle className={`w-4 h-4 ${
+                criticalVenues.length > 0 ? 'text-red-500' :
+                warningVenues.length > 0 ? 'text-amber-500' : 'text-gray-400'
+              }`} />
               <span className="text-xs text-muted-foreground">景點預警</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto" />
             </div>
-            <div className={`text-2xl font-bold ${criticalVenues.length > 0 ? 'text-red-600' : warningVenues.length > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+            <div className={`text-2xl font-bold ${
+              criticalVenues.length > 0 ? 'text-red-600' :
+              warningVenues.length > 0 ? 'text-amber-600' : 'text-gray-400'
+            }`}>
               {criticalVenues.length + warningVenues.length}
             </div>
             <div className="text-xs text-muted-foreground">
-              {criticalVenues.length > 0 ? `${criticalVenues.length} 個超負荷` : warningVenues.length > 0 ? `${warningVenues.length} 個即將滿員` : '全部健康'}
+              {criticalVenues.length > 0 ? `${criticalVenues.length} 個超負荷` :
+               warningVenues.length > 0 ? `${warningVenues.length} 個即將滿員` : '全部健康'}
             </div>
           </CardContent>
         </Card>
-        <Card className={`border-0 shadow-sm ${urgentDining.length > 0 ? 'bg-amber-50' : 'bg-white'}`}>
+
+        {/* 餐饮提醒 — 可点击 */}
+        <Card
+          className={`border shadow-sm cursor-pointer hover:shadow-md transition-all ${
+            urgentDining.length > 0 ? 'bg-amber-50 border-amber-200 hover:border-amber-400' :
+            'bg-white border-transparent hover:border-rose-200'
+          }`}
+          onClick={() => setDiningDetailOpen(true)}
+        >
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <Utensils className={`w-4 h-4 ${urgentDining.length > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
               <span className="text-xs text-muted-foreground">餐飲提醒</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground ml-auto" />
             </div>
             <div className={`text-2xl font-bold ${urgentDining.length > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
               {diningAlerts.length}
@@ -732,11 +1064,15 @@ export default function OperationsDashboard() {
         {/* 右列：工作人员状态 + 景点预警 + 餐饮提醒 */}
         <div className="space-y-4">
           {/* 工作人员实时状态 */}
-          <Card className="bg-white border-0 shadow-sm">
+          <Card
+            className="bg-white border-0 shadow-sm cursor-pointer hover:shadow-md transition-all"
+            onClick={() => setStaffDetailOpen(true)}
+          >
             <CardHeader className="pb-3 pt-4 px-5">
               <CardTitle className="text-base flex items-center gap-2">
                 <Users className="w-4 h-4 text-blue-500" />
                 工作人員實時狀態
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
               </CardTitle>
               <div className="flex gap-3 text-xs mt-1">
                 <span className="flex items-center gap-1 text-emerald-600">
@@ -789,11 +1125,15 @@ export default function OperationsDashboard() {
           </Card>
 
           {/* 景点人流预警 */}
-          <Card className="bg-white border-0 shadow-sm">
+          <Card
+            className="bg-white border-0 shadow-sm cursor-pointer hover:shadow-md transition-all"
+            onClick={() => setVenueDetailOpen(true)}
+          >
             <CardHeader className="pb-3 pt-4 px-5">
               <CardTitle className="text-base flex items-center gap-2">
                 <Navigation className="w-4 h-4 text-orange-500" />
                 景點人流監控
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
               </CardTitle>
             </CardHeader>
             <CardContent className="px-5 pb-4">
@@ -812,11 +1152,15 @@ export default function OperationsDashboard() {
           </Card>
 
           {/* 餐饮预备提醒 */}
-          <Card className="bg-white border-0 shadow-sm">
+          <Card
+            className="bg-white border-0 shadow-sm cursor-pointer hover:shadow-md transition-all"
+            onClick={() => setDiningDetailOpen(true)}
+          >
             <CardHeader className="pb-3 pt-4 px-5">
               <CardTitle className="text-base flex items-center gap-2">
                 <Utensils className="w-4 h-4 text-rose-500" />
                 餐飲預備提醒
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
               </CardTitle>
             </CardHeader>
             <CardContent className="px-5 pb-4">
@@ -836,6 +1180,28 @@ export default function OperationsDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* 詳情弹窗 */}
+      <StaffDetailDialog
+        open={staffDetailOpen}
+        onClose={() => setStaffDetailOpen(false)}
+        staffStatus={staffStatus}
+      />
+      <VenueDetailDialog
+        open={venueDetailOpen}
+        onClose={() => setVenueDetailOpen(false)}
+        venueAlerts={venueAlerts}
+      />
+      <DiningDetailDialog
+        open={diningDetailOpen}
+        onClose={() => setDiningDetailOpen(false)}
+        diningAlerts={diningAlerts}
+      />
+      <AccomDetailDialog
+        open={accomDetailOpen}
+        onClose={() => setAccomDetailOpen(false)}
+        accommodation={accommodation}
+      />
     </div>
   );
 }
