@@ -362,7 +362,41 @@ export const appRouter = router({
 
   groups: router({
     list: protectedProcedure.query(async () => {
-      return await db.getAllGroups();
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { groups: groupsTable } = await import('../drizzle/schema');
+      const { sql } = await import('drizzle-orm');
+      return await dbConn.select({
+        id: groupsTable.id,
+        projectId: groupsTable.projectId,
+        name: groupsTable.name,
+        code: groupsTable.code,
+        startDate: sql<string>`DATE_FORMAT(${groupsTable.startDate}, '%Y-%m-%d')`,
+        endDate: sql<string>`DATE_FORMAT(${groupsTable.endDate}, '%Y-%m-%d')`,
+        days: groupsTable.days,
+        type: groupsTable.type,
+        status: groupsTable.status,
+        studentCount: groupsTable.studentCount,
+        teacherCount: groupsTable.teacherCount,
+        totalCount: groupsTable.totalCount,
+        hotel: groupsTable.hotel,
+        color: groupsTable.color,
+        tags: groupsTable.tags,
+        contact: groupsTable.contact,
+        phone: groupsTable.phone,
+        emergencyContact: groupsTable.emergencyContact,
+        emergencyPhone: groupsTable.emergencyPhone,
+        notes: groupsTable.notes,
+        requiredItineraries: groupsTable.requiredItineraries,
+        batch_id: groupsTable.batch_id,
+        batch_code: groupsTable.batch_code,
+        start_city: groupsTable.start_city,
+        crossing_date: sql<string>`DATE_FORMAT(${groupsTable.crossing_date}, '%Y-%m-%d')`,
+        sister_school_id: groupsTable.sister_school_id,
+        flight_info: groupsTable.flight_info,
+        school_list: groupsTable.school_list,
+        createdBy: groupsTable.createdBy,
+      }).from(groupsTable);
     }),
     
     get: protectedProcedure
@@ -1834,15 +1868,15 @@ export const appRouter = router({
         const dbConn = await db.getDb();
         if (!dbConn) return [];
         const { batchStaff, groups } = await import('../drizzle/schema');
-        const { eq } = await import('drizzle-orm');
+        const { eq, sql } = await import('drizzle-orm');
         const assignments = await dbConn.select({
           assignment: {
             id: batchStaff.id,
             groupId: batchStaff.groupId,
             staffId: batchStaff.staffId,
             role: batchStaff.role,
-            startDate: batchStaff.startDate,
-            endDate: batchStaff.endDate,
+            startDate: sql<string>`DATE_FORMAT(${batchStaff.startDate}, '%Y-%m-%d')`,
+            endDate: sql<string>`DATE_FORMAT(${batchStaff.endDate}, '%Y-%m-%d')`,
             currentTask: batchStaff.currentTask,
             notes: batchStaff.notes,
           },
@@ -1850,8 +1884,8 @@ export const appRouter = router({
             id: groups.id,
             name: groups.name,
             code: groups.code,
-            startDate: groups.startDate,
-            endDate: groups.endDate,
+            startDate: sql<string>`DATE_FORMAT(${groups.startDate}, '%Y-%m-%d')`,
+            endDate: sql<string>`DATE_FORMAT(${groups.endDate}, '%Y-%m-%d')`,
           },
         }).from(batchStaff)
           .leftJoin(groups, eq(batchStaff.groupId, groups.id))
@@ -1868,15 +1902,15 @@ export const appRouter = router({
         const dbConn = await db.getDb();
         if (!dbConn) return [];
         const { batchStaff, staff } = await import('../drizzle/schema');
-        const { eq } = await import('drizzle-orm');
+        const { eq, sql } = await import('drizzle-orm');
         const result = await dbConn.select({
           assignment: {
             id: batchStaff.id,
             groupId: batchStaff.groupId,
             staffId: batchStaff.staffId,
             role: batchStaff.role,
-            startDate: batchStaff.startDate,
-            endDate: batchStaff.endDate,
+            startDate: sql<string>`DATE_FORMAT(${batchStaff.startDate}, '%Y-%m-%d')`,
+            endDate: sql<string>`DATE_FORMAT(${batchStaff.endDate}, '%Y-%m-%d')`,
             notes: batchStaff.notes,
           },
           staffMember: {
