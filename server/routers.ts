@@ -2477,6 +2477,87 @@ export const appRouter = router({
     }),
 
     // 获取航班信息
+    // 紧急调整行程点
+    urgentAdjust: protectedProcedure
+      .input(z.object({
+        itineraryId: z.number(),
+        locationName: z.string().optional(),
+        description: z.string().optional(),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        notes: z.string().optional(),
+        reason: z.string(), // 调整原因（必填）
+        notifyAll: z.boolean().default(false), // 是否通知全员
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error('DB not available');
+        const { sql } = await import('drizzle-orm');
+        // 1. 获取原行程点信息
+        const [origRows] = await dbConn.execute(sql`
+          SELECT i.id, i.locationName, i.description, i.startTime, i.endTime, i.notes,
+            DATE_FORMAT(i.date, '%Y-%m-%d') as date,
+            g.name as groupName, g.code as groupCode
+          FROM itineraries i
+          JOIN \`groups\` g ON g.id = i.groupId
+          WHERE i.id = ${input.itineraryId}
+        `);
+        const orig = ((origRows as unknown) as any[])[0];
+        if (!orig) throw new Error('行程點不存在');
+        // 2. 更新行程點（使用 Drizzle sql 模板安全参数化）
+        const hasUpdate = input.locationName !== undefined || input.description !== undefined ||
+          input.startTime !== undefined || input.endTime !== undefined || input.notes !== undefined;
+        if (hasUpdate) {
+          await dbConn.execute(sql`
+            UPDATE itineraries SET
+              locationName = COALESCE(${input.locationName ?? null}, locationName),
+              description = COALESCE(${input.description ?? null}, description),
+              startTime = COALESCE(${input.startTime ?? null}, startTime),
+              endTime = COALESCE(${input.endTime ?? null}, endTime),
+              notes = COALESCE(${input.notes ?? null}, notes)
+            WHERE id = ${input.itineraryId}
+          `);
+        }
+        // 3. 如果通知全员，向所有用户写入通知
+        if (input.notifyAll) {
+          const [allUsers] = await dbConn.execute(sql`SELECT id FROM users`);
+          const userList = (allUsers as unknown) as any[];
+          const title = `【緊急調整】${orig.groupCode} ${orig.date} 行程點變更`;
+          const content = `${orig.groupName} 在 ${orig.date} 的行程點「${orig.locationName || orig.description}」已緊急調整。\n調整原因：${input.reason}\n` +
+            (input.locationName ? `地點：${orig.locationName} → ${input.locationName}\n` : '') +
+            (input.startTime ? `時間：${orig.startTime}–${orig.endTime} → ${input.startTime}–${input.endTime ?? orig.endTime}\n` : '') +
+            (input.description ? `內容：${input.description}\n` : '') +
+            (input.notes ? `備註：${input.notes}` : '');
+          for (const u of userList) {
+            await dbConn.execute(sql`
+              INSERT INTO notifications (userId, type, title, content, isRead, createdAt)
+              VALUES (${u.id}, 'change', ${title}, ${content}, false, NOW())
+            `);
+          }
+          // 同时通知 owner
+          const { notifyOwner } = await import('./_core/notification');
+          await notifyOwner({ title, content });
+        }
+        return { success: true, groupName: orig.groupName, date: orig.date };
+      }),
+
+    // 获取最近调整记录
+    recentAdjustments: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { sql } = await import('drizzle-orm');
+      // 从 notifications 表中获取最近的 change 类型通知作为调整记录
+      const [rows] = await dbConn.execute(sql`
+        SELECT n.title, n.content, DATE_FORMAT(n.createdAt, '%Y-%m-%d %H:%i') as createdAt
+        FROM notifications n
+        WHERE n.type = 'change'
+        GROUP BY n.title, n.content, n.createdAt
+        ORDER BY n.createdAt DESC
+        LIMIT 5
+      `);
+      return (rows as unknown) as any[];
+    }),
+
     flightInfo: protectedProcedure.query(async () => {
       const dbConn = await db.getDb();
       if (!dbConn) return { arrivals: [], departures: [] };

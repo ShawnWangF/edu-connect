@@ -30,7 +30,7 @@ import { trpc } from "@/lib/trpc";
 
 const menuItems = [
   { icon: Activity, label: "實時指揮中心", path: "/" },
-  { icon: CalendarDays, label: "排程總覽", path: "/projects" },
+  { icon: CalendarDays, label: "排程總覽", path: "/schedule" },
   { icon: Layers, label: "批次管理", path: "/batches" },
   { icon: Users, label: "團組管理", path: "/groups" },
   { icon: Users, label: "工作人員管理", path: "/members" },

@@ -42,6 +42,11 @@ function Router() {
           <ScheduleOverview />
         </DashboardLayout>
       </Route>
+      <Route path="/schedule">
+        <DashboardLayout>
+          <ScheduleOverview />
+        </DashboardLayout>
+      </Route>
       <Route path="/projects/:id">
         <DashboardLayout>
           <ProjectDetail />

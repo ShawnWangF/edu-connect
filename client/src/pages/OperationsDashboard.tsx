@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,16 @@ import {
   Users, MapPin, Clock, AlertTriangle, CheckCircle2, Circle,
   Utensils, Plane, Building2, UserCheck, UserX, Activity,
   TrendingUp, Navigation, CalendarClock, ChevronRight, RefreshCw,
-  Hotel, Bus, Star
+  Hotel, Bus, Star, Zap, Bell, BellRing, Edit3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 // ===== 辅助函数 =====
 const roleLabel: Record<string, string> = {
@@ -283,6 +290,185 @@ function DiningCard({ booking }: { booking: any }) {
   );
 }
 
+// ===== 紧急调整快捷窗口 =====
+function UrgentAdjustPanel({ allItins }: { allItins: any[] }) {
+  const [open, setOpen] = useState(false);
+  const [selectedItinId, setSelectedItinId] = useState<string>("");
+  const [form, setForm] = useState({
+    locationName: "", description: "", startTime: "", endTime: "",
+    notes: "", reason: "", notifyAll: true
+  });
+  const utils = trpc.useUtils();
+  const { data: recentAdj = [] } = trpc.dashboard.recentAdjustments.useQuery(undefined, { refetchInterval: 30000 });
+  const adjustMutation = trpc.dashboard.urgentAdjust.useMutation({
+    onSuccess: (data) => {
+      toast.success("調整已提交", {
+        description: `${data.groupName} ${data.date} 行程點已更新${form.notifyAll ? "，已通知全员" : ""}`,
+      });
+      utils.dashboard.recentAdjustments.invalidate();
+      utils.dashboard.overview.invalidate();
+      setOpen(false);
+      setForm({ locationName: "", description: "", startTime: "", endTime: "", notes: "", reason: "", notifyAll: true });
+      setSelectedItinId("");
+    },
+    onError: (e) => toast.error("提交失敗", { description: e.message }),
+  });
+  const selectedItin = useMemo(
+    () => allItins.find(i => String(i.itinId) === selectedItinId),
+    [allItins, selectedItinId]
+  );
+  const handleSubmit = () => {
+    if (!selectedItinId || !form.reason.trim()) {
+      toast.error("請選擇行程點並填寫調整原因");
+      return;
+    }
+    adjustMutation.mutate({
+      itineraryId: Number(selectedItinId),
+      locationName: form.locationName || undefined,
+      description: form.description || undefined,
+      startTime: form.startTime || undefined,
+      endTime: form.endTime || undefined,
+      notes: form.notes || undefined,
+      reason: form.reason,
+      notifyAll: form.notifyAll,
+    });
+  };
+  return (
+    <>
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-red-500 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-red-800">緊急行程調整</div>
+              <div className="text-xs text-red-600">快速修改行程點 · 可一鍵通知全員</div>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setOpen(true)}
+            className="bg-red-500 hover:bg-red-600 text-white text-xs h-8 px-3 gap-1.5 shadow-sm"
+          >
+            <Edit3 className="w-3.5 h-3.5" />發起調整
+          </Button>
+        </div>
+        {recentAdj.length > 0 ? (
+          <div className="space-y-1.5">
+            <div className="text-xs font-semibold text-red-700 mb-1.5">最近調整記錄</div>
+            {(recentAdj as any[]).slice(0, 3).map((r: any, i: number) => (
+              <div key={i} className="flex items-start gap-2 p-2 bg-white rounded-lg border border-red-100">
+                <BellRing className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-red-800 truncate">{r.title}</div>
+                  <div className="text-xs text-muted-foreground">{r.createdAt}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-red-500 text-center py-1">暂無調整記錄</div>
+        )}
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <Zap className="w-5 h-5" />緊急行程點調整
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">選擇行程點 <span className="text-red-500">*</span></Label>
+              <Select value={selectedItinId} onValueChange={setSelectedItinId}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="選擇需要調整的行程點..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {allItins.map((itin: any) => (
+                    <SelectItem key={itin.itinId} value={String(itin.itinId)}>
+                      <span className="font-semibold text-blue-700 mr-2">{itin.groupCode}</span>
+                      {itin.description || itin.locationName}
+                      {itin.startTime && <span className="text-muted-foreground ml-1">({formatTime(itin.startTime)})</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedItin && (
+                <div className="text-xs text-muted-foreground bg-slate-50 rounded p-2 border">
+                  當前：{selectedItin.description || selectedItin.locationName}
+                  {selectedItin.startTime && ` · ${formatTime(selectedItin.startTime)}–${formatTime(selectedItin.endTime)}`}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">新地點名稱</Label>
+                <Input placeholder="留空則不修改" value={form.locationName}
+                  onChange={e => setForm(f => ({ ...f, locationName: e.target.value }))} className="text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">新行程描述</Label>
+                <Input placeholder="留空則不修改" value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">新開始時間</Label>
+                <Input type="time" value={form.startTime}
+                  onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className="text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">新結束時間</Label>
+                <Input type="time" value={form.endTime}
+                  onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className="text-sm" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">備註</Label>
+              <Input placeholder="其他補充說明" value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">調整原因 <span className="text-red-500">*</span></Label>
+              <Textarea
+                placeholder="請說明調整原因，此內容將包含在通知中..."
+                value={form.reason}
+                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+                className="text-sm resize-none" rows={2}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-amber-600" />
+                <div>
+                  <div className="text-sm font-medium text-amber-800">通知全員</div>
+                  <div className="text-xs text-amber-600">向所有平台用戶發送調整通知</div>
+                </div>
+              </div>
+              <Switch checked={form.notifyAll} onCheckedChange={v => setForm(f => ({ ...f, notifyAll: v }))} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)} size="sm">取消</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={adjustMutation.isPending}
+              className="bg-red-500 hover:bg-red-600 text-white"
+              size="sm"
+            >
+              {adjustMutation.isPending ? "提交中..." : (
+                <><Zap className="w-3.5 h-3.5 mr-1" />{form.notifyAll ? "調整並通知全員" : "僅調整行程"}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ===== 主仪表盘组件 =====
 export default function OperationsDashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -458,6 +644,9 @@ export default function OperationsDashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* 紧急调整快捷窗口（明日行程預告上方） */}
+          <UrgentAdjustPanel allItins={[...todayItins, ...tomorrowItins]} />
 
           {/* 明日预告 */}
           {tomorrowItins.length > 0 && (
