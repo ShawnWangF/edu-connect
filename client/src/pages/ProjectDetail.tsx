@@ -126,7 +126,7 @@ function TodayScheduleTab({ projectId, groups, project }: any) {
 
       {/* 快速日期選擇（月曆條） */}
       <div className="flex gap-1 overflow-x-auto pb-1">
-        {dateList.map(date => {
+        {dateList.map((date, idx) => {
           const d = new Date(date + 'T00:00:00');
           const dayBlocks = blocks.filter((b: any) => {
             const bd = b.date instanceof Date ? b.date.toISOString().split('T')[0] : typeof b.date === 'string' ? b.date.split('T')[0] : '';
@@ -135,6 +135,9 @@ function TodayScheduleTab({ projectId, groups, project }: any) {
           const hasActivity = dayBlocks.length > 0;
           const isSelected = date === selectedDate;
           const isTodayDate = date === today;
+          // 只在每月第一天或列表第一个日期显示月份
+          const prevDate = idx > 0 ? new Date(dateList[idx - 1] + 'T00:00:00') : null;
+          const showMonth = idx === 0 || (prevDate && d.getMonth() !== prevDate.getMonth());
           return (
             <button
               key={date}
@@ -147,7 +150,7 @@ function TodayScheduleTab({ projectId, groups, project }: any) {
                   : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
               }`}
             >
-              <div className="text-[10px] text-current opacity-70">{d.toLocaleDateString('zh-TW', { month: 'numeric' })}月</div>
+              <div className="text-[10px] text-current opacity-70">{showMonth ? `${d.getMonth() + 1}月` : '\u00a0'}</div>
               <div className="text-sm font-bold">{d.getDate()}</div>
               {hasActivity && !isSelected && (
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mx-auto mt-0.5" />
