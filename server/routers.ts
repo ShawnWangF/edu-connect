@@ -441,7 +441,8 @@ export const appRouter = router({
           name: z.string(),
           studentCount: z.number(),
           teacherCount: z.number().optional(),
-          exchangeSchoolId: z.number().optional(),
+          domesticSchoolId: z.number().optional(), // 前來交流學校資源庫ID
+          exchangeSchoolId: z.number().optional(), // 姊妹學校資源庫ID
           timeSlot: z.string().optional(), // 上午 / 下午 / 全天
         })).optional(),
       }))
@@ -512,7 +513,8 @@ export const appRouter = router({
           name: z.string(),
           studentCount: z.number(),
           teacherCount: z.number().optional(),
-          exchangeSchoolId: z.number().optional(),
+          domesticSchoolId: z.number().optional(), // 前來交流學校資源庫ID
+          exchangeSchoolId: z.number().optional(), // 姊妹學校資源庫ID
           timeSlot: z.string().optional(), // 上午 / 下午 / 全天
         })).optional(),
       }))

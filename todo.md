@@ -258,3 +258,10 @@
 - [x] 填充真实批次、团组、航班信息（6个批次、12个团组）
 - [x] 填充学校交流分配数据（school_list、exchangeDate、sisterSchool 等）
 - [x] 验证数据准确性（12个团组、 6个批次、24所姊妹学校、25所前来交流学校）
+
+## 数据引用逻辑修复（第十七轮）
+- [x] 问题查明：school_list 中学校名称是硬编码文本，缺少 domesticSchoolId 字段（未引用资源库）
+- [x] 修复数据：已为 12 个团组的 school_list 添加 domesticSchoolId，全郠匹配成功
+- [x] 修复前端：学校分组「添加学校」改为从 domesticSchools 资源库下拉选择，保存 domesticSchoolId
+- [x] 修复后端路由：groups.create/update 的 schoolList schema 添加 domesticSchoolId 字段
+- [x] 验证完整数据链路：P1 学校 domesticSchoolId/exchangeSchoolId 均可正确 JOIN 资源库

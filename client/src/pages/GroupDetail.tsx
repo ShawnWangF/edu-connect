@@ -46,7 +46,8 @@ export default function GroupDetail() {
   const { data: attractions } = trpc.locations.list.useQuery();
   // const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const schoolExchanges: any[] = []; // 暫時移除，待後續實現
-  const { data: schools } = trpc.schools.list.useQuery();
+  const { data: domesticSchoolsList } = trpc.domesticSchools.list.useQuery();
+  const schools = domesticSchoolsList; // 前來交流學校資源庫
   const { data: exchangeSchools } = trpc.exchangeSchools.list.useQuery();
   // 批次列表（用於排程信息編輯）
   const { data: project } = trpc.projects.get.useQuery(
@@ -2411,17 +2412,18 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
   const [sisterSchoolId, setSisterSchoolId] = useState<string>(group.sister_school_id?.toString() || '');
   const [exchangeDate, setExchangeDate] = useState<string>((group.tags as any)?.exchangeDate || '');
   // 學校分組列表
-  const parseSchoolList = (schoolList: any): Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number; timeSlot?: string }> => {
+  const parseSchoolList = (schoolList: any): Array<{ name: string; studentCount: number; teacherCount: number; domesticSchoolId?: number; exchangeSchoolId?: number; timeSlot?: string }> => {
     if (Array.isArray(schoolList)) {
       return schoolList.map((s: any) => ({ 
         name: s.name, 
         studentCount: s.studentCount || 0, 
         teacherCount: s.teacherCount || 0, 
-        exchangeSchoolId: s.exchangeSchoolId,
+        domesticSchoolId: s.domesticSchoolId, // 前來交流學校資源庫ID
+        exchangeSchoolId: s.exchangeSchoolId, // 姊妹學校資源庫ID
         timeSlot: s.timeSlot,
       }));
     } else if (typeof schoolList === 'string' && schoolList) {
-      const schools: Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number; timeSlot?: string }> = [];
+      const schools: Array<{ name: string; studentCount: number; teacherCount: number; domesticSchoolId?: number; exchangeSchoolId?: number; timeSlot?: string }> = [];
       schoolList.split(' · ').forEach((item: string) => {
         const match = item.match(/^(.+?)\((\d+)人\)$/);
         if (match) {
@@ -2433,7 +2435,7 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
     return [];
   };
   
-  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number; timeSlot?: string }>>(
+  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number; domesticSchoolId?: number; exchangeSchoolId?: number; timeSlot?: string }>>(
     parseSchoolList(group.school_list)
   );
   const [newSchoolId, setNewSchoolId] = useState<string>('');
@@ -2475,7 +2477,8 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
       return;
     }
     setSchoolList([...schoolList, { 
-      name: school.name, 
+      name: school.name,
+      domesticSchoolId: school.id, // 關聯 domesticSchools 資源庫
       studentCount: newSchoolStudentCount, 
       teacherCount: newSchoolTeacherCount, 
       exchangeSchoolId: newSchoolExchangeSchoolId && newSchoolExchangeSchoolId !== '__none' ? parseInt(newSchoolExchangeSchoolId) : undefined,
