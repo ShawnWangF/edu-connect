@@ -127,6 +127,21 @@ export default function ScheduleOverview() {
   const { data: groups = [], refetch: refetchGroups } = trpc.projects.getGroups.useQuery({ projectId: pid! }, { enabled: !!pid });
   const { data: blocks = [], refetch: refetchBlocks } = trpc.scheduleBlocks.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
   const { data: staffAssignments = [] } = trpc.batchStaff.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
+  const { data: batchList = [] } = trpc.batches.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
+
+  // 批次航班信息 Map：batch_code -> { arrivalFlight, departureFlight, arrivalTime, departureTime }
+  const batchFlightMap = useMemo(() => {
+    const map = new Map<string, { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string }>();
+    batchList.forEach((b: any) => {
+      if (b.code) map.set(b.code, {
+        arrivalFlight: b.arrivalFlight || undefined,
+        departureFlight: b.departureFlight || undefined,
+        arrivalTime: b.arrivalTime || undefined,
+        departureTime: b.departureTime || undefined,
+      });
+    });
+    return map;
+  }, [batchList]);
 
   const upsertBlock = trpc.scheduleBlocks.upsert.useMutation();
   const shiftBatch = trpc.scheduleBlocks.shiftBatch.useMutation();
@@ -404,7 +419,15 @@ export default function ScheduleOverview() {
         teacherCount: item.teacherCount ?? item.teachers ?? 0
       }));
     }
-    const flightInfo = group.flight_info || {};
+    // 航班信息：团组优先，批次兜底
+    const groupFlightInfo = group.flight_info || {};
+    const batchFlightInfo = group.batch_code ? (batchFlightMap.get(group.batch_code) || {}) : {};
+    const flightInfo = {
+      arrivalFlight: groupFlightInfo.arrivalFlight || batchFlightInfo.arrivalFlight,
+      departureFlight: groupFlightInfo.departureFlight || batchFlightInfo.departureFlight,
+      arrivalTime: groupFlightInfo.arrivalTime || batchFlightInfo.arrivalTime,
+      departureTime: groupFlightInfo.departureTime || batchFlightInfo.departureTime,
+    };
     const startCityLabel = (group.startCity === 'sz' || group.startCity === '深圳') ? '深圳'
       : (group.startCity === 'hk' || group.startCity === '香港') ? '香港'
       : (group.startCity === 'macau' || group.startCity === '澳門' || group.startCity === '澳门') ? '澳門'
@@ -892,11 +915,16 @@ export default function ScheduleOverview() {
                         teacherCount: item.teacherCount ?? item.teachers ?? 0
                       }));
                     }
-                    const flightInfo = g.flight_info || {};
+                    const gGroupFlightInfo = g.flight_info || {};
+                    const gBatchFlightInfo = g.batch_code ? (batchFlightMap.get(g.batch_code) || {}) : {};
+                    const gFlightInfo = {
+                      arrivalFlight: gGroupFlightInfo.arrivalFlight || gBatchFlightInfo.arrivalFlight,
+                      departureFlight: gGroupFlightInfo.departureFlight || gBatchFlightInfo.departureFlight,
+                    };
                     return (
                       <tr key={g.id} style={{ backgroundColor: rowBg }}>
                         <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                          {flightInfo.arrivalFlight || '-'}
+                          {gFlightInfo.arrivalFlight || '-'}
                         </td>
                         <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
                           {g.batch_code || '-'}
