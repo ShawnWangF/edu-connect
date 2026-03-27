@@ -1,0 +1,8 @@
+{
+  "query": "\nDELETE FROM dailyCards;\nDELETE FROM itineraries;\nDELETE FROM scheduleBlocks;\nDELETE FROM schoolExchanges;\nDELETE FROM schoolPairings;\nDELETE FROM groups;\nDELETE FROM batches;\nDELETE FROM exchangeSchoolAvailability;\nDELETE FROM exchangeSchools;\nDELETE FROM domesticSchools;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \nDELETE FROM dailyCards;\nDELETE FROM itineraries;\nDELETE FROM scheduleBlocks;\nDELETE FROM schoolExchanges;\nDELETE FROM schoolPairings;\nDELETE FROM groups;\nDELETE FROM batches;\nDELETE FROM exchangeSchoolAvailability;\nDELETE FROM exchangeSchools;\nDELETE FROM domesticSchools;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 7: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 18 near \"groups\""
+  ]
+}
