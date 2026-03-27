@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE exchangeSchools \n  CHANGE COLUMN city region VARCHAR(50) NULL,\n  CHANGE COLUMN contactName contactPerson VARCHAR(100) NULL;\n\nALTER TABLE exchangeSchools\n  ADD COLUMN receptionProcess TEXT NULL AFTER contactEmail,\n  ADD COLUMN availableDates JSON NULL AFTER receptionProcess,\n  ADD COLUMN schoolType VARCHAR(50) NULL AFTER availableDates,\n  ADD COLUMN maxGroupSize INT NULL DEFAULT 50 AFTER schoolType,\n  ADD COLUMN capacity INT NULL DEFAULT 0 AFTER maxGroupSize,\n  ADD COLUMN isActive BOOLEAN NOT NULL DEFAULT TRUE AFTER capacity,\n  ADD COLUMN createdBy INT NOT NULL DEFAULT 1 AFTER isActive;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute ALTER TABLE exchangeSchools \n  CHANGE COLUMN city region VARCHAR(50) NULL,\n  CHANGE COLUMN contactName contactPerson VARCHAR(100) NULL;\n\nALTER TABLE exchangeSchools\n  ADD COLUMN receptionProcess TEXT NULL AFTER contactEmail,\n  ADD COLUMN availableDates JSON NULL AFTER receptionProcess,\n  ADD COLUMN schoolType VARCHAR(50) NULL AFTER availableDates,\n  ADD COLUMN maxGroupSize INT NULL DEFAULT 50 AFTER schoolType,\n  ADD COLUMN capacity INT NULL DEFAULT 0 AFTER maxGroupSize,\n  ADD COLUMN isActive BOOLEAN NOT NULL DEFAULT TRUE AFTER capacity,\n  ADD COLUMN createdBy INT NOT NULL DEFAULT 1 AFTER isActive;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 5: Unknown column 'receptionprocess' in 'exchangeSchools'"
+  ]
+}

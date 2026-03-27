@@ -265,3 +265,8 @@
 - [x] 修复前端：学校分组「添加学校」改为从 domesticSchools 资源库下拉选择，保存 domesticSchoolId
 - [x] 修复后端路由：groups.create/update 的 schoolList schema 添加 domesticSchoolId 字段
 - [x] 验证完整数据链路：P1 学校 domesticSchoolId/exchangeSchoolId 均可正确 JOIN 资源库
+
+## 资源库学校数据显示修复（第十八轮）
+- [x] 根本原因：exchangeSchools/domesticSchools 数据库表字段与 schema.ts 不匹配（city/contactName vs region/contactPerson），导致 Drizzle ORM 查询失败静默返回空
+- [x] 修复：ALTER TABLE 重命名字段并添加缺失字段，两表字段现已与 schema.ts 完全对齐
+- [x] 验证：24 所姊妹学校、25 所前来交流学校数据完好，查询正常返回
