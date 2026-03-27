@@ -200,18 +200,44 @@ export default function GroupDetail() {
             </div>
             {/* 學校分組 */}
             <div className="mt-3">
-              <p className="text-xs text-gray-500 font-medium mb-2">🏫 學校分組（本次項目配置）</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-500 font-medium">🏫 學校分組（本次項目配置）</p>
+                {(group.tags as any)?.exchangeDate && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                    📅 交流日：{(group.tags as any).exchangeDate}
+                  </span>
+                )}
+              </div>
               {group.school_list ? (
                 typeof group.school_list === 'string' ? (
                   <p className="text-sm text-gray-600">{group.school_list}</p>
                 ) : Array.isArray(group.school_list) && group.school_list.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {group.school_list.map((s: any, i: number) => (
-                      <div key={i} className="bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-sm">
-                        <span className="font-medium text-blue-800">{s.name}</span>
-                        <span className="text-blue-500 ml-2">學生 {s.studentCount} 人{s.teacherCount ? ` + 教師 ${s.teacherCount} 人` : ''}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-1.5">
+                    {group.school_list.map((s: any, i: number) => {
+                      const sisterSchool = exchangeSchools?.find((ex: any) => ex.id === s.exchangeSchoolId);
+                      return (
+                        <div key={i} className="bg-white border border-blue-200 rounded-lg px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-blue-800">{s.name}</span>
+                            <span className="text-xs text-blue-500">學生 {s.studentCount}人{s.teacherCount ? ` + 教師 ${s.teacherCount}人` : ''}</span>
+                          </div>
+                          {(sisterSchool || s.timeSlot) && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {sisterSchool && (
+                                <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
+                                  ⭐ {sisterSchool.name}
+                                </span>
+                              )}
+                              {s.timeSlot && (
+                                <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                                  ⏰ {s.timeSlot}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400 italic">未配置學校分組 — 點擊右上角「編輯排程信息」設置</p>
@@ -220,15 +246,6 @@ export default function GroupDetail() {
                 <p className="text-sm text-gray-400 italic">未配置學校分組 — 點擊右上角「編輯排程信息」設置</p>
               )}
             </div>
-            {/* 交流學校 */}
-            {group.sister_school_id && (
-              <div className="mt-3">
-                <p className="text-xs text-gray-500 font-medium mb-1">⭐ 指定交流學校</p>
-                <p className="text-sm font-medium text-purple-700">
-                  {schools?.find((s: any) => s.id === group.sister_school_id)?.name || `學校 ID: ${group.sister_school_id}`}
-                </p>
-              </div>
-            )}
           </div>
 
           <div className="mt-6 pt-6 border-t">
@@ -2392,62 +2409,38 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
   const [departureFlight, setDepartureFlight] = useState(group.flight_info?.departureFlight || '');
   const [departureTime, setDepartureTime] = useState(group.flight_info?.departureTime || '');
   const [sisterSchoolId, setSisterSchoolId] = useState<string>(group.sister_school_id?.toString() || '');
+  const [exchangeDate, setExchangeDate] = useState<string>((group.tags as any)?.exchangeDate || '');
   // 學校分組列表
-  // 解析 school_list，支持字符串和数组格式
-  const parseSchoolList = (schoolList: any): Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }> => {
-    console.log('[parseSchoolList] Input:', schoolList, 'Type:', typeof schoolList);
+  const parseSchoolList = (schoolList: any): Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number; timeSlot?: string }> => {
     if (Array.isArray(schoolList)) {
-      console.log('[parseSchoolList] Input is array');
       return schoolList.map((s: any) => ({ 
         name: s.name, 
         studentCount: s.studentCount || 0, 
         teacherCount: s.teacherCount || 0, 
-        exchangeSchoolId: s.exchangeSchoolId 
+        exchangeSchoolId: s.exchangeSchoolId,
+        timeSlot: s.timeSlot,
       }));
     } else if (typeof schoolList === 'string' && schoolList) {
-      // 从字符串格式解析学校列表
-      // 格式: "学校名（人数人） · 学校名2（人数人）" 或 "学校名（人） · 学校名2（人）"
-      console.log('[parseSchoolList] Input is string, parsing...');
-      const schools: Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }> = [];
+      const schools: Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number; timeSlot?: string }> = [];
       schoolList.split(' · ').forEach((item: string) => {
-        console.log('[parseSchoolList] Parsing item:', item);
-        // 尝试匹配 "学校名（数字人）" 格式
-        let match = item.match(/^(.+?)\((\d+)人\)$/);
+        const match = item.match(/^(.+?)\((\d+)人\)$/);
         if (match) {
-          schools.push({
-            name: match[1],
-            studentCount: parseInt(match[2]) || 0,
-            teacherCount: 0,
-            exchangeSchoolId: undefined
-          });
-        } else {
-          // 尝试匹配 "学校名（人）" 格式（没有数字）
-          match = item.match(/^(.+?)\(人\)$/);
-          if (match) {
-            schools.push({
-              name: match[1],
-              studentCount: 0,
-              teacherCount: 0,
-              exchangeSchoolId: undefined
-            });
-          }
+          schools.push({ name: match[1], studentCount: parseInt(match[2]) || 0, teacherCount: 0 });
         }
-        console.log('[parseSchoolList] Match result:', match);
       });
-      console.log('[parseSchoolList] Parsed schools:', schools);
       return schools;
     }
-    console.log('[parseSchoolList] Returning empty array');
     return [];
   };
   
-  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number }>>(
+  const [schoolList, setSchoolList] = useState<Array<{ name: string; studentCount: number; teacherCount: number; exchangeSchoolId?: number; timeSlot?: string }>>(
     parseSchoolList(group.school_list)
   );
   const [newSchoolId, setNewSchoolId] = useState<string>('');
   const [newSchoolStudentCount, setNewSchoolStudentCount] = useState<number>(0);
   const [newSchoolTeacherCount, setNewSchoolTeacherCount] = useState<number>(0);
   const [newSchoolExchangeSchoolId, setNewSchoolExchangeSchoolId] = useState<string>('__none');
+  const [newSchoolTimeSlot, setNewSchoolTimeSlot] = useState<string>('__none');
 
   const updateGroup = trpc.groups.update.useMutation({
     onSuccess: () => {
@@ -2468,6 +2461,7 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
     setDepartureFlight(group.flight_info?.departureFlight || '');
     setDepartureTime(group.flight_info?.departureTime || '');
     setSisterSchoolId(group.sister_school_id?.toString() || '');
+    setExchangeDate((group.tags as any)?.exchangeDate || '');
     setSchoolList(parseSchoolList(group.school_list));
     setOpen(true);
   };
@@ -2480,11 +2474,18 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
       toast.error('該學校已在分組列表中');
       return;
     }
-    setSchoolList([...schoolList, { name: school.name, studentCount: newSchoolStudentCount, teacherCount: newSchoolTeacherCount, exchangeSchoolId: newSchoolExchangeSchoolId && newSchoolExchangeSchoolId !== '__none' ? parseInt(newSchoolExchangeSchoolId) : undefined }]);
+    setSchoolList([...schoolList, { 
+      name: school.name, 
+      studentCount: newSchoolStudentCount, 
+      teacherCount: newSchoolTeacherCount, 
+      exchangeSchoolId: newSchoolExchangeSchoolId && newSchoolExchangeSchoolId !== '__none' ? parseInt(newSchoolExchangeSchoolId) : undefined,
+      timeSlot: newSchoolTimeSlot && newSchoolTimeSlot !== '__none' ? newSchoolTimeSlot : undefined,
+    }]);
     setNewSchoolId('');
     setNewSchoolStudentCount(0);
     setNewSchoolTeacherCount(0);
     setNewSchoolExchangeSchoolId('__none');
+    setNewSchoolTimeSlot('__none');
   };
 
   const removeSchool = (idx: number) => setSchoolList(schoolList.filter((_, i) => i !== idx));
@@ -2510,7 +2511,8 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
         departureFlight: departureFlight || undefined,
         departureTime: departureTime || undefined,
       },
-      schoolList: schoolList, // 总是传递 schoolList，即使为空
+      schoolList: schoolList,
+      exchangeDate: exchangeDate || undefined,
     });
   };
 
@@ -2617,19 +2619,39 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
                         }} />
                       </div>
                     </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">指定交流學校</Label>
-                      <Select value={s.exchangeSchoolId?.toString() || '__none'} onValueChange={(val) => updateSchoolExchangeSchoolId(i, val === '__none' ? undefined : (val ? parseInt(val) : undefined))}>
-                        <SelectTrigger className="h-7 text-xs">
-                          <SelectValue placeholder="選擇交流學校" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none">不指定</SelectItem>
-                          {exchangeSchools?.map((ex: any) => (
-                            <SelectItem key={ex.id} value={ex.id.toString()}>{ex.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-gray-500">指定姊妹學校</Label>
+                        <Select value={s.exchangeSchoolId?.toString() || '__none'} onValueChange={(val) => updateSchoolExchangeSchoolId(i, val === '__none' ? undefined : (val ? parseInt(val) : undefined))}>
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue placeholder="選姊妹學校" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">不指定</SelectItem>
+                            {exchangeSchools?.map((ex: any) => (
+                              <SelectItem key={ex.id} value={ex.id.toString()}>{ex.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500">交流時段</Label>
+                        <Select value={s.timeSlot || '__none'} onValueChange={(val) => {
+                          const updated = [...schoolList];
+                          updated[i].timeSlot = val === '__none' ? undefined : val;
+                          setSchoolList(updated);
+                        }}>
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue placeholder="選時段" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none">不指定</SelectItem>
+                            <SelectItem value="上午">上午</SelectItem>
+                            <SelectItem value="下午">下午</SelectItem>
+                            <SelectItem value="全天">全天</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -2658,39 +2680,51 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
                   <Input type="number" min={0} className="h-7 text-sm mt-0.5" value={newSchoolTeacherCount} onChange={e => setNewSchoolTeacherCount(parseInt(e.target.value) || 0)} />
                 </div>
               </div>
-              <div>
-                <Label className="text-xs text-gray-500">指定交流學校（可選）</Label>
-                <Select value={newSchoolExchangeSchoolId} onValueChange={setNewSchoolExchangeSchoolId}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="選擇交流學校" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">不指定</SelectItem>
-                    {exchangeSchools?.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">姊妹學校（可選）</Label>
+                  <Select value={newSchoolExchangeSchoolId} onValueChange={setNewSchoolExchangeSchoolId}>
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder="選姊妹學校" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">不指定</SelectItem>
+                      {exchangeSchools?.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">交流時段（可選）</Label>
+                  <Select value={newSchoolTimeSlot} onValueChange={setNewSchoolTimeSlot}>
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder="選時段" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">不指定</SelectItem>
+                      <SelectItem value="上午">上午</SelectItem>
+                      <SelectItem value="下午">下午</SelectItem>
+                      <SelectItem value="全天">全天</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <Button type="button" variant="outline" size="sm" className="w-full h-7 text-xs" onClick={addSchoolToList} disabled={!newSchoolId}>
                 <Plus className="h-3 w-3 mr-1" /> 添加學校
               </Button>
             </div>
           </div>
-          {/* 指定交流學校 */}
+          {/* 交流日期（團組級別） */}
           <div className="space-y-1.5">
-            <Label className="text-sm">⭐ 指定交流學校（香港學校）</Label>
-            <Select value={sisterSchoolId} onValueChange={setSisterSchoolId}>
-              <SelectTrigger>
-                <SelectValue placeholder="選擇交流學校（可空）" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">不指定</SelectItem>
-                {schools.map((s: any) => (
-                  <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-sm">📅 交流日期（團組內所有學校一致）</Label>
+            <Input
+              type="date"
+              value={exchangeDate}
+              onChange={e => setExchangeDate(e.target.value)}
+              className="h-9"
+            />
+            <p className="text-xs text-gray-400">團組內所有學校交流日期一致，僅時段可不同</p>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-3 border-t">

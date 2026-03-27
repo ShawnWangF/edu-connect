@@ -441,6 +441,8 @@ export const appRouter = router({
           name: z.string(),
           studentCount: z.number(),
           teacherCount: z.number().optional(),
+          exchangeSchoolId: z.number().optional(),
+          timeSlot: z.string().optional(), // 上午 / 下午 / 全天
         })).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -505,14 +507,20 @@ export const appRouter = router({
           departureFlight: z.string().optional(),
           departureTime: z.string().optional(),
         }).optional(),
+        exchangeDate: z.string().optional(), // 團組級別交流日期 YYYY-MM-DD
         schoolList: z.array(z.object({
           name: z.string(),
           studentCount: z.number(),
           teacherCount: z.number().optional(),
+          exchangeSchoolId: z.number().optional(),
+          timeSlot: z.string().optional(), // 上午 / 下午 / 全天
         })).optional(),
       }))
       .mutation(async ({ input }) => {
-        const { id, batchId, batchCode, startCity, crossingDate, sisterSchoolId, flightInfo, schoolList, ...rest } = input as any;
+        const { id, batchId, batchCode, startCity, crossingDate, sisterSchoolId, flightInfo, schoolList, exchangeDate, ...rest } = input as any;
+        
+        // 獲取更新前的團組信息
+        const oldGroup = await db.getGroupById(id);
         
         const updateData = {
           ...rest,
@@ -523,10 +531,8 @@ export const appRouter = router({
           ...(sisterSchoolId !== undefined && { sister_school_id: sisterSchoolId }),
           ...(flightInfo !== undefined && { flight_info: flightInfo }),
           ...(schoolList !== undefined && { school_list: schoolList }),
+          ...(exchangeDate !== undefined && { tags: { ...(oldGroup?.tags as any || {}), exchangeDate } }),
         };
-        
-        // 獲取更新前的團組信息
-        const oldGroup = await db.getGroupById(id);
         
         await db.updateGroup(id, updateData);
         
@@ -1735,28 +1741,132 @@ export const appRouter = router({
     list: protectedProcedure.query(async () => {
       const dbConn = await db.getDb();
       if (!dbConn) return [];
-      try {
-        const result = await dbConn.execute('SELECT * FROM exchangeSchools ORDER BY name');
-        return result[0] || [];
-      } catch (error) {
-        console.error('Error fetching exchangeSchools:', error);
-        return [];
-      }
+      const { exchangeSchools } = await import('../drizzle/schema');
+      return await dbConn.select().from(exchangeSchools).orderBy(exchangeSchools.name);
     }),
+    create: editorProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        address: z.string().optional(),
+        region: z.string().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        contactEmail: z.string().optional(),
+        receptionProcess: z.string().optional(),
+        availableDates: z.array(z.string()).optional(),
+        schoolType: z.string().optional(),
+        maxGroupSize: z.number().optional(),
+        capacity: z.number().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { exchangeSchools } = await import('../drizzle/schema');
+        const result = await dbConn.insert(exchangeSchools).values({
+          ...input,
+          createdBy: ctx.user.id,
+        });
+        return { id: Number(result[0].insertId), ...input };
+      }),
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        address: z.string().optional().nullable(),
+        region: z.string().optional().nullable(),
+        contactPerson: z.string().optional().nullable(),
+        contactPhone: z.string().optional().nullable(),
+        contactEmail: z.string().optional().nullable(),
+        receptionProcess: z.string().optional().nullable(),
+        availableDates: z.array(z.string()).optional().nullable(),
+        schoolType: z.string().optional().nullable(),
+        maxGroupSize: z.number().optional().nullable(),
+        capacity: z.number().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { exchangeSchools } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const { id, ...data } = input;
+        await dbConn.update(exchangeSchools).set(data).where(eq(exchangeSchools.id, id));
+        return { success: true };
+      }),
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { exchangeSchools } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        await dbConn.delete(exchangeSchools).where(eq(exchangeSchools.id, input.id));
+        return { success: true };
+      }),
   }),
-  
+
   domesticSchools: router({
     list: protectedProcedure.query(async () => {
       const dbConn = await db.getDb();
       if (!dbConn) return [];
-      try {
-        const result = await dbConn.execute('SELECT * FROM domesticSchools ORDER BY name');
-        return result[0] || [];
-      } catch (error) {
-        console.error('Error fetching domesticSchools:', error);
-        return [];
-      }
+      const { domesticSchools } = await import('../drizzle/schema');
+      return await dbConn.select().from(domesticSchools).orderBy(domesticSchools.name);
     }),
+    create: editorProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        address: z.string().optional(),
+        studentCount: z.number().optional(),
+        teacherCount: z.number().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        contactEmail: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { domesticSchools } = await import('../drizzle/schema');
+        const result = await dbConn.insert(domesticSchools).values({
+          ...input,
+          createdBy: ctx.user.id,
+        });
+        return { id: Number(result[0].insertId), ...input };
+      }),
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        address: z.string().optional().nullable(),
+        studentCount: z.number().optional().nullable(),
+        teacherCount: z.number().optional().nullable(),
+        contactPerson: z.string().optional().nullable(),
+        contactPhone: z.string().optional().nullable(),
+        contactEmail: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { domesticSchools } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const { id, ...data } = input;
+        await dbConn.update(domesticSchools).set(data).where(eq(domesticSchools.id, id));
+        return { success: true };
+      }),
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { domesticSchools } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        await dbConn.delete(domesticSchools).where(eq(domesticSchools.id, input.id));
+        return { success: true };
+      }),
   }),
 
   // ===== 工作人員庫 =====
