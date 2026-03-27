@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT \n  g.id,\n  g.code,\n  g.name,\n  g.type,\n  g.student_count,\n  g.teacher_count,\n  g.total_count,\n  g.start_city,\n  g.batch_code,\n  g.flight_info,\n  g.school_list,\n  g.start_date,\n  g.end_date\nFROM `groups` g\nORDER BY g.batch_code, g.code\nLIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 41NsuGXnm89dPgc.aed783a1450b --database P3EFPXo6PDntRisxqhyY6k --execute \nSELECT \n  g.id,\n  g.code,\n  g.name,\n  g.type,\n  g.student_count,\n  g.teacher_count,\n  g.total_count,\n  g.start_city,\n  g.batch_code,\n  g.flight_info,\n  g.school_list,\n  g.start_date,\n  g.end_date\nFROM `groups` g\nORDER BY g.batch_code, g.code\nLIMIT 20;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 'g.student_count' in 'field list'"
+  ]
+}

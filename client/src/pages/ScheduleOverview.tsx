@@ -405,7 +405,10 @@ export default function ScheduleOverview() {
       }));
     }
     const flightInfo = group.flight_info || {};
-    const startCityLabel = group.startCity === 'sz' ? '深圳' : group.startCity === 'hk' ? '香港' : group.startCity === 'macau' ? '澳門' : '-';
+    const startCityLabel = (group.startCity === 'sz' || group.startCity === '深圳') ? '深圳'
+      : (group.startCity === 'hk' || group.startCity === '香港') ? '香港'
+      : (group.startCity === 'macau' || group.startCity === '澳門' || group.startCity === '澳门') ? '澳門'
+      : group.startCity || '-';
 
     return (
       <tr
