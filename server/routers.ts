@@ -481,7 +481,7 @@ export const appRouter = router({
         totalCount: z.number().optional(),
         hotel: z.string().optional(),
         color: z.string().optional(),
-        tags: z.string().optional(),
+        tags: z.record(z.string(), z.string()).optional(), // JSON 物件，支持 exchangeDate 等結構化數據
         contact: z.string().optional(),
         phone: z.string().optional(),
         emergencyContact: z.string().optional(),
@@ -551,7 +551,7 @@ export const appRouter = router({
         totalCount: z.number().optional(),
         hotel: z.string().optional(),
         color: z.string().optional(),
-        tags: z.string().optional(),
+        tags: z.record(z.string(), z.string()).optional(), // JSON 物件，支持 exchangeDate 等結構化數據
         contact: z.string().optional(),
         phone: z.string().optional(),
         emergencyContact: z.string().optional(),

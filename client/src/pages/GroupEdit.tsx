@@ -61,7 +61,8 @@ export default function GroupEdit() {
       totalCount: parseInt(formData.get("totalCount") as string) || undefined,
       hotel: (formData.get("hotel") as string) || undefined,
       color: (formData.get("color") as string) || undefined,
-      tags: (formData.get("tags") as string) || undefined,
+      // tags 字段已是 JSON 类型，將用戶輸入的標籤字串存入 label 屬性
+      tags: (formData.get("tags") as string) ? { label: formData.get("tags") as string } : undefined,
       contact: (formData.get("contact") as string) || undefined,
       phone: (formData.get("phone") as string) || undefined,
       emergencyContact: (formData.get("emergencyContact") as string) || undefined,
@@ -267,7 +268,7 @@ export default function GroupEdit() {
               <Input
                 id="tags"
                 name="tags"
-                defaultValue={group.tags || ""}
+                defaultValue={(group.tags as any)?.label || ""}
                 placeholder="用逗號分隔多個標籤"
               />
             </div>

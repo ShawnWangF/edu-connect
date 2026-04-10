@@ -75,7 +75,7 @@ export const groups = mysqlTable("groups", {
   totalCount: int("totalCount").default(0).notNull(),
   hotel: text("hotel"), // 住宿酒店
   color: varchar("color", { length: 7 }).default("#52c41a"), // 標識顏色
-  tags: text("tags"), // 標籤
+  tags: json("tags").$type<Record<string, string>>(), // 標籤（JSON 格式，支持 exchangeDate 等結構化數據）
   contact: varchar("contact", { length: 100 }), // 聯系人
   phone: varchar("phone", { length: 50 }), // 聯系電話
   emergencyContact: varchar("emergencyContact", { length: 100 }), // 緊急聯系人
