@@ -50,8 +50,9 @@ function getHotelCity(blockType: BlockType): 'sz' | 'hk' | null {
 }
 
 // 是否是抵達類型（需要顯示航班）
+// 只有 hk_arrive（抵達香港）才有航班；sz_arrive（抵達深圳）是陸路入境，無航班
 function isArrivalType(bt: BlockType) {
-  return ['sz_arrive', 'hk_arrive'].includes(bt);
+  return bt === 'hk_arrive';
 }
 
 // 是否是離開類型
@@ -228,13 +229,18 @@ export default function ScheduleOverview() {
     }
   }
 
-  // 判斷某天是否有航班（只有落地日和離開日才有航班）
+  // 判斷某天是否有航班
+  // 規則：只有抵港日（落地香港）和離境日才有航班
+  // 抵達深圳是陸路入境，無航班
   function hasFlightOnDate(g: any, date: string): { arrival: boolean; departure: boolean } {
     const startDate = toDateStr(g.startDate);
     const endDate = toDateStr(g.endDate);
+    const startCity = (g.start_city || g.startCity || '').toLowerCase();
+    const isHkFirst = startCity === 'hk' || startCity === '香港';
+    // 抵達航班：只有香港先（落地香港）才有抵達航班；深圳先是陸路入境，無抵達航班
     return {
-      arrival: date === startDate,   // 落地日（抵達）
-      departure: date === endDate,   // 離開日（離境）
+      arrival: date === startDate && isHkFirst,
+      departure: date === endDate,   // 離境日必有離開航班（從香港飛回）
     };
   }
 

@@ -291,3 +291,6 @@
 - [x] Bug 2：排程總覽無法同步批次內行程日期（新增 scheduleBlocks.autoGenerate 路由 + 前端「自動生成色塊」按鈕）
 - [x] 修復 startCityLabel 讀取 start_city 而非 startCity（snake_case 字段名稱對齊）
 - [x] 修復排程總覽航班欄位：改為讀取團組管理中的航班號（優先色塊手動填寫 → 團組 flight_info → 批次航班），未設置時顯示「未設置」（橙色）
+
+## Bug 修復（第二十一輪）
+- [x] 修正航班統計邏輯：只有抵港日（落地香港）和離境日才有航班，抵達深圳是陸路入境無航班
