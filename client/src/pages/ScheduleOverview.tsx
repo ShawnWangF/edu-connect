@@ -61,13 +61,20 @@ function isDepartureType(bt: BlockType) {
 }
 
 // 生成日期範圍
+// 將 Date 物件格式化為本地 YYYY-MM-DD（避免 toISOString() 的 UTC 時區偏移問題）
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function generateDateRange(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
   const start = new Date(startDate + 'T00:00:00');
   const end = new Date(endDate + 'T00:00:00');
   const current = new Date(start);
   while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
+    dates.push(localDateStr(current));
     current.setDate(current.getDate() + 1);
   }
   return dates;
@@ -91,13 +98,16 @@ function isWeekend(dateStr: string): boolean {
 }
 
 function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().split('T')[0];
+  return dateStr === localDateStr(new Date());
 }
 
 function toDateStr(val: any): string {
   if (!val) return '';
-  if (val instanceof Date) return val.toISOString().split('T')[0];
-  return String(val).split('T')[0];
+  // 使用本地時間格式化，避免 toISOString() 的 UTC 時區偏移導致日期少一天
+  if (val instanceof Date) return localDateStr(val);
+  const s = String(val);
+  // 如果是 ISO 字串（含 T），取前 10 位即可（已是存儲的 YYYY-MM-DD）
+  return s.split('T')[0];
 }
 
 // ===== 左側固定列寬度 =====
