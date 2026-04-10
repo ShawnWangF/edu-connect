@@ -206,6 +206,7 @@ export default function ScheduleOverview() {
   }, [groups]);
 
   // 根據團組信息推算某天的住宿城市（當色塊不存在時作為 fallback）
+  // 規則：起始城市住到過關日前一日，過關日當天起住對山城市，離境日不計入住宿
   function inferCityFromGroup(g: any, date: string): 'sz' | 'hk' | null {
     const startDate = toDateStr(g.startDate);
     const endDate = toDateStr(g.endDate);
@@ -217,15 +218,24 @@ export default function ScheduleOverview() {
     const isSz = startCity === 'sz' || startCity === '深圳';
     const isHk = startCity === 'hk' || startCity === '香港';
     if (!crossingDate) {
-      // 沒有過關日，全程住起始城市
       return isSz ? 'sz' : isHk ? 'hk' : null;
     }
+    // 過關日前一日：住起始城市；過關日當天及之後：住對山城市
     if (date < crossingDate) {
       return isSz ? 'sz' : isHk ? 'hk' : null;
     } else {
-      // 過關日當天及之後，住對山城市
       return isSz ? 'hk' : isHk ? 'sz' : null;
     }
+  }
+
+  // 判斷某天是否有航班（只有落地日和離開日才有航班）
+  function hasFlightOnDate(g: any, date: string): { arrival: boolean; departure: boolean } {
+    const startDate = toDateStr(g.startDate);
+    const endDate = toDateStr(g.endDate);
+    return {
+      arrival: date === startDate,   // 落地日（抵達）
+      departure: date === endDate,   // 離開日（離境）
+    };
   }
 
   // 每日統計
@@ -253,6 +263,7 @@ export default function ScheduleOverview() {
             const arrivalFlightNum = block.flightNumber || gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
             arrivalFlights.push(arrivalFlightNum || '未設置');
           }
+          // 離開航班只在 departure（離境）時計入，過關（border_sz_hk/border_hk_sz）是陸路過境，無航班
           if (bt === 'departure') {
             departureGroupCount++;
             const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
@@ -265,18 +276,16 @@ export default function ScheduleOverview() {
           const city = inferCityFromGroup(g, date);
           if (city === 'sz') szCount += count;
           if (city === 'hk') hkCount += count;
-          // 推算抵達日（起始日）
-          const startDate = toDateStr(g.startDate);
-          if (date === startDate && city) {
+          // 航班只存在於落地日（startDate）和離開日（endDate），過關日無航班
+          const flightDates = hasFlightOnDate(g, date);
+          if (flightDates.arrival) {
             arrivalGroupCount++;
             const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
             const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string };
             const arrivalFlightNum = gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
             arrivalFlights.push(arrivalFlightNum || '未設置');
           }
-          // 推算離境日
-          const endDate = toDateStr(g.endDate);
-          if (date === endDate) {
+          if (flightDates.departure) {
             departureGroupCount++;
             const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
             const gFlightInfo = (g.flight_info || {}) as { departureFlight?: string };
