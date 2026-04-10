@@ -815,7 +815,7 @@ export default function ScheduleOverview() {
               </tr>
               {/* 第二行：星期 */}
               <tr>
-                <th colSpan={7} className="border border-gray-200 bg-gray-100 text-center text-[9px] text-gray-500 py-0.5">
+                <th colSpan={8} className="border border-gray-200 bg-gray-100 text-center text-[9px] text-gray-500 py-0.5">
                   {project?.name || ''}
                 </th>
                 {dateRange.map(date => {
@@ -897,7 +897,7 @@ export default function ScheduleOverview() {
                   </tr>
                   {/* 抵達班數 */}
                   <tr className="bg-[#E8F4FD]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-800 bg-[#BDD7EE]">抵達班數</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-800 bg-[#BDD7EE]">抵達班數</td>
                     {dailyStats.map(({ date, arrivalGroupCount }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5" style={{ backgroundColor: arrivalGroupCount > 0 ? '#70AD47' : '#E8F4FD' }}>
                         {arrivalGroupCount > 0 && <span className="text-[10px] font-bold text-white">{arrivalGroupCount}</span>}
@@ -908,7 +908,7 @@ export default function ScheduleOverview() {
                   </tr>
                   {/* 抵達航班列表 */}
                   <tr className="bg-[#F0F8FF]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] text-blue-700 bg-[#DAEEF3]">抵達航班</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] text-blue-700 bg-[#DAEEF3]">抵達航班</td>
                     {dailyStats.map(({ date, arrivalFlights }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5 bg-[#F0F8FF]">
                         {arrivalFlights.map((f, i) => (
@@ -925,7 +925,7 @@ export default function ScheduleOverview() {
                   </tr>
                   {/* 離開班數 */}
                   <tr className="bg-[#FFF9E6]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-amber-800 bg-[#FFE699]">離開班數</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-amber-800 bg-[#FFE699]">離開班數</td>
                     {dailyStats.map(({ date, departureGroupCount }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5" style={{ backgroundColor: departureGroupCount > 0 ? '#FF7F00' : '#FFF9E6' }}>
                         {departureGroupCount > 0 && <span className="text-[10px] font-bold text-white">{departureGroupCount}</span>}
@@ -936,7 +936,7 @@ export default function ScheduleOverview() {
                   </tr>
                   {/* 離開航班列表 */}
                   <tr className="bg-[#FFFBF0]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] text-amber-700 bg-[#FFE699] opacity-80">離開航班</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] text-amber-700 bg-[#FFE699] opacity-80">離開航班</td>
                     {dailyStats.map(({ date, departureFlights }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5 bg-[#FFFBF0]">
                         {departureFlights.map((f, i) => (
@@ -959,7 +959,7 @@ export default function ScheduleOverview() {
                     </td>
                   </tr>
                   <tr className="bg-[#EBF5FB]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-900 bg-[#9DC3E6]">香港住宿人數</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-900 bg-[#9DC3E6]">香港住宿人數</td>
                     {dailyStats.map(({ date, hkCount }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5" style={{ backgroundColor: hkCount > 0 ? '#5b9bd5' : '#EBF5FB' }}>
                         {hkCount > 0 && <span className="text-[10px] font-bold text-white">{hkCount}</span>}
@@ -969,7 +969,7 @@ export default function ScheduleOverview() {
                     <td className="border border-gray-200 bg-[#EBF5FB]"></td>
                   </tr>
                   <tr className="bg-[#EBF5FB]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-800 bg-[#BDD7EE]">深圳住宿人數</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-800 bg-[#BDD7EE]">深圳住宿人數</td>
                     {dailyStats.map(({ date, szCount }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5" style={{ backgroundColor: szCount > 0 ? '#DAEEF3' : '#EBF5FB' }}>
                         {szCount > 0 && <span className="text-[10px] font-bold text-blue-900">{szCount}</span>}
@@ -979,7 +979,7 @@ export default function ScheduleOverview() {
                     <td className="border border-gray-200 bg-[#EBF5FB]"></td>
                   </tr>
                   <tr className="bg-[#F5F5F5]">
-                    <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-gray-700 bg-gray-200">合計人數</td>
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-gray-700 bg-gray-200">合計人數</td>
                     {dailyStats.map(({ date, szCount, hkCount }) => {
                       const total = szCount + hkCount;
                       return (
