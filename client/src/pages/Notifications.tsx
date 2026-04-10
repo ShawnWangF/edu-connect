@@ -1,14 +1,26 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Check, AlertCircle, Calendar, Clock, RefreshCw } from "lucide-react";
+import { Bell, Check, AlertCircle, Calendar, Clock, RefreshCw, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
+import { PushNotificationToggle } from "@/components/PushNotificationBanner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Notifications() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const { data: notifications, refetch } = trpc.notifications.list.useQuery();
+  const sendTestPush = trpc.pushNotifications.sendTest.useMutation({
+    onSuccess: (data) => {
+      toast.success(`測試通知已發送，成功推送 ${data.sent} 個訂閱`);
+    },
+    onError: (err) => {
+      toast.error(`發送失敗：${err.message}`);
+    },
+  });
   const markAsRead = trpc.notifications.markAsRead.useMutation({
     onSuccess: () => {
       refetch();
@@ -107,6 +119,44 @@ export default function Notifications() {
           </Button>
         </div>
       </div>
+
+      {/* 推送通知設置 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            推送通知設置
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">設備推送通知</p>
+              <p className="text-xs text-muted-foreground mt-0.5">開啟後，行程變動和緊急調整將即時推送到此設備</p>
+            </div>
+            <PushNotificationToggle />
+          </div>
+          {isAdmin && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">發送測試通知</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">向所有已訂閱的設備發送測試推送</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sendTestPush.mutate({ title: 'HKEIU 測試通知', body: '推送通知功能正常運行 ✓' })}
+                  disabled={sendTestPush.isPending}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {sendTestPush.isPending ? '發送中...' : '發送測試'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

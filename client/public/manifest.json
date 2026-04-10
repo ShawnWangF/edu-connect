@@ -1,0 +1,26 @@
+{
+  "name": "HKEIU 教育團組管理",
+  "short_name": "HKEIU",
+  "description": "香港教育工作者聯盟 - 教育團組管理系統",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663284768894/P3EFPXo6PDntRisxqhyY6k/icon-192_981db244.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663284768894/P3EFPXo6PDntRisxqhyY6k/icon-512_ddd9db22.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "zh-TW"
+}

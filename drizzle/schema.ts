@@ -656,3 +656,18 @@ export const schoolExchanges = mysqlTable("schoolExchanges", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+
+/**
+ * Web Push 訂閱表 - 存儲用戶的推送通知訂閱信息
+ */
+export const pushSubscriptions = mysqlTable("pushSubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(), // 關聯用戶
+  endpoint: text("endpoint").notNull(), // 推送服務端點 URL
+  p256dh: text("p256dh").notNull(), // 加密公鑰
+  auth: varchar("auth", { length: 255 }).notNull(), // 認證密鑰
+  userAgent: text("userAgent"), // 設備信息（可選，用於調試）
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});

@@ -270,3 +270,18 @@
 - [x] 根本原因：exchangeSchools/domesticSchools 数据库表字段与 schema.ts 不匹配（city/contactName vs region/contactPerson），导致 Drizzle ORM 查询失败静默返回空
 - [x] 修复：ALTER TABLE 重命名字段并添加缺失字段，两表字段现已与 schema.ts 完全对齐
 - [x] 验证：24 所姊妹学校、25 所前来交流学校数据完好，查询正常返回
+
+## PWA + Web Push 通知功能开发（第十九轮）
+- [x] 生成 VAPID 密钥对并配置环境变量（VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VITE_VAPID_PUBLIC_KEY）
+- [x] 数据库新增 pushSubscriptions 表（userId/endpoint/p256dh/auth/userAgent）
+- [x] 后端：订阅管理路由（subscribe/unsubscribe/mySubscriptions）
+- [x] 后端：sendWebPushToAll 服务函数（使用原生 mysql2 连接，支持指定 userIds）
+- [x] 后端：pushNotifications.sendTest 路由（管理员发送测试推送）
+- [x] 后端：pushNotifications.broadcast 路由（管理员广播推送）
+- [x] 前端：manifest.json 配置（PWA 安装支持，含 CDN 图标）
+- [x] 前端：Service Worker（sw.js）处理推送事件（push/notificationclick）
+- [x] 前端：index.html 添加 manifest link 和 Apple PWA meta 标签
+- [x] 前端：usePushNotification hook（Service Worker 注册、权限请求、订阅管理）
+- [x] 前端：PushNotificationBanner 组件（登录后显示通知权限请求横幅）
+- [x] 前端：通知中心页面添加推送通知设置区域（开启/关闭订阅、管理员发送测试）
+- [x] 前端：DashboardLayout 集成 PushNotificationBanner（每页顶部显示）

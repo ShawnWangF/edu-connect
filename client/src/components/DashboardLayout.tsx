@@ -27,6 +27,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { trpc } from "@/lib/trpc";
+import { PushNotificationBanner } from "./PushNotificationBanner";
 
 const menuItems = [
   { icon: Activity, label: "實時指揮中心", path: "/" },
@@ -262,7 +263,10 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1 p-4">
+          <PushNotificationBanner />
+          {children}
+        </main>
       </SidebarInset>
     </>
   );

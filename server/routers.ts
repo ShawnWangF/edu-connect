@@ -7,6 +7,68 @@ import { z } from "zod";
 import * as db from "./db";
 import { nanoid } from "nanoid";
 import * as notificationService from "./notificationService";
+import webpush from "web-push";
+
+// 初始化 VAPID 配置
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:admin@hkeiu.org',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
+// 發送 Web Push 通知給所有訂閱者（或指定用戶）
+async function sendWebPushToAll(payload: { title: string; body: string; url?: string }, userIds?: number[]) {
+  if (!process.env.DATABASE_URL) return 0;
+  const mysql2 = require('mysql2/promise');
+  const rawConn = await mysql2.createConnection(process.env.DATABASE_URL);
+  try {
+    let query = 'SELECT * FROM pushSubscriptions';
+    const params: any[] = [];
+    if (userIds && userIds.length > 0) {
+      query += ` WHERE userId IN (${userIds.map(() => '?').join(',')})`;
+      params.push(...userIds);
+    }
+    const [rows] = await rawConn.execute(query, params) as any;
+    if (!rows || rows.length === 0) return 0;
+    const message = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      url: payload.url || '/',
+      timestamp: Date.now(),
+    });
+    const results = await Promise.allSettled(
+      rows.map((sub: any) =>
+        webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          message
+        )
+      )
+    );
+    // 清理失效訂閱（410 Gone）
+    const toDelete: string[] = [];
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        const err = result.reason as any;
+        if (err?.statusCode === 410 || err?.statusCode === 404) {
+          toDelete.push(rows[i].endpoint);
+        }
+      }
+    });
+    if (toDelete.length > 0) {
+      for (const ep of toDelete) {
+        await rawConn.execute('DELETE FROM pushSubscriptions WHERE endpoint = ?', [ep]);
+      }
+    }
+    return results.filter(r => r.status === 'fulfilled').length;
+  } catch (e) {
+    console.error('sendWebPushToAll error:', e);
+    return 0;
+  } finally {
+    await rawConn.end();
+  }
+}
 
 // 權限檢查中間件
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -2845,5 +2907,79 @@ export const appRouter = router({
       return { arrivals: (arrivals as unknown) as any[], departures: (departures as unknown) as any[] };
     }),
   }),
+  pushNotifications: router({
+    // 訂閱推送通知
+    subscribe: protectedProcedure
+      .input(z.object({
+        endpoint: z.string(),
+        p256dh: z.string(),
+        auth: z.string(),
+        userAgent: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        // 先刪除同一 endpoint 的舊訂閱（避免重複）
+        const mysql2 = require('mysql2/promise');
+        const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
+        await rawConn.execute('DELETE FROM pushSubscriptions WHERE endpoint = ?', [input.endpoint]);
+        await rawConn.execute(
+          'INSERT INTO pushSubscriptions (userId, endpoint, p256dh, auth, userAgent) VALUES (?, ?, ?, ?, ?)',
+          [ctx.user.id, input.endpoint, input.p256dh, input.auth, input.userAgent || null]
+        );
+        await rawConn.end();
+        return { success: true };
+      }),
+
+    // 取消訂閱
+    unsubscribe: protectedProcedure
+      .input(z.object({ endpoint: z.string() }))
+      .mutation(async ({ input }) => {
+        const mysql2 = require('mysql2/promise');
+        const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
+        await rawConn.execute('DELETE FROM pushSubscriptions WHERE endpoint = ?', [input.endpoint]);
+        await rawConn.end();
+        return { success: true };
+      }),
+
+    // 查詢當前用戶的訂閱狀態
+    mySubscriptions: protectedProcedure.query(async ({ ctx }) => {
+      const mysql2 = require('mysql2/promise');
+      const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
+      try {
+        const [rows] = await rawConn.execute(
+          'SELECT id, endpoint, userAgent, createdAt FROM pushSubscriptions WHERE userId = ?',
+          [ctx.user.id]
+        ) as any;
+        return rows as any[];
+      } finally {
+        await rawConn.end();
+      }
+    }),
+
+    // 管理員：向所有人發送測試通知
+    sendTest: adminProcedure
+      .input(z.object({
+        title: z.string().default('HKEIU 測試通知'),
+        body: z.string().default('這是一條測試推送通知，系統運行正常。'),
+      }))
+      .mutation(async ({ input }) => {
+        const count = await sendWebPushToAll({ title: input.title, body: input.body, url: '/' });
+        return { sent: count };
+      }),
+
+    // 向所有訂閱者廣播通知（供其他路由內部調用）
+    broadcast: adminProcedure
+      .input(z.object({
+        title: z.string(),
+        body: z.string(),
+        url: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const count = await sendWebPushToAll(input);
+        return { sent: count };
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;
+export { sendWebPushToAll };
