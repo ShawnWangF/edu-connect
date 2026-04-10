@@ -227,7 +227,8 @@ export default function ScheduleOverview() {
           const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
           const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string };
           const arrivalFlightNum = block.flightNumber || gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
-          arrivalFlights.push(arrivalFlightNum ? `${g.code} ${arrivalFlightNum}` : `${g.code} 未設置`);
+          // 格式：團組編號 + 航班號，未設置時標記
+          arrivalFlights.push({ code: g.code || g.name, flight: arrivalFlightNum } as any);
         }
         if (isDepartureType(bt) && bt === 'departure') {
           departureGroupCount++;
@@ -235,7 +236,7 @@ export default function ScheduleOverview() {
           const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
           const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string };
           const departureFlightNum = block.flightNumber || gFlightInfo.departureFlight || batchFlight?.departureFlight || '';
-          departureFlights.push(departureFlightNum ? `${g.code} ${departureFlightNum}` : `${g.code} 未設置`);
+          departureFlights.push({ code: g.code || g.name, flight: departureFlightNum } as any);
         }
       });
       return { date, szCount, hkCount, arrivalFlights, departureFlights, arrivalGroupCount, departureGroupCount };
@@ -839,8 +840,14 @@ export default function ScheduleOverview() {
                     <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] text-blue-700 bg-[#DAEEF3]">抵達航班</td>
                     {dailyStats.map(({ date, arrivalFlights }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5 bg-[#F0F8FF]">
-                        {arrivalFlights.map((f, i) => (
-                          <div key={i} className="text-[8px] text-blue-800 leading-tight">{f}</div>
+                        {(arrivalFlights as any[]).map((f: any, i: number) => (
+                          <div key={i} className="text-[8px] leading-tight">
+                            <span className="text-gray-500">{f.code}</span>{' '}
+                            {f.flight
+                              ? <span className="text-blue-800 font-medium">{f.flight}</span>
+                              : <span className="text-orange-400">未設置</span>
+                            }
+                          </div>
                         ))}
                       </td>
                     ))}
@@ -862,8 +869,14 @@ export default function ScheduleOverview() {
                     <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] text-amber-700 bg-[#FFE699] opacity-80">離開航班</td>
                     {dailyStats.map(({ date, departureFlights }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5 bg-[#FFFBF0]">
-                        {departureFlights.map((f, i) => (
-                          <div key={i} className="text-[8px] text-amber-800 leading-tight">{f}</div>
+                        {(departureFlights as any[]).map((f: any, i: number) => (
+                          <div key={i} className="text-[8px] leading-tight">
+                            <span className="text-gray-500">{f.code}</span>{' '}
+                            {f.flight
+                              ? <span className="text-amber-800 font-medium">{f.flight}</span>
+                              : <span className="text-orange-400">未設置</span>
+                            }
+                          </div>
                         ))}
                       </td>
                     ))}
