@@ -205,6 +205,29 @@ export default function ScheduleOverview() {
     }));
   }, [groups]);
 
+  // 根據團組信息推算某天的住宿城市（當色塊不存在時作為 fallback）
+  function inferCityFromGroup(g: any, date: string): 'sz' | 'hk' | null {
+    const startDate = toDateStr(g.startDate);
+    const endDate = toDateStr(g.endDate);
+    const crossingDate = toDateStr(g.crossing_date);
+    const startCity = (g.start_city || g.startCity || '').toLowerCase();
+    if (!startDate || !endDate) return null;
+    if (date < startDate || date > endDate) return null;
+    if (date === endDate) return null; // 離境日不計入住宿
+    const isSz = startCity === 'sz' || startCity === '深圳';
+    const isHk = startCity === 'hk' || startCity === '香港';
+    if (!crossingDate) {
+      // 沒有過關日，全程住起始城市
+      return isSz ? 'sz' : isHk ? 'hk' : null;
+    }
+    if (date < crossingDate) {
+      return isSz ? 'sz' : isHk ? 'hk' : null;
+    } else {
+      // 過關日當天及之後，住對山城市
+      return isSz ? 'hk' : isHk ? 'sz' : null;
+    }
+  }
+
   // 每日統計
   const dailyStats = useMemo(() => {
     return dateRange.map(date => {
@@ -215,33 +238,56 @@ export default function ScheduleOverview() {
 
       groups.forEach(g => {
         const block = blockMap.get(`${g.id}_${date}`);
-        if (!block) return;
-        const bt: BlockType = block.blockType || 'free';
-        const city = getHotelCity(bt);
         const count = (g.studentCount || 0) + (g.teacherCount || 0);
-        if (city === 'sz') szCount += count;
-        if (city === 'hk') hkCount += count;
-        if (isArrivalType(bt)) {
-          arrivalGroupCount++;
-          // 優先：色塊手動填寫的航班號 → 團組 flight_info.arrivalFlight → 批次 arrivalFlight → 「未設置」
-          const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
-          const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string };
-          const arrivalFlightNum = block.flightNumber || gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
-          // 格式：團組編號 + 航班號，未設置時標記
-          arrivalFlights.push({ code: g.code || g.name, flight: arrivalFlightNum } as any);
-        }
-        if (isDepartureType(bt) && bt === 'departure') {
-          departureGroupCount++;
-          // 優先：色塊手動填寫的航班號 → 團組 flight_info.departureFlight → 批次 departureFlight → 「未設置」
-          const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
-          const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string };
-          const departureFlightNum = block.flightNumber || gFlightInfo.departureFlight || batchFlight?.departureFlight || '';
-          departureFlights.push({ code: g.code || g.name, flight: departureFlightNum } as any);
+
+        if (block) {
+          // 有色塊：使用色塊數據
+          const bt: BlockType = block.blockType || 'free';
+          const city = getHotelCity(bt);
+          if (city === 'sz') szCount += count;
+          if (city === 'hk') hkCount += count;
+          if (isArrivalType(bt)) {
+            arrivalGroupCount++;
+            const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
+            const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string };
+            const arrivalFlightNum = block.flightNumber || gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
+            arrivalFlights.push(arrivalFlightNum || '未設置');
+          }
+          if (bt === 'departure') {
+            departureGroupCount++;
+            const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
+            const gFlightInfo = (g.flight_info || {}) as { departureFlight?: string };
+            const departureFlightNum = block.flightNumber || gFlightInfo.departureFlight || batchFlight?.departureFlight || '';
+            departureFlights.push(departureFlightNum || '未設置');
+          }
+        } else {
+          // 無色塊：根據團組信息推算住宿城市
+          const city = inferCityFromGroup(g, date);
+          if (city === 'sz') szCount += count;
+          if (city === 'hk') hkCount += count;
+          // 推算抵達日（起始日）
+          const startDate = toDateStr(g.startDate);
+          if (date === startDate && city) {
+            arrivalGroupCount++;
+            const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
+            const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string };
+            const arrivalFlightNum = gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
+            arrivalFlights.push(arrivalFlightNum || '未設置');
+          }
+          // 推算離境日
+          const endDate = toDateStr(g.endDate);
+          if (date === endDate) {
+            departureGroupCount++;
+            const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
+            const gFlightInfo = (g.flight_info || {}) as { departureFlight?: string };
+            const departureFlightNum = gFlightInfo.departureFlight || batchFlight?.departureFlight || '';
+            departureFlights.push(departureFlightNum || '未設置');
+          }
         }
       });
       return { date, szCount, hkCount, arrivalFlights, departureFlights, arrivalGroupCount, departureGroupCount };
     });
-  }, [dateRange, groups, blockMap]);
+  }, [dateRange, groups, blockMap, batchFlightMap]);
 
   function handleCellClick(groupId: number, date: string) {
     const existing = blockMap.get(`${groupId}_${date}`);
@@ -840,12 +886,11 @@ export default function ScheduleOverview() {
                     <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] text-blue-700 bg-[#DAEEF3]">抵達航班</td>
                     {dailyStats.map(({ date, arrivalFlights }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5 bg-[#F0F8FF]">
-                        {(arrivalFlights as any[]).map((f: any, i: number) => (
+                        {arrivalFlights.map((f, i) => (
                           <div key={i} className="text-[8px] leading-tight">
-                            <span className="text-gray-500">{f.code}</span>{' '}
-                            {f.flight
-                              ? <span className="text-blue-800 font-medium">{f.flight}</span>
-                              : <span className="text-orange-400">未設置</span>
+                            {f === '未設置'
+                              ? <span className="text-orange-400">未設置</span>
+                              : <span className="text-blue-800 font-medium">{f}</span>
                             }
                           </div>
                         ))}
@@ -869,12 +914,11 @@ export default function ScheduleOverview() {
                     <td colSpan={7} className="border border-gray-200 px-2 py-0.5 text-[9px] text-amber-700 bg-[#FFE699] opacity-80">離開航班</td>
                     {dailyStats.map(({ date, departureFlights }) => (
                       <td key={date} className="border border-gray-200 text-center py-0.5 bg-[#FFFBF0]">
-                        {(departureFlights as any[]).map((f: any, i: number) => (
+                        {departureFlights.map((f, i) => (
                           <div key={i} className="text-[8px] leading-tight">
-                            <span className="text-gray-500">{f.code}</span>{' '}
-                            {f.flight
-                              ? <span className="text-amber-800 font-medium">{f.flight}</span>
-                              : <span className="text-orange-400">未設置</span>
+                            {f === '未設置'
+                              ? <span className="text-orange-400">未設置</span>
+                              : <span className="text-amber-800 font-medium">{f}</span>
                             }
                           </div>
                         ))}
