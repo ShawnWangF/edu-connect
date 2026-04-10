@@ -223,13 +223,19 @@ export default function ScheduleOverview() {
         if (city === 'hk') hkCount += count;
         if (isArrivalType(bt)) {
           arrivalGroupCount++;
-          if (block.flightNumber) arrivalFlights.push(block.flightNumber);
-          else arrivalFlights.push(g.code || g.name);
+          // 優先：色塊手動填寫的航班號 → 團組 flight_info.arrivalFlight → 批次 arrivalFlight → 「未設置」
+          const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
+          const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string };
+          const arrivalFlightNum = block.flightNumber || gFlightInfo.arrivalFlight || batchFlight?.arrivalFlight || '';
+          arrivalFlights.push(arrivalFlightNum ? `${g.code} ${arrivalFlightNum}` : `${g.code} 未設置`);
         }
         if (isDepartureType(bt) && bt === 'departure') {
           departureGroupCount++;
-          if (block.flightNumber) departureFlights.push(block.flightNumber);
-          else departureFlights.push(g.code || g.name);
+          // 優先：色塊手動填寫的航班號 → 團組 flight_info.departureFlight → 批次 departureFlight → 「未設置」
+          const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
+          const gFlightInfo = (g.flight_info || {}) as { arrivalFlight?: string; departureFlight?: string; arrivalTime?: string; departureTime?: string };
+          const departureFlightNum = block.flightNumber || gFlightInfo.departureFlight || batchFlight?.departureFlight || '';
+          departureFlights.push(departureFlightNum ? `${g.code} ${departureFlightNum}` : `${g.code} 未設置`);
         }
       });
       return { date, szCount, hkCount, arrivalFlights, departureFlights, arrivalGroupCount, departureGroupCount };
@@ -452,9 +458,12 @@ export default function ScheduleOverview() {
         {/* 航班列 */}
         <td className="border border-gray-200 px-1 py-0.5 text-center align-middle" style={{ width: LEFT_COL_WIDTHS.flight, minWidth: LEFT_COL_WIDTHS.flight, backgroundColor: rowBg }}>
           <div className="text-[9px] text-gray-600 leading-tight">
-            {flightInfo.arrivalFlight && <div title={`抵達 ${flightInfo.arrivalTime || ''}`}>↓{flightInfo.arrivalFlight}</div>}
-            {flightInfo.departureFlight && <div title={`離開 ${flightInfo.departureTime || ''}`}>↑{flightInfo.departureFlight}</div>}
-            {!flightInfo.arrivalFlight && !flightInfo.departureFlight && <span className="text-gray-300">-</span>}
+            <div title={`抵達 ${flightInfo.arrivalTime || ''}`}>
+              ↓{flightInfo.arrivalFlight || <span className="text-orange-400">未設置</span>}
+            </div>
+            <div title={`離開 ${flightInfo.departureTime || ''}`}>
+              ↑{flightInfo.departureFlight || <span className="text-orange-400">未設置</span>}
+            </div>
           </div>
         </td>
         {/* 類型列 */}

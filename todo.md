@@ -290,3 +290,4 @@
 - [x] Bug 1：學校分組追加後無法保存（在 handleSave 中加入數據清洗，確保 schoolList 必填字段有效）
 - [x] Bug 2：排程總覽無法同步批次內行程日期（新增 scheduleBlocks.autoGenerate 路由 + 前端「自動生成色塊」按鈕）
 - [x] 修復 startCityLabel 讀取 start_city 而非 startCity（snake_case 字段名稱對齊）
+- [x] 修復排程總覽航班欄位：改為讀取團組管理中的航班號（優先色塊手動填寫 → 團組 flight_info → 批次航班），未設置時顯示「未設置」（橙色）
