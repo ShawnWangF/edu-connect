@@ -285,3 +285,8 @@
 - [x] 前端：PushNotificationBanner 组件（登录后显示通知权限请求横幅）
 - [x] 前端：通知中心页面添加推送通知设置区域（开启/关闭订阅、管理员发送测试）
 - [x] 前端：DashboardLayout 集成 PushNotificationBanner（每页顶部显示）
+
+## Bug 修複（第二十輪）
+- [x] Bug 1：學校分組追加後無法保存（在 handleSave 中加入數據清洗，確保 schoolList 必填字段有效）
+- [x] Bug 2：排程總覽無法同步批次內行程日期（新增 scheduleBlocks.autoGenerate 路由 + 前端「自動生成色塊」按鈕）
+- [x] 修復 startCityLabel 讀取 start_city 而非 startCity（snake_case 字段名稱對齊）

@@ -146,6 +146,7 @@ export default function ScheduleOverview() {
   const upsertBlock = trpc.scheduleBlocks.upsert.useMutation();
   const shiftBatch = trpc.scheduleBlocks.shiftBatch.useMutation();
   const batchUpsert = trpc.scheduleBlocks.batchUpsert.useMutation();
+  const autoGenerate = trpc.scheduleBlocks.autoGenerate.useMutation();
   const updateGroup = trpc.groups.update.useMutation();
 
   // 色塊編輯
@@ -428,10 +429,11 @@ export default function ScheduleOverview() {
       arrivalTime: groupFlightInfo.arrivalTime || batchFlightInfo.arrivalTime,
       departureTime: groupFlightInfo.departureTime || batchFlightInfo.departureTime,
     };
-    const startCityLabel = (group.startCity === 'sz' || group.startCity === '深圳') ? '深圳'
-      : (group.startCity === 'hk' || group.startCity === '香港') ? '香港'
-      : (group.startCity === 'macau' || group.startCity === '澳門' || group.startCity === '澳门') ? '澳門'
-      : group.startCity || '-';
+    const startCityRaw = group.start_city || group.startCity || '';
+    const startCityLabel = (startCityRaw === 'sz' || startCityRaw === '深圳') ? '深圳'
+      : (startCityRaw === 'hk' || startCityRaw === '香港') ? '香港'
+      : (startCityRaw === 'macau' || startCityRaw === '澳門' || startCityRaw === '澳门') ? '澳門'
+      : startCityRaw || '-';
 
     return (
       <tr
@@ -616,6 +618,48 @@ export default function ScheduleOverview() {
             </span>
           )}
         </div>
+        {/* 一鍵自動生成色塊按鈕 */}
+        {pid && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+              disabled={autoGenerate.isPending}
+              onClick={async () => {
+                if (!pid) return;
+                try {
+                  const result = await autoGenerate.mutateAsync({ projectId: pid, overwrite: false });
+                  await refetchBlocks();
+                  toast.success(`已自動生成 ${result.generated} 個色塊（跳過 ${result.skipped} 個已有色塊的團組）`);
+                } catch {
+                  toast.error('自動生成失敗');
+                }
+              }}
+            >
+              {autoGenerate.isPending ? '生成中...' : '✨ 自動生成色塊'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+              disabled={autoGenerate.isPending}
+              onClick={async () => {
+                if (!pid) return;
+                if (!confirm('確定覆蓋所有團組的色塊？已手動調整的色塊將被重置。')) return;
+                try {
+                  const result = await autoGenerate.mutateAsync({ projectId: pid, overwrite: true });
+                  await refetchBlocks();
+                  toast.success(`已重新生成 ${result.generated} 個色塊`);
+                } catch {
+                  toast.error('重新生成失敗');
+                }
+              }}
+            >
+              {autoGenerate.isPending ? '生成中...' : '↺ 重新生成'}
+            </Button>
+          </div>
+        )}
         {/* 圖例 */}
         <div className="flex items-center gap-2 flex-wrap">
           {[

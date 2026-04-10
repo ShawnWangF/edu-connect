@@ -2501,6 +2501,20 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
 
   const handleSave = () => {
     const selectedBatch = batches.find((b: any) => b.id.toString() === batchId);
+    // 數据清洗：確保 schoolList 中每個學校的必填字段有效
+    const cleanedSchoolList = schoolList
+      .filter(s => s.name && s.name.trim() !== '')
+      .map(s => {
+        const item: any = {
+          name: s.name.trim(),
+          studentCount: typeof s.studentCount === 'number' && !isNaN(s.studentCount) ? s.studentCount : 0,
+          teacherCount: typeof s.teacherCount === 'number' && !isNaN(s.teacherCount) ? s.teacherCount : 0,
+        };
+        if (s.domesticSchoolId !== undefined && s.domesticSchoolId !== null) item.domesticSchoolId = s.domesticSchoolId;
+        if (s.exchangeSchoolId !== undefined && s.exchangeSchoolId !== null) item.exchangeSchoolId = s.exchangeSchoolId;
+        if (s.timeSlot && s.timeSlot !== '__none') item.timeSlot = s.timeSlot;
+        return item;
+      });
     updateGroup.mutate({
       id: groupId,
       batchId: batchId ? parseInt(batchId) : undefined,
@@ -2514,7 +2528,7 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
         departureFlight: departureFlight || undefined,
         departureTime: departureTime || undefined,
       },
-      schoolList: schoolList,
+      schoolList: cleanedSchoolList,
       exchangeDate: exchangeDate || undefined,
     });
   };

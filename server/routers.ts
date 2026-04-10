@@ -1771,6 +1771,96 @@ export const appRouter = router({
         return { success: true, count: input.blocks.length };
       }),
 
+    // 根據團組信息自動生成色塊（startDate/endDate/start_city/crossing_date）
+    autoGenerate: editorProcedure
+      .input(z.object({
+        projectId: z.number(),
+        overwrite: z.boolean().optional().default(false), // 是否覆蓋已有色塊
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { scheduleBlocks, groups } = await import('../drizzle/schema');
+        const { eq, and, inArray } = await import('drizzle-orm');
+        // 查詢項目下所有團組
+        const allGroups = await dbConn.select().from(groups).where(eq(groups.projectId, input.projectId));
+        let totalGenerated = 0;
+        const skipped: number[] = [];
+        for (const group of allGroups) {
+          if (!group.startDate || !group.endDate || !group.start_city) {
+            skipped.push(group.id);
+            continue;
+          }
+          // 如果不覆蓋，檢查是否已有色塊
+          if (!input.overwrite) {
+            const existing = await dbConn.select().from(scheduleBlocks).where(eq(scheduleBlocks.groupId, group.id));
+            if (existing.length > 0) {
+              skipped.push(group.id);
+              continue;
+            }
+          }
+          // 生成色塊
+          // 注意：drizzle 返回的 date 字段是 Date 物件，需要轉為字串比較
+          const toDateStr = (d: Date | string | null | undefined): string | null => {
+            if (!d) return null;
+            if (typeof d === 'string') return d.split('T')[0];
+            return d.toISOString().split('T')[0];
+          };
+          const startDateStr = toDateStr(group.startDate)!;
+          const endDateStr = toDateStr(group.endDate)!;
+          const crossingDateStr = toDateStr(group.crossing_date);
+          // 交流日儲存在 tags.exchangeDate 中
+          const tagsObj = group.tags as Record<string, string> | null;
+          const exchangeDateStr = tagsObj?.exchangeDate || null;
+          const startCity = group.start_city; // 'hk' | 'sz'
+          const newBlocks: Array<{ groupId: number; date: string; blockType: string; isExchangeDay: boolean; hotelCity: string | null; notes: string | null }> = [];
+          // 遍歷每一天
+          const startDate = new Date(startDateStr + 'T00:00:00');
+          const endDate = new Date(endDateStr + 'T00:00:00');
+          let cur = new Date(startDate);
+          while (cur <= endDate) {
+            const dateStr = cur.toISOString().split('T')[0];
+            const isStart = dateStr === startDateStr;
+            const isEnd = dateStr === endDateStr;
+            const isCrossing = crossingDateStr && dateStr === crossingDateStr;
+            const isExchange = exchangeDateStr && dateStr === exchangeDateStr;
+            let blockType = 'free';
+            let hotelCity: string | null = null;
+            let isExchangeDay = false;
+            if (isEnd) {
+              blockType = 'departure';
+              hotelCity = null;
+            } else if (isCrossing) {
+              blockType = startCity === 'hk' ? 'border_hk_sz' : 'border_sz_hk';
+              hotelCity = startCity === 'hk' ? 'sz' : 'hk';
+            } else if (isStart) {
+              blockType = startCity === 'hk' ? 'hk_arrive' : 'sz_arrive';
+              hotelCity = startCity === 'hk' ? 'hk' : 'sz';
+            } else {
+              // 判斷當前在哪個城市
+              const afterCrossing = crossingDateStr && cur.toISOString().split('T')[0] > crossingDateStr;
+              const inHk = startCity === 'hk' ? !afterCrossing : !!afterCrossing;
+              blockType = inHk ? 'hk_stay' : 'sz_stay';
+              hotelCity = inHk ? 'hk' : 'sz';
+            }
+            if (isExchange && blockType !== 'departure' && blockType !== 'border_hk_sz' && blockType !== 'border_sz_hk') {
+              blockType = 'exchange';
+              isExchangeDay = true;
+              hotelCity = 'hk';
+            }
+            newBlocks.push({ groupId: group.id, date: dateStr, blockType, isExchangeDay, hotelCity, notes: null });
+            cur.setDate(cur.getDate() + 1);
+          }
+          // 刪除舊色塊並插入新色塊
+          await dbConn.delete(scheduleBlocks).where(eq(scheduleBlocks.groupId, group.id));
+          if (newBlocks.length > 0) {
+            await dbConn.insert(scheduleBlocks).values(newBlocks as any);
+            totalGenerated += newBlocks.length;
+          }
+        }
+        return { success: true, generated: totalGenerated, skipped: skipped.length };
+      }),
+
     // 整體移動批次行程（將所有色塊往後移 n 天）
     shiftBatch: editorProcedure
       .input(z.object({
