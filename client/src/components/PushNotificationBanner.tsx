@@ -2,9 +2,10 @@ import { Bell, BellOff, X } from "lucide-react";
 import { useState } from "react";
 import { usePushNotification } from "@/hooks/usePushNotification";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export function PushNotificationBanner() {
-  const { state, isLoading, isSupported, subscribe } = usePushNotification();
+  const { state, isLoading, error, isSupported, subscribe } = usePushNotification();
   const [dismissed, setDismissed] = useState(() => {
     return localStorage.getItem("push-banner-dismissed") === "true";
   });
@@ -22,7 +23,10 @@ export function PushNotificationBanner() {
   const handleSubscribe = async () => {
     const success = await subscribe();
     if (success) {
+      toast.success("推送通知已開啟！");
       // 订阅成功后横幅自动消失（state 变为 subscribed）
+    } else if (error) {
+      toast.error(error);
     }
   };
 
@@ -60,7 +64,7 @@ export function PushNotificationBanner() {
 
 // 通知设置按钮（用于侧边栏或设置页面）
 export function PushNotificationToggle() {
-  const { state, isLoading, isSupported, subscribe, unsubscribe } = usePushNotification();
+  const { state, isLoading, error, isSupported, subscribe, unsubscribe } = usePushNotification();
 
   if (!isSupported) {
     return (
@@ -99,15 +103,18 @@ export function PushNotificationToggle() {
   }
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={subscribe}
-      disabled={isLoading}
-      className="flex items-center gap-2"
-    >
-      <Bell className="h-4 w-4" />
-      {isLoading ? "處理中..." : "開啟推送通知"}
-    </Button>
+    <div className="space-y-1">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={subscribe}
+        disabled={isLoading}
+        className="flex items-center gap-2"
+      >
+        <Bell className="h-4 w-4" />
+        {isLoading ? "開啟中..." : "開啟推送通知"}
+      </Button>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
   );
 }

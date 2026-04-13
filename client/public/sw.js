@@ -1,6 +1,6 @@
 // HKEIU EduConnect Service Worker
 // 版本号：每次更新时修改此值以触发更新
-const SW_VERSION = 'v1.0.0';
+const SW_VERSION = 'v1.0.2';
 const CACHE_NAME = `hkeiu-cache-${SW_VERSION}`;
 
 // 安装事件：预缓存关键资源
