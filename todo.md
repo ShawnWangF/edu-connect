@@ -298,5 +298,9 @@
 ## Bug 修復（第二十二輪）
 - [x] 修正排程總覽日期時區偏移：新增 localDateStr() 函數使用本地時間格式化，修復 generateDateRange/toDateStr/isToday 全部改用本地時間，避免 UTC 偏移導致日期少一天
 
-## Bug 修復（第二十三輪）
-- [ ] 修正排程總覽底部統計行（航班/住宿）的日期列與上方甘特圖不對齊問題（統計行列數偏少，數字往左偏移一格）
+## Bug 修複（第二十三輪）
+- [x] 修正排程總覽底部統計行（航班/住宿）的日期列與上方甘特圖不對齊問題（將所有 colSpan 從 7 改為 8，對齊 8 個固定列）
+
+## Bug 修複（第二十四輪）
+- [x] 修復 /notifications 頁面 API Mutation Error: require is not defined（將所有 require('mysql2/promise') 改為 Drizzle ORM）
+- [x] 修復 PWA Web Push 通知無法收到（根本原因是 require 在 ESM 環境不存在，將 sendWebPushToAll/subscribe/unsubscribe/mySubscriptions 全部改用 Drizzle ORM）

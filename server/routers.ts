@@ -8,6 +8,8 @@ import * as db from "./db";
 import { nanoid } from "nanoid";
 import * as notificationService from "./notificationService";
 import webpush from "web-push";
+import { pushSubscriptions as pushSubTable } from "../drizzle/schema";
+import { eq, inArray } from "drizzle-orm";
 
 // 初始化 VAPID 配置
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -20,17 +22,16 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 
 // 發送 Web Push 通知給所有訂閱者（或指定用戶）
 async function sendWebPushToAll(payload: { title: string; body: string; url?: string }, userIds?: number[]) {
-  if (!process.env.DATABASE_URL) return 0;
-  const mysql2 = require('mysql2/promise');
-  const rawConn = await mysql2.createConnection(process.env.DATABASE_URL);
   try {
-    let query = 'SELECT * FROM pushSubscriptions';
-    const params: any[] = [];
+    const dbConn = await db.getDb();
+    if (!dbConn) return 0;
+    // 查詢訂閱列表
+    let rows: any[];
     if (userIds && userIds.length > 0) {
-      query += ` WHERE userId IN (${userIds.map(() => '?').join(',')})`;
-      params.push(...userIds);
+      rows = await dbConn.select().from(pushSubTable).where(inArray(pushSubTable.userId, userIds));
+    } else {
+      rows = await dbConn.select().from(pushSubTable);
     }
-    const [rows] = await rawConn.execute(query, params) as any;
     if (!rows || rows.length === 0) return 0;
     const message = JSON.stringify({
       title: payload.title,
@@ -58,15 +59,13 @@ async function sendWebPushToAll(payload: { title: string; body: string; url?: st
     });
     if (toDelete.length > 0) {
       for (const ep of toDelete) {
-        await rawConn.execute('DELETE FROM pushSubscriptions WHERE endpoint = ?', [ep]);
+        await dbConn.delete(pushSubTable).where(eq(pushSubTable.endpoint, ep));
       }
     }
     return results.filter(r => r.status === 'fulfilled').length;
   } catch (e) {
     console.error('sendWebPushToAll error:', e);
     return 0;
-  } finally {
-    await rawConn.end();
   }
 }
 
@@ -3010,14 +3009,14 @@ export const appRouter = router({
         const dbConn = await db.getDb();
         if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         // 先刪除同一 endpoint 的舊訂閱（避免重複）
-        const mysql2 = require('mysql2/promise');
-        const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
-        await rawConn.execute('DELETE FROM pushSubscriptions WHERE endpoint = ?', [input.endpoint]);
-        await rawConn.execute(
-          'INSERT INTO pushSubscriptions (userId, endpoint, p256dh, auth, userAgent) VALUES (?, ?, ?, ?, ?)',
-          [ctx.user.id, input.endpoint, input.p256dh, input.auth, input.userAgent || null]
-        );
-        await rawConn.end();
+        await dbConn.delete(pushSubTable).where(eq(pushSubTable.endpoint, input.endpoint));
+        await dbConn.insert(pushSubTable).values({
+          userId: ctx.user.id,
+          endpoint: input.endpoint,
+          p256dh: input.p256dh,
+          auth: input.auth,
+          userAgent: input.userAgent || null,
+        });
         return { success: true };
       }),
 
@@ -3025,26 +3024,21 @@ export const appRouter = router({
     unsubscribe: protectedProcedure
       .input(z.object({ endpoint: z.string() }))
       .mutation(async ({ input }) => {
-        const mysql2 = require('mysql2/promise');
-        const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
-        await rawConn.execute('DELETE FROM pushSubscriptions WHERE endpoint = ?', [input.endpoint]);
-        await rawConn.end();
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        await dbConn.delete(pushSubTable).where(eq(pushSubTable.endpoint, input.endpoint));
         return { success: true };
       }),
 
     // 查詢當前用戶的訂閱狀態
     mySubscriptions: protectedProcedure.query(async ({ ctx }) => {
-      const mysql2 = require('mysql2/promise');
-      const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
-      try {
-        const [rows] = await rawConn.execute(
-          'SELECT id, endpoint, userAgent, createdAt FROM pushSubscriptions WHERE userId = ?',
-          [ctx.user.id]
-        ) as any;
-        return rows as any[];
-      } finally {
-        await rawConn.end();
-      }
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const rows = await dbConn
+        .select({ id: pushSubTable.id, endpoint: pushSubTable.endpoint, userAgent: pushSubTable.userAgent, createdAt: pushSubTable.createdAt })
+        .from(pushSubTable)
+        .where(eq(pushSubTable.userId, ctx.user.id));
+      return rows;
     }),
 
     // 管理員：向所有人發送測試通知
