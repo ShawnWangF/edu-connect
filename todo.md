@@ -304,3 +304,10 @@
 ## Bug 修複（第二十四輪）
 - [x] 修復 /notifications 頁面 API Mutation Error: require is not defined（將所有 require('mysql2/promise') 改為 Drizzle ORM）
 - [x] 修復 PWA Web Push 通知無法收到（根本原因是 require 在 ESM 環境不存在，將 sendWebPushToAll/subscribe/unsubscribe/mySubscriptions 全部改用 Drizzle ORM）
+
+## 景點資源庫容量與休館日（第二十五輪）
+- [x] Schema：attractions 表加入 maxCapacity（最大承接量）和 closedDays（每週休館日）欄位
+- [x] 後端：景點 CRUD 路由支持新欄位
+- [x] 後端：新增衝突偵測查詢（同日同景點人數超載 / 休館日衝突）
+- [x] 前端：資源庫景點表單加入最大承接量和休館日選擇
+- [x] 前端：排程總覽顯示超載和休館日衝突警告

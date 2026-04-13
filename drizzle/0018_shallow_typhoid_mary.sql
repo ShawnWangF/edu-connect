@@ -1,0 +1,1 @@
+ALTER TABLE `attractions` ADD `maxCapacity` int;

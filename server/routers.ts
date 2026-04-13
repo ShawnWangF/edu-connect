@@ -9,7 +9,7 @@ import { nanoid } from "nanoid";
 import * as notificationService from "./notificationService";
 import webpush from "web-push";
 import { pushSubscriptions as pushSubTable } from "../drizzle/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and, gte, lte, isNotNull } from "drizzle-orm";
 
 // 初始化 VAPID 配置
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -1104,6 +1104,12 @@ export const appRouter = router({
         address: z.string().optional(),
         description: z.string().optional(),
         capacity: z.number().optional(),
+        maxCapacity: z.number().optional(), // 最大承接量
+        closedDays: z.array(z.union([z.string(), z.number()])).optional(), // 每週休館日 ["monday","tuesday"] 或 [1,2]
+        requiresBooking: z.boolean().optional(),
+        bookingLeadTime: z.number().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
         isAlwaysUnavailable: z.boolean(),
         unavailableTimeSlots: z.array(z.object({
           dayOfWeek: z.number(),
@@ -1112,8 +1118,8 @@ export const appRouter = router({
         })),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
-        await db.createAttraction(input);
+      .mutation(async ({ ctx, input }) => {
+        await db.createAttraction({ ...input, createdBy: ctx.user.id });
         return { success: true };
       }),
     
@@ -1125,6 +1131,12 @@ export const appRouter = router({
         address: z.string().optional(),
         description: z.string().optional(),
         capacity: z.number().optional(),
+        maxCapacity: z.number().optional(), // 最大承接量
+        closedDays: z.array(z.union([z.string(), z.number()])).optional(), // 每週休館日
+        requiresBooking: z.boolean().optional(),
+        bookingLeadTime: z.number().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
         isAlwaysUnavailable: z.boolean(),
         unavailableTimeSlots: z.array(z.object({
           dayOfWeek: z.number(),
@@ -1224,6 +1236,160 @@ export const appRouter = router({
             contactPhone: attraction.contactPhone,
           },
         };
+      }),
+
+    // 排程衝突偵測：檢查指定日期範圍內所有景點的超載和休館日衝突
+    checkConflicts: protectedProcedure
+      .input(z.object({
+        projectId: z.number().optional(), // 限定在某個項目內
+        startDate: z.string(), // YYYY-MM-DD
+        endDate: z.string(),   // YYYY-MM-DD
+      }))
+      .query(async ({ input }) => {
+        const { getDb } = await import('./db');
+        const { sql: drizzleSql } = await import('drizzle-orm');
+        const dbConn = await getDb();
+        if (!dbConn) return { conflicts: [] };
+
+        const { itineraries: itiTable, groups: groupsTable, attractions: attTable } = await import('../drizzle/schema');
+
+        // 取得日期範圍內所有有 locationId 的行程點
+        const itin = await dbConn
+          .select({
+            id: itiTable.id,
+            groupId: itiTable.groupId,
+            date: itiTable.date,
+            locationId: itiTable.locationId,
+          })
+          .from(itiTable)
+          .where(
+            and(
+              drizzleSql`${itiTable.date} >= ${input.startDate}`,
+              drizzleSql`${itiTable.date} <= ${input.endDate}`,
+              isNotNull(itiTable.locationId),
+            )
+          );
+
+        if (itin.length === 0) return { conflicts: [] };
+
+        // 取得相關團組人數
+        const groupIds = Array.from(new Set(itin.map((i: { groupId: number }) => i.groupId))) as number[];
+        const groupRows = await dbConn
+          .select({ id: groupsTable.id, name: groupsTable.name, totalCount: groupsTable.totalCount })
+          .from(groupsTable)
+          .where(inArray(groupsTable.id, groupIds));
+        const groupMap = Object.fromEntries(groupRows.map((g: { id: number; name: string; totalCount: number }) => [g.id, g]));
+
+        // 取得所有相關景點資料
+        const locationIds = Array.from(new Set(itin.map((i: { locationId: number | null }) => i.locationId!).filter(Boolean))) as number[];
+        const attrRows = await dbConn
+          .select({ id: attTable.id, name: attTable.name, maxCapacity: attTable.maxCapacity, closedDays: attTable.closedDays })
+          .from(attTable)
+          .where(inArray(attTable.id, locationIds));
+        const attrMap = Object.fromEntries(attrRows.map((a: { id: number; name: string; maxCapacity: number | null; closedDays: unknown }) => [a.id, a]));
+
+        // 按日期 + locationId 分組計算人數
+        type ConflictItem = {
+          date: string;
+          attractionId: number;
+          attractionName: string;
+          conflictType: 'overload' | 'closed';
+          totalPeople: number;
+          maxCapacity: number | null;
+          closedReason: string;
+          groups: Array<{ id: number; name: string; count: number }>;
+        };
+        const conflicts: ConflictItem[] = [];
+
+        // 按日期+景點分組
+        const grouped: Record<string, typeof itin> = {};
+        for (const row of itin) {
+          const key = `${row.date}__${row.locationId}`;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(row);
+        }
+
+        const dayNames = ['\u9031\u65e5', '\u9031\u4e00', '\u9031\u4e8c', '\u9031\u4e09', '\u9031\u56db', '\u9031\u4e94', '\u9031\u516d'];
+        const weekdayMap: Record<string, number> = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+
+        for (const [key, rows] of Object.entries(grouped)) {
+          const [dateStr, locIdStr] = key.split('__');
+          const locId = Number(locIdStr);
+          const attr = attrMap[locId];
+          if (!attr) continue;
+
+          // 計算當日到訪該景點的總人數
+          const groupsOnDay = (rows as Array<{ groupId: number }>).map((r) => {
+            const g = groupMap[r.groupId] as { id: number; name: string; totalCount: number } | undefined;
+            return { id: r.groupId, name: g?.name || `團組#${r.groupId}`, count: g?.totalCount || 0 };
+          });
+          const totalPeople = groupsOnDay.reduce((sum: number, g: { count: number }) => sum + g.count, 0);
+
+          // 檢查超載
+          if (attr.maxCapacity && totalPeople > attr.maxCapacity) {
+            conflicts.push({
+              date: dateStr,
+              attractionId: locId,
+              attractionName: attr.name,
+              conflictType: 'overload',
+              totalPeople,
+              maxCapacity: attr.maxCapacity,
+              closedReason: '',
+              groups: groupsOnDay,
+            });
+          }
+
+          // 檢查休館日
+          if (attr.closedDays) {
+            try {
+              const closedList = typeof attr.closedDays === 'string'
+                ? JSON.parse(attr.closedDays)
+                : (attr.closedDays as any[]);
+              if (Array.isArray(closedList) && closedList.length > 0) {
+                // 解析日期的星期幾
+                const d = new Date(dateStr + 'T00:00:00');
+                const dow = d.getDay(); // 0=週日
+                const dateOnly = dateStr; // YYYY-MM-DD
+
+                let closedReason = '';
+                for (const entry of closedList) {
+                  if (typeof entry === 'number' && entry === dow) {
+                    closedReason = `每${dayNames[dow]}休館`;
+                    break;
+                  }
+                  if (typeof entry === 'string') {
+                    const lower = entry.toLowerCase();
+                    if (weekdayMap[lower] !== undefined && weekdayMap[lower] === dow) {
+                      closedReason = `每${dayNames[dow]}休館`;
+                      break;
+                    }
+                    if (entry === dateOnly) {
+                      closedReason = `${dateOnly} 特定休館日`;
+                      break;
+                    }
+                  }
+                }
+
+                if (closedReason) {
+                  conflicts.push({
+                    date: dateStr,
+                    attractionId: locId,
+                    attractionName: attr.name,
+                    conflictType: 'closed',
+                    totalPeople,
+                    maxCapacity: attr.maxCapacity ?? null,
+                    closedReason,
+                    groups: groupsOnDay,
+                  });
+                }
+              }
+            } catch (_) { /* 忽略解析錯誤 */ }
+          }
+        }
+
+        // 按日期排序
+        conflicts.sort((a, b) => a.date.localeCompare(b.date));
+        return { conflicts };
       }),
   }),
   

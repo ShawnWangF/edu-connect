@@ -294,15 +294,20 @@ export const attractions = mysqlTable("attractions", {
   // 詳細地址
   address: text("address"),
   description: text("description"),
-  // 可容納人數
+  // 可容納人數（一般容量）
   capacity: int("capacity"),
+  // 最大承接量（同時最多可接待的人數，超過則觸發超載警告）
+  maxCapacity: int("maxCapacity"),
   // 不可用時間段（JSON格式），例如：[{"day": "monday", "startTime": "09:00", "endTime": "17:00"}]
   unavailableTimeSlots: json("unavailableTimeSlots"),
   // 是否全天不可用（例如永久關閉的景點）
   isAlwaysUnavailable: boolean("isAlwaysUnavailable").default(false).notNull(),
   // 開放時間（JSON格式），例如：{"monday": {"open": "09:00", "close": "17:00"}, ...}
   openingHours: json("openingHours"),
-  // 休館日（JSON格式），例如：["2024-01-01", "2024-12-25"]
+  // 休館日（JSON格式）：支持兩種格式混用
+  //   每週固定休館日：["monday", "tuesday", ...] （0=週日, 1=週一, ..., 6=週六）
+  //   特定日期休館：["2024-01-01", "2024-12-25"]
+  //   混合格式：["monday", "2024-01-01"]
   closedDays: json("closedDays"),
   // 是否需要預約
   requiresBooking: boolean("requiresBooking").default(false).notNull(),

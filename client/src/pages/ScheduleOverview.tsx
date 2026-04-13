@@ -4,7 +4,7 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, GripHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, GripHorizontal, X, AlertTriangle, CalendarX, ChevronUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -159,6 +159,16 @@ export default function ScheduleOverview() {
   const batchUpsert = trpc.scheduleBlocks.batchUpsert.useMutation();
   const autoGenerate = trpc.scheduleBlocks.autoGenerate.useMutation();
   const updateGroup = trpc.groups.update.useMutation();
+
+  // 衝突偵測
+  const [conflictPanelOpen, setConflictPanelOpen] = useState(false);
+  const conflictStartDate = project?.startDate ? toDateStr(project.startDate) : '';
+  const conflictEndDate = project?.endDate ? toDateStr(project.endDate) : '';
+  const { data: conflictData } = trpc.attractions.checkConflicts.useQuery(
+    { startDate: conflictStartDate, endDate: conflictEndDate },
+    { enabled: !!pid && !!conflictStartDate && !!conflictEndDate }
+  );
+  const conflicts = conflictData?.conflicts || [];
 
   // 色塊編輯
   const [editDialog, setEditDialog] = useState<{ groupId: number; date: string; current?: any } | null>(null);
@@ -767,6 +777,62 @@ export default function ScheduleOverview() {
           <div className="text-sm text-gray-400 mb-4">點擊上方「請選擇項目」選擇一個項目</div>
           {allProjects.length === 0 && (
             <Button size="sm" onClick={() => window.location.href = '/projects'}>前往創建項目</Button>
+          )}
+        </div>
+      )}
+
+      {/* 衝突警告面板 */}
+      {pid && conflicts.length > 0 && (
+        <div className="flex-shrink-0 border-b bg-amber-50 dark:bg-amber-950/20">
+          <button
+            className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors"
+            onClick={() => setConflictPanelOpen(v => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+              <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                排程衝突警告：共 {conflicts.length} 個衝突
+              </span>
+              <span className="text-xs text-amber-600">
+                ({conflicts.filter((c: any) => c.conflictType === 'overload').length} 個超載、
+                {conflicts.filter((c: any) => c.conflictType === 'closed').length} 個休館日衝突)
+              </span>
+            </div>
+            {conflictPanelOpen
+              ? <ChevronUp className="h-4 w-4 text-amber-600" />
+              : <ChevronDown className="h-4 w-4 text-amber-600" />}
+          </button>
+          {conflictPanelOpen && (
+            <div className="px-4 pb-3 space-y-2 max-h-48 overflow-y-auto">
+              {conflicts.map((c: any, idx: number) => (
+                <div key={idx} className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                  c.conflictType === 'overload'
+                    ? 'bg-orange-100 border border-orange-300 dark:bg-orange-900/20 dark:border-orange-700'
+                    : 'bg-red-100 border border-red-300 dark:bg-red-900/20 dark:border-red-700'
+                }`}>
+                  {c.conflictType === 'overload'
+                    ? <AlertTriangle className="h-3.5 w-3.5 text-orange-600 mt-0.5 flex-shrink-0" />
+                    : <CalendarX className="h-3.5 w-3.5 text-red-600 mt-0.5 flex-shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">{c.date}</span>
+                    <span className="mx-1 text-gray-500">·</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{c.attractionName}</span>
+                    {c.conflictType === 'overload' ? (
+                      <span className="ml-1 text-orange-700 dark:text-orange-400">
+                        超載：{c.totalPeople}人，最大承接量 {c.maxCapacity}人
+                      </span>
+                    ) : (
+                      <span className="ml-1 text-red-700 dark:text-red-400">
+                        休館日衝突：{c.closedReason}
+                      </span>
+                    )}
+                    <div className="text-gray-500 mt-0.5">
+                      涉及團組：{c.groups.map((g: any) => `${g.name}(${g.count}人)`).join('、')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
