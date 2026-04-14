@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,11 +12,23 @@ import { toast } from "sonner";
 import { MapPin, UtensilsCrossed, School, Building2, Plus, Edit, Trash2, Search, Phone, Mail, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// 週日對應數字（0=週日, 1=週一, ..., 6=週六）
+const WEEKDAYS = [
+  { label: '週日', value: 0 },
+  { label: '週一', value: 1 },
+  { label: '週二', value: 2 },
+  { label: '週三', value: 3 },
+  { label: '週四', value: 4 },
+  { label: '週五', value: 5 },
+  { label: '週六', value: 6 },
+];
+
 export default function ResourceLibrary() {
   const [activeTab, setActiveTab] = useState("attractions");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedClosedDays, setSelectedClosedDays] = useState<number[]>([]); // 休館日選擇
 
   const utils = trpc.useUtils();
 
@@ -86,11 +98,27 @@ export default function ResourceLibrary() {
     setActiveTab(type);
     setEditingItem(item || null);
     setIsDialogOpen(true);
+    // 初始化休館日選擇
+    if (type === 'attractions' && item?.closedDays) {
+      try {
+        const days = typeof item.closedDays === 'string' ? JSON.parse(item.closedDays) : item.closedDays;
+        setSelectedClosedDays(Array.isArray(days) ? days : []);
+      } catch { setSelectedClosedDays([]); }
+    } else {
+      setSelectedClosedDays([]);
+    }
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingItem(null);
+    setSelectedClosedDays([]);
+  };
+
+  const toggleClosedDay = (day: number) => {
+    setSelectedClosedDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -107,6 +135,10 @@ export default function ResourceLibrary() {
 
     if (activeTab === "attractions") {
       data.requiresBooking = data.requiresBooking === "true";
+      // 最大承接量轉數字
+      if (data.maxCapacity) data.maxCapacity = parseInt(data.maxCapacity) || undefined;
+      // 加入結構化休館日（來自 state，不是 FormData）
+      data.closedDays = selectedClosedDays;
       if (editingItem) updateAttractionMutation.mutate({ id: editingItem.id, ...data });
       else createAttractionMutation.mutate(data);
     } else if (activeTab === "restaurants") {
@@ -221,9 +253,30 @@ export default function ResourceLibrary() {
                       </CardHeader>
                       <CardContent className="space-y-2 text-sm">
                         {item.address && <div className="text-muted-foreground">{item.address}</div>}
-                        {item.capacity > 0 && <div className="text-muted-foreground">容量：{item.capacity}人</div>}
-                        {item.contactPerson && <div className="text-muted-foreground">對接人：{item.contactPerson}</div>}
-                        {item.requiresBooking && <div className="text-xs text-amber-600">需要預約</div>}
+                        <div className="flex flex-wrap gap-2">
+                          {item.maxCapacity > 0 && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">
+                              <Users className="h-3 w-3" />最大 {item.maxCapacity} 人
+                            </span>
+                          )}
+                          {item.closedDays && (() => {
+                            try {
+                              const days = typeof item.closedDays === 'string' ? JSON.parse(item.closedDays) : item.closedDays;
+                              if (Array.isArray(days) && days.length > 0) {
+                                const dayNames = ['週日','週一','週二','週三','週四','週五','週六'];
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded px-2 py-0.5">
+                                    休：{days.sort().map((d: number) => dayNames[d]).join('、')}
+                                  </span>
+                                );
+                              }
+                            } catch {}
+                            return null;
+                          })()}
+                          {item.requiresBooking && <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">需預約</span>}
+                        </div>
+                        {(item.contact || item.contactPerson) && <div className="text-muted-foreground">對接：{item.contact || item.contactPerson}</div>}
+                        {item.openingHours && <div className="text-muted-foreground">開放：{item.openingHours}</div>}
                       </CardContent>
                     </Card>
                   ))}
@@ -470,9 +523,33 @@ export default function ResourceLibrary() {
                     <Input id="openingHours" name="openingHours" defaultValue={editingItem?.openingHours} placeholder="如：09:00-18:00" />
                   </div>
                   <div>
-                    <Label htmlFor="closedDays">休館日</Label>
-                    <Input id="closedDays" name="closedDays" defaultValue={editingItem?.closedDays} placeholder="如：週一、公眾假期" />
+                    <Label htmlFor="maxCapacity">最大承接量（人）</Label>
+                    <Input id="maxCapacity" name="maxCapacity" type="number" min={0} defaultValue={editingItem?.maxCapacity || ''} placeholder="如：300" />
                   </div>
+                </div>
+                <div>
+                  <Label>每週固定休館日</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {WEEKDAYS.map(day => (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => toggleClosedDay(day.value)}
+                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                          selectedClosedDays.includes(day.value)
+                            ? 'bg-destructive text-destructive-foreground border-destructive'
+                            : 'bg-background text-foreground border-border hover:bg-muted'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedClosedDays.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      已選：{selectedClosedDays.sort().map(d => WEEKDAYS[d].label).join('、')} 休館
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="requiresBooking">是否需要預約</Label>

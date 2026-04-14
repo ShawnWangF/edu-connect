@@ -929,14 +929,28 @@ export const appRouter = router({
       .input(z.object({
         name: z.string(),
         address: z.string().optional(),
-        capacity: z.number(),
-        applicableType: z.enum(['all', 'elementary', 'middle', 'vip']),
+        capacity: z.number().default(0),
+        applicableType: z.enum(['all', 'elementary', 'middle', 'vip']).default('all'),
         restrictedDays: z.string().optional(),
+        maxCapacity: z.number().optional(),
+        closedDays: z.array(z.number()).optional(),
+        openingHours: z.string().optional(),
         contact: z.string().optional(),
         phone: z.string().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        notes: z.string().optional(),
+        requiresBooking: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
-        await db.createLocation(input);
+        const { contactPerson, contactPhone, closedDays, notes, requiresBooking, ...rest } = input;
+        const data: any = {
+          ...rest,
+          contact: contactPerson || rest.contact,
+          phone: contactPhone || rest.phone,
+          closedDays: closedDays ? JSON.stringify(closedDays) : null,
+        };
+        await db.createLocation(data);
         return { success: true };
       }),
     
@@ -948,12 +962,23 @@ export const appRouter = router({
         capacity: z.number().optional(),
         applicableType: z.enum(['all', 'elementary', 'middle', 'vip']).optional(),
         restrictedDays: z.string().optional(),
+        maxCapacity: z.number().optional(),
+        closedDays: z.array(z.number()).optional(),
+        openingHours: z.string().optional(),
         contact: z.string().optional(),
         phone: z.string().optional(),
+        contactPerson: z.string().optional(),
+        contactPhone: z.string().optional(),
+        notes: z.string().optional(),
+        requiresBooking: z.boolean().optional(),
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
-        const { id, ...updateData } = input;
+        const { id, contactPerson, contactPhone, closedDays, notes, requiresBooking, ...rest } = input;
+        const updateData: any = { ...rest };
+        if (contactPerson !== undefined) updateData.contact = contactPerson;
+        if (contactPhone !== undefined) updateData.phone = contactPhone;
+        if (closedDays !== undefined) updateData.closedDays = closedDays ? JSON.stringify(closedDays) : null;
         await db.updateLocation(id, updateData);
         return { success: true };
       }),
@@ -1251,7 +1276,7 @@ export const appRouter = router({
         const dbConn = await getDb();
         if (!dbConn) return { conflicts: [] };
 
-        const { itineraries: itiTable, groups: groupsTable, attractions: attTable } = await import('../drizzle/schema');
+        const { itineraries: itiTable, groups: groupsTable, locations: locTable } = await import('../drizzle/schema');
 
         // 取得日期範圍內所有有 locationId 的行程點
         const itin = await dbConn
@@ -1280,12 +1305,12 @@ export const appRouter = router({
           .where(inArray(groupsTable.id, groupIds));
         const groupMap = Object.fromEntries(groupRows.map((g: { id: number; name: string; totalCount: number }) => [g.id, g]));
 
-        // 取得所有相關景點資料
+        // 取得所有相關景點資料（使用 locations 表，即資源庫中的景點）
         const locationIds = Array.from(new Set(itin.map((i: { locationId: number | null }) => i.locationId!).filter(Boolean))) as number[];
         const attrRows = await dbConn
-          .select({ id: attTable.id, name: attTable.name, maxCapacity: attTable.maxCapacity, closedDays: attTable.closedDays })
-          .from(attTable)
-          .where(inArray(attTable.id, locationIds));
+          .select({ id: locTable.id, name: locTable.name, maxCapacity: locTable.maxCapacity, closedDays: locTable.closedDays })
+          .from(locTable)
+          .where(inArray(locTable.id, locationIds));
         const attrMap = Object.fromEntries(attrRows.map((a: { id: number; name: string; maxCapacity: number | null; closedDays: unknown }) => [a.id, a]));
 
         // 按日期 + locationId 分組計算人數

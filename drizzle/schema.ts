@@ -204,6 +204,9 @@ export const locations = mysqlTable("locations", {
   capacity: int("capacity").default(0).notNull(),
   applicableType: mysqlEnum("applicableType", ["all", "elementary", "middle", "vip"]).default("all").notNull(),
   restrictedDays: varchar("restrictedDays", { length: 100 }), // 受限日期，逗號分隔
+  maxCapacity: int("maxCapacity"), // 最大承接量（超過此人數觸發超載警告）
+  closedDays: json("closedDays").$type<number[]>(), // 每週固定休館日（0=週日,1=週一,...,6=週六）
+  openingHours: varchar("openingHours", { length: 100 }), // 開放時間（文字描述）
   contact: varchar("contact", { length: 100 }),
   phone: varchar("phone", { length: 50 }),
   isActive: boolean("isActive").default(true).notNull(),
