@@ -160,6 +160,25 @@ export default function ScheduleOverview() {
   const autoGenerate = trpc.scheduleBlocks.autoGenerate.useMutation();
   const updateGroup = trpc.groups.update.useMutation();
 
+  // 新建項目
+  const utils = trpc.useUtils();
+  const [newProjectDialog, setNewProjectDialog] = useState(false);
+  const [newProjectForm, setNewProjectForm] = useState({ code: '', name: '', startDate: '', endDate: '', description: '' });
+  const createProject = trpc.projects.create.useMutation({
+    onSuccess: (data: any) => {
+      toast.success('項目創建成功');
+      utils.projects.list.invalidate();
+      setNewProjectDialog(false);
+      setNewProjectForm({ code: '', name: '', startDate: '', endDate: '', description: '' });
+      // 自動切換到新建項目
+      if (data?.result?.id) {
+        setSelectedProjectId(data.result.id);
+        localStorage.setItem('schedule_last_project_id', String(data.result.id));
+      }
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   // 衝突偵測
   const [conflictPanelOpen, setConflictPanelOpen] = useState(false);
   const conflictStartDate = project?.startDate ? toDateStr(project.startDate) : '';
@@ -678,7 +697,7 @@ export default function ScheduleOverview() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72">
                 {allProjects.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-gray-400">暫無項目，請先創建項目</div>
+                  <div className="px-3 py-2 text-xs text-gray-400">暫無項目，請點擊下方「新建項目」</div>
                 ) : (
                   allProjects.map((p: any) => (
                     <DropdownMenuItem
@@ -698,6 +717,14 @@ export default function ScheduleOverview() {
                     </DropdownMenuItem>
                   ))
                 )}
+                <div className="border-t border-gray-100 mt-1 pt-1">
+                  <DropdownMenuItem
+                    onClick={() => setNewProjectDialog(true)}
+                    className="cursor-pointer text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium"
+                  >
+                    <span className="mr-2 text-base">+</span> 新建項目
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -1304,6 +1331,82 @@ export default function ScheduleOverview() {
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setTemplateDialog(null)}>取消</Button>
               <Button size="sm" className="h-7 text-xs" onClick={handleGenerateTemplate} disabled={batchUpsert.isPending || !templateStartDate}>
                 {batchUpsert.isPending ? '生成中...' : '生成模板'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 新建項目對話框 */}
+      <Dialog open={newProjectDialog} onOpenChange={setNewProjectDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>新建項目</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">項目代碼 *</Label>
+                <Input
+                  className="h-8 text-sm mt-1"
+                  placeholder="如：2026-SZ-01"
+                  value={newProjectForm.code}
+                  onChange={e => setNewProjectForm(f => ({ ...f, code: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">項目名稱 *</Label>
+                <Input
+                  className="h-8 text-sm mt-1"
+                  placeholder="如：2026年蘇州學校交流"
+                  value={newProjectForm.name}
+                  onChange={e => setNewProjectForm(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">開始日期 *</Label>
+                <Input
+                  type="date"
+                  className="h-8 text-sm mt-1"
+                  value={newProjectForm.startDate}
+                  onChange={e => setNewProjectForm(f => ({ ...f, startDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">結束日期 *</Label>
+                <Input
+                  type="date"
+                  className="h-8 text-sm mt-1"
+                  value={newProjectForm.endDate}
+                  onChange={e => setNewProjectForm(f => ({ ...f, endDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">項目描述</Label>
+              <Input
+                className="h-8 text-sm mt-1"
+                placeholder="選填"
+                value={newProjectForm.description}
+                onChange={e => setNewProjectForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setNewProjectDialog(false)}>取消</Button>
+              <Button
+                size="sm"
+                disabled={!newProjectForm.code || !newProjectForm.name || !newProjectForm.startDate || !newProjectForm.endDate || createProject.isPending}
+                onClick={() => createProject.mutate({
+                  code: newProjectForm.code,
+                  name: newProjectForm.name,
+                  startDate: newProjectForm.startDate,
+                  endDate: newProjectForm.endDate,
+                  description: newProjectForm.description || undefined,
+                })}
+              >
+                {createProject.isPending ? '創建中...' : '創建項目'}
               </Button>
             </div>
           </div>
