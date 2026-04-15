@@ -25,6 +25,19 @@ import * as db from "./db";
 // 星期對照
 const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 
+// 將任意日期格式（Date 物件或字串）轉成 "YYYY-MM-DD" 字串
+function toDateStr(d: any): string {
+  if (!d) return "";
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  const s = String(d);
+  // 如果已經是 YYYY-MM-DD 格式，直接返回
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  // 其他格式嘗試解析
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return "";
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
@@ -108,7 +121,7 @@ export async function generateGroupItineraryDocx(groupId: number): Promise<Buffe
   const dailyCardRows = await db.getDailyCardsByGroupId(groupId);
   const dailyCardMap: Record<string, any> = {};
   for (const card of dailyCardRows) {
-    dailyCardMap[String(card.date)] = card;
+    dailyCardMap[toDateStr(card.date)] = card;
   }
 
   // 4. 解析學校列表
@@ -127,14 +140,14 @@ export async function generateGroupItineraryDocx(groupId: number): Promise<Buffe
     departureToCity?: string;
   } = (group.flight_info as any) || {};
 
-  // 6. 生成日期範圍
-  const startDate = group.startDate ? String(group.startDate) : "";
-  const endDate = group.endDate ? String(group.endDate) : "";
+  // 6. 生成日期範圍（統一轉成 YYYY-MM-DD 字串）
+  const startDate = toDateStr(group.startDate);
+  const endDate = toDateStr(group.endDate);
 
-  // 按日期分組行程點
+  // 按日期分組行程點（統一轉成 YYYY-MM-DD 字串）
   const itineraryByDate: Record<string, typeof itineraryRows> = {};
   for (const row of itineraryRows) {
-    const d = String(row.date);
+    const d = toDateStr(row.date);
     if (!itineraryByDate[d]) itineraryByDate[d] = [];
     itineraryByDate[d].push(row);
   }
