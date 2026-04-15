@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { startNotificationScheduler } from "../notificationService";
+import { generateGroupItineraryDocx } from "../exportService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,24 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // Word 導出路由（需要登入 cookie，但這裡簡單允許，前端已保護）
+  app.get("/api/export/group/:id", async (req, res) => {
+    try {
+      const groupId = parseInt(req.params.id, 10);
+      if (isNaN(groupId)) {
+        res.status(400).json({ error: "Invalid group ID" });
+        return;
+      }
+      const buffer = await generateGroupItineraryDocx(groupId);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="group-${groupId}-itinerary.docx"`);
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("Export error:", err);
+      res.status(500).json({ error: err.message || "Export failed" });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

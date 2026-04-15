@@ -495,8 +495,12 @@ export const appRouter = router({
         flightInfo: z.object({
           arrivalFlight: z.string().optional(),
           arrivalTime: z.string().optional(),
+          arrivalFromCity: z.string().optional(), // 到達航班起飛城市
+          arrivalToCity: z.string().optional(),   // 到達航班落地城市
           departureFlight: z.string().optional(),
           departureTime: z.string().optional(),
+          departureFromCity: z.string().optional(), // 離開航班起飛城市
+          departureToCity: z.string().optional(),   // 離開航班落地城市
         }).optional(),
         schoolList: z.array(z.object({
           name: z.string(),
@@ -566,8 +570,12 @@ export const appRouter = router({
         flightInfo: z.object({
           arrivalFlight: z.string().optional(),
           arrivalTime: z.string().optional(),
+          arrivalFromCity: z.string().optional(),
+          arrivalToCity: z.string().optional(),
           departureFlight: z.string().optional(),
           departureTime: z.string().optional(),
+          departureFromCity: z.string().optional(),
+          departureToCity: z.string().optional(),
         }).optional(),
         exchangeDate: z.string().optional(), // 團組級別交流日期 YYYY-MM-DD
         schoolList: z.array(z.object({

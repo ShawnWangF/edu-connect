@@ -88,22 +88,41 @@ export default function GroupDetail() {
           </div>
           <p className="text-muted-foreground mt-1">編號: {group.code}</p>
         </div>
-        <Button 
-          onClick={async () => {
-            toast.loading("正在生成PDF...");
-            const result = await exportGroupToPDF(group, itineraries || [], members || [], dailyCards || [], attractions || []);
-            toast.dismiss();
-            if (result.success) {
-              toast.success(`PDF已成功導出：${result.fileName}`);
-            } else {
-              toast.error(`導出失敗：${result.error}`);
-            }
-          }}
-          className="bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          導出PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={async () => {
+              toast.loading("正在生成PDF...");
+              const result = await exportGroupToPDF(group, itineraries || [], members || [], dailyCards || [], attractions || []);
+              toast.dismiss();
+              if (result.success) {
+                toast.success(`PDF已成功導出：${result.fileName}`);
+              } else {
+                toast.error(`導出失敗：${result.error}`);
+              }
+            }}
+            className="bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            導出PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const url = `/api/export/group/${groupId}`;
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${group.name || group.code || 'group'}-行程.docx`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              toast.success('行程 Word 導出已開始下載');
+            }}
+            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            導出行程 Word
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -183,6 +202,9 @@ export default function GroupDetail() {
               {/* 抵達航班 */}
               <div className="bg-green-50 rounded-lg p-3">
                 <p className="text-xs text-green-600 font-medium mb-1">✈️ 抵達航班</p>
+                {(group.flight_info as any)?.arrivalFromCity && (
+                  <p className="text-xs text-green-700 mb-0.5">{(group.flight_info as any).arrivalFromCity} → {(group.flight_info as any).arrivalToCity || '—'}</p>
+                )}
                 <p className="text-sm font-semibold text-green-900">
                   {group.flight_info?.arrivalFlight
                     ? <>{group.flight_info.arrivalFlight} {group.flight_info.arrivalTime && <span className="font-normal text-green-700">· {group.flight_info.arrivalTime}</span>}</>
@@ -192,6 +214,9 @@ export default function GroupDetail() {
               {/* 離境航班 */}
               <div className="bg-orange-50 rounded-lg p-3">
                 <p className="text-xs text-orange-600 font-medium mb-1">✈️ 離境航班</p>
+                {(group.flight_info as any)?.departureFromCity && (
+                  <p className="text-xs text-orange-700 mb-0.5">{(group.flight_info as any).departureFromCity} → {(group.flight_info as any).departureToCity || '—'}</p>
+                )}
                 <p className="text-sm font-semibold text-orange-900">
                   {group.flight_info?.departureFlight
                     ? <>{group.flight_info.departureFlight} {group.flight_info.departureTime && <span className="font-normal text-orange-700">· {group.flight_info.departureTime}</span>}</>
@@ -2407,8 +2432,12 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
   const [crossingDate, setCrossingDate] = useState<string>(group.crossing_date ? new Date(group.crossing_date).toISOString().split('T')[0] : '');
   const [arrivalFlight, setArrivalFlight] = useState(group.flight_info?.arrivalFlight || '');
   const [arrivalTime, setArrivalTime] = useState(group.flight_info?.arrivalTime || '');
+  const [arrivalFromCity, setArrivalFromCity] = useState((group.flight_info as any)?.arrivalFromCity || '');
+  const [arrivalToCity, setArrivalToCity] = useState((group.flight_info as any)?.arrivalToCity || '');
   const [departureFlight, setDepartureFlight] = useState(group.flight_info?.departureFlight || '');
   const [departureTime, setDepartureTime] = useState(group.flight_info?.departureTime || '');
+  const [departureFromCity, setDepartureFromCity] = useState((group.flight_info as any)?.departureFromCity || '');
+  const [departureToCity, setDepartureToCity] = useState((group.flight_info as any)?.departureToCity || '');
   const [sisterSchoolId, setSisterSchoolId] = useState<string>(group.sister_school_id?.toString() || '');
   const [exchangeDate, setExchangeDate] = useState<string>((group.tags as any)?.exchangeDate || '');
   // 學校分組列表
@@ -2460,8 +2489,12 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
     setCrossingDate(group.crossing_date ? new Date(group.crossing_date).toISOString().split('T')[0] : '');
     setArrivalFlight(group.flight_info?.arrivalFlight || '');
     setArrivalTime(group.flight_info?.arrivalTime || '');
+    setArrivalFromCity((group.flight_info as any)?.arrivalFromCity || '');
+    setArrivalToCity((group.flight_info as any)?.arrivalToCity || '');
     setDepartureFlight(group.flight_info?.departureFlight || '');
     setDepartureTime(group.flight_info?.departureTime || '');
+    setDepartureFromCity((group.flight_info as any)?.departureFromCity || '');
+    setDepartureToCity((group.flight_info as any)?.departureToCity || '');
     setSisterSchoolId(group.sister_school_id?.toString() || '');
     setExchangeDate((group.tags as any)?.exchangeDate || '');
     setSchoolList(parseSchoolList(group.school_list));
@@ -2525,8 +2558,12 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
       flightInfo: {
         arrivalFlight: arrivalFlight || undefined,
         arrivalTime: arrivalTime || undefined,
+        arrivalFromCity: arrivalFromCity || undefined,
+        arrivalToCity: arrivalToCity || undefined,
         departureFlight: departureFlight || undefined,
         departureTime: departureTime || undefined,
+        departureFromCity: departureFromCity || undefined,
+        departureToCity: departureToCity || undefined,
       },
       schoolList: cleanedSchoolList,
       exchangeDate: exchangeDate || undefined,
@@ -2586,22 +2623,48 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
           {/* 航班信息 */}
           <div className="space-y-2">
             <Label className="text-sm">航班信息</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs text-gray-500">抵達航班號</Label>
-                <Input className="h-8 text-sm mt-1" placeholder="如 CZ3456" value={arrivalFlight} onChange={e => setArrivalFlight(e.target.value)} />
+            {/* 抵達航班 */}
+            <div className="bg-green-50 rounded-lg p-2 space-y-2">
+              <p className="text-xs font-medium text-green-700">✈️ 抵達航班</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">起飛城市</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 上海浦東" value={arrivalFromCity} onChange={e => setArrivalFromCity(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">到達城市</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 香港" value={arrivalToCity} onChange={e => setArrivalToCity(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">航班號</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 CZ3456" value={arrivalFlight} onChange={e => setArrivalFlight(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">時間</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 14:30" value={arrivalTime} onChange={e => setArrivalTime(e.target.value)} />
+                </div>
               </div>
-              <div>
-                <Label className="text-xs text-gray-500">抵達時間</Label>
-                <Input className="h-8 text-sm mt-1" placeholder="如 14:30" value={arrivalTime} onChange={e => setArrivalTime(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500">離境航班號</Label>
-                <Input className="h-8 text-sm mt-1" placeholder="如 CZ3457" value={departureFlight} onChange={e => setDepartureFlight(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs text-gray-500">離境時間</Label>
-                <Input className="h-8 text-sm mt-1" placeholder="如 16:00" value={departureTime} onChange={e => setDepartureTime(e.target.value)} />
+            </div>
+            {/* 離境航班 */}
+            <div className="bg-orange-50 rounded-lg p-2 space-y-2">
+              <p className="text-xs font-medium text-orange-700">✈️ 離境航班</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">起飛城市</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 深圳" value={departureFromCity} onChange={e => setDepartureFromCity(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">到達城市</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 上海虹橋" value={departureToCity} onChange={e => setDepartureToCity(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">航班號</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 CZ3457" value={departureFlight} onChange={e => setDepartureFlight(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">時間</Label>
+                  <Input className="h-8 text-sm mt-1" placeholder="如 16:00" value={departureTime} onChange={e => setDepartureTime(e.target.value)} />
+                </div>
               </div>
             </div>
           </div>

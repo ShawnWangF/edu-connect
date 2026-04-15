@@ -88,7 +88,7 @@ export const groups = mysqlTable("groups", {
   start_city: varchar("start_city", { length: 10 }), // 起始城市（sz/hk/macau），即第一天落地城市
   crossing_date: date("crossing_date"), // 過關日期（從起始城市過關到另一個城市的日期）
   sister_school_id: int("sister_school_id"), // 指定的交流學校 ID（schools 表），創建時指定
-  flight_info: json("flight_info").$type<{ arrivalFlight?: string; arrivalTime?: string; departureFlight?: string; departureTime?: string }>(), // 航班信息
+  flight_info: json("flight_info").$type<{ arrivalFlight?: string; arrivalTime?: string; arrivalFromCity?: string; arrivalToCity?: string; departureFlight?: string; departureTime?: string; departureFromCity?: string; departureToCity?: string }>(), // 航班信息
   school_list: json("school_list").$type<Array<{ name: string; studentCount: number; teacherCount?: number }>>(), // 學校分組列表（每個項目重新配置）
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
