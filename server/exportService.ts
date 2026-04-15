@@ -93,7 +93,7 @@ function makeText(text: string, options?: { bold?: boolean; size?: number; color
     bold: options?.bold ?? false,
     size: options?.size ?? 20, // 10pt = 20 half-points
     color: options?.color,
-    font: "微軟正黑體",
+    // 不指定字體，讓 Word 使用文件默認字體（避免服務器端字體缺失導致亂碼）
   });
 }
 

@@ -75,20 +75,20 @@ export default function GroupDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/groups")}>
+      <div className="flex flex-wrap items-start gap-3">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/groups")} className="mt-1 shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{group.name}</h1>
-            <Badge className={`${statusMap[group.status].color} text-white`}>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold break-words">{group.name}</h1>
+            <Badge className={`${statusMap[group.status].color} text-white shrink-0`}>
               {statusMap[group.status].label}
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1">編號: {group.code}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           <Button 
             onClick={async () => {
               toast.loading("正在生成PDF...");
@@ -117,7 +117,7 @@ export default function GroupDetail() {
               document.body.removeChild(a);
               toast.success('行程 Word 導出已開始下載');
             }}
-            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+            className="border-green-400 text-green-700 hover:bg-green-50"
           >
             <FileText className="mr-2 h-4 w-4" />
             導出行程 Word
