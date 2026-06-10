@@ -659,10 +659,15 @@ export const batchExchangeSchools = mysqlTable("batchExchangeSchools", {
 export const schoolExchanges = mysqlTable("schoolExchanges", {
   id: int("id").autoincrement().primaryKey(),
   groupId: int("groupId").notNull(),
-  schoolId: int("schoolId").notNull(),
+  schoolId: int("schoolId").notNull(), // 姊妹/接待學校
+  domesticSchoolId: int("domesticSchoolId"), // 前來交流學校
+  domesticSchoolName: varchar("domesticSchoolName", { length: 255 }),
   exchangeDate: date("exchangeDate").notNull(),
   startTime: varchar("startTime", { length: 10 }),
   endTime: varchar("endTime", { length: 10 }),
+  studentCount: int("studentCount").default(0).notNull(),
+  teacherCount: int("teacherCount").default(0).notNull(),
+  lunch: text("lunch"),
   activities: text("activities"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

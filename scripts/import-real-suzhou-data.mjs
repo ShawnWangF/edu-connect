@@ -371,6 +371,22 @@ function addDays(dateStr, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function parseTimeRange(value) {
+  const raw = String(value || "").replace(/上午|下午|約|约/g, "").replace(/[：]/g, ":");
+  const parts = raw.split(/\s*(?:-|－|—|–|~|至|到)\s*/).filter(Boolean);
+  const parsePart = (part, startHour = null) => {
+    const match = String(part || "").match(/(\d{1,2})\s*:\s*(\d{2})/);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    if (startHour !== null && startHour >= 8 && hour <= 6) hour += 12;
+    return `${String(hour).padStart(2, "0")}:${match[2]}`;
+  };
+  const start = parsePart(parts[0]);
+  const startHour = start ? Number(start.split(":")[0]) : null;
+  const end = parsePart(parts[1], startHour);
+  return { startTime: start, endTime: end };
+}
+
 function oppositeCity(city) {
   return city === "hk" ? "sz" : "hk";
 }
@@ -726,13 +742,29 @@ async function insertProjectData(conn, parsed, resources) {
       );
     }
 
-    for (const pair of exchangePairsByGroup.get(group.code) || []) {
-      const exchangeSchoolId = resources.exchangeIds.get(normalizeName(pair.exchangeName));
+    for (const sourceSchool of sourceSchools.filter((school) => school.exchangeSchoolId)) {
+      const pair = (exchangePairsByGroup.get(group.code) || []).find((p) => normalizeName(p.domesticName) === normalizeName(sourceSchool.name));
+      const exchangeSchoolId = sourceSchool.exchangeSchoolId;
       if (!exchangeSchoolId) continue;
+      const timeRange = parseTimeRange(sourceSchool.timeSlot);
       await conn.execute(
-        `INSERT INTO schoolExchanges (groupId, schoolId, exchangeDate, startTime, endTime, activities, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [groupId, exchangeSchoolId, pair.date, pair.startTime || null, pair.endTime || null, `${pair.domesticName} - ${pair.exchangeName}`, pair.notes || null]
+        `INSERT INTO schoolExchanges
+         (groupId, schoolId, domesticSchoolId, domesticSchoolName, exchangeDate, startTime, endTime, studentCount, teacherCount, lunch, activities, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          groupId,
+          exchangeSchoolId,
+          sourceSchool?.domesticSchoolId || null,
+          sourceSchool?.name,
+          sourceSchool.exchangeDate || exchangeDate,
+          timeRange.startTime || pair?.startTime || null,
+          timeRange.endTime || pair?.endTime || null,
+          sourceSchool?.studentCount || 0,
+          sourceSchool?.teacherCount || 0,
+          sourceSchool?.lunch || null,
+          pair ? `${sourceSchool.name} - ${pair.exchangeName}` : `${sourceSchool.name} 交流`,
+          sourceSchool?.notes || pair?.notes || null,
+        ]
       );
     }
 

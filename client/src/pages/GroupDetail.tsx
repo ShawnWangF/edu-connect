@@ -44,8 +44,7 @@ export default function GroupDetail() {
   const { data: dailyCards } = trpc.dailyCards.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: attractions } = trpc.locations.list.useQuery();
-  // const { data: schoolExchanges } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
-  const schoolExchanges: any[] = []; // 暫時移除，待後續實現
+  const { data: schoolExchanges = [] } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: domesticSchoolsList } = trpc.domesticSchools.list.useQuery();
   const schools = domesticSchoolsList; // 前來交流學校資源庫
   const { data: exchangeSchools } = trpc.exchangeSchools.list.useQuery();
@@ -339,7 +338,7 @@ export default function GroupDetail() {
         </TabsContent>
 
         <TabsContent value="school">
-          <SchoolExchangeTab groupId={groupId} schoolExchanges={schoolExchanges} schools={schools} utils={utils} />
+          <SchoolExchangeTab groupId={groupId} schoolExchanges={schoolExchanges} domesticSchools={schools} exchangeSchools={exchangeSchools} utils={utils} />
         </TabsContent>
       </Tabs>
     </div>
@@ -356,6 +355,8 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
   const [constraintWarnings, setConstraintWarnings] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
+  const [itineraryImpacts, setItineraryImpacts] = useState<Array<{ level: 'error' | 'warning' | 'info'; title: string; message: string }>>([]);
+  const [checkingItineraryImpact, setCheckingItineraryImpact] = useState(false);
   const [batchStartDate, setBatchStartDate] = useState<string>("");
   const [batchEndDate, setBatchEndDate] = useState<string>("");
   const [batchAttractions, setBatchAttractions] = useState<number[]>([]);
@@ -382,6 +383,40 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
     } catch (error) {
       console.error("約束檢查失敗", error);
       setConstraintWarnings([]);
+    }
+  };
+
+  const handlePreviewItinerary = async () => {
+    const dateInput = document.getElementById("date") as HTMLInputElement;
+    const startTimeInput = document.getElementById("startTime") as HTMLInputElement;
+    const endTimeInput = document.getElementById("endTime") as HTMLInputElement;
+    const locationNameInput = document.getElementById("locationName") as HTMLInputElement;
+    const locationId = selectedAttractionId && selectedAttractionId !== "manual"
+      ? parseInt(selectedAttractionId)
+      : selectedItem?.locationId || null;
+
+    if (!dateInput?.value) {
+      toast.error("請先選擇日期");
+      return;
+    }
+
+    setCheckingItineraryImpact(true);
+    try {
+      const result = await utils.client.itineraries.previewUpdate.query({
+        id: selectedItem?.id,
+        groupId,
+        date: dateInput.value,
+        startTime: startTimeInput?.value || null,
+        endTime: endTimeInput?.value || null,
+        locationId,
+        locationName: locationNameInput?.value || selectedItem?.locationName || null,
+      });
+      setItineraryImpacts(result.impacts || []);
+    } catch (error: any) {
+      toast.error(error.message || "影響檢查失敗");
+      setItineraryImpacts([]);
+    } finally {
+      setCheckingItineraryImpact(false);
     }
   };
 
@@ -457,6 +492,7 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
       dayNumber: dayNumber,
       startTime: (formData.get("startTime") as string) || undefined,
       endTime: (formData.get("endTime") as string) || undefined,
+      locationId: selectedAttractionId && selectedAttractionId !== "manual" ? parseInt(selectedAttractionId) : undefined,
       locationName: locationName || undefined,
       description: (formData.get("description") as string) || undefined,
       notes: (formData.get("notes") as string) || undefined,
@@ -525,7 +561,11 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
           </Dialog>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setSelectedItem(null)}>
+              <Button onClick={() => {
+                setSelectedItem(null);
+                setSelectedAttractionId("");
+                setItineraryImpacts([]);
+              }}>
                 <Plus className="mr-2 h-4 w-4" />
                 添加行程點
               </Button>
@@ -688,6 +728,27 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                 </div>
               )}
 
+              {itineraryImpacts.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm">影響預覽</Label>
+                  {itineraryImpacts.map((impact, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-md border p-3 text-sm ${
+                        impact.level === 'error'
+                          ? 'bg-red-50 border-red-200 text-red-800'
+                          : impact.level === 'warning'
+                            ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                            : 'bg-blue-50 border-blue-200 text-blue-800'
+                      }`}
+                    >
+                      <div className="font-semibold">{impact.title}</div>
+                      <div className="mt-1">{impact.message}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="description">活動描述</Label>
                 <Textarea id="description" name="description" defaultValue={selectedItem?.description || ""} rows={3} />
@@ -701,6 +762,10 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   取消
+                </Button>
+                <Button type="button" variant="outline" onClick={handlePreviewItinerary} disabled={checkingItineraryImpact}>
+                  <AlertCircle className="mr-2 h-4 w-4" />
+                  {checkingItineraryImpact ? "檢查中..." : "檢查影響"}
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                   {(createMutation.isPending || updateMutation.isPending) ? "保存中..." : "保存"}
@@ -857,6 +922,8 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                                   variant="ghost"
                                   onClick={() => {
                                     setSelectedItem(item.data);
+                                    setSelectedAttractionId(item.data.locationId ? item.data.locationId.toString() : "manual");
+                                    setItineraryImpacts([]);
                                     setIsDialogOpen(true);
                                   }}
                                 >
@@ -2819,47 +2886,91 @@ function ScheduleInfoDialog({ group, batches, schools, exchangeSchools, utils, g
 }
 
 // 學校交流Tab
-function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
+function SchoolExchangeTab({ groupId, schoolExchanges, domesticSchools, exchangeSchools, utils }: any) {
   const [open, setOpen] = useState(false);
   const [selectedExchange, setSelectedExchange] = useState<any>(null);
+  const [exchangeSchoolId, setExchangeSchoolId] = useState('');
+  const [domesticSchoolId, setDomesticSchoolId] = useState('');
+  const [exchangeDate, setExchangeDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [studentCount, setStudentCount] = useState(0);
+  const [teacherCount, setTeacherCount] = useState(0);
+  const [lunch, setLunch] = useState('');
+  const [activities, setActivities] = useState('');
+  const [notes, setNotes] = useState('');
 
-  //   const createExchange = trpc.schoolExchanges.create.useMutation({
-  //     onSuccess: () => {
-  //       utils.schoolExchanges.listByGroup.invalidate({ groupId });
-  //       setOpen(false);
-  //       setSelectedExchange(null);
-  //       toast.success("學校交流記錄已保存");
-  //     },
-  //     onError: (error) => {
-  //       toast.error(`保存失敗：${error.message}`);
-  //     },
-  //   });
-  // 
-  //   const deleteExchange = trpc.schoolExchanges.delete.useMutation({
-  //     onSuccess: () => {
-  //       utils.schoolExchanges.listByGroup.invalidate({ groupId });
-  //       toast.success("學校交流記錄已刪除");
-  //     },
-  //     onError: (error) => {
-  //       toast.error(`刪除失敗：${error.message}`);
-  //     },
-  //   });
+  const resetForm = (exchange?: any) => {
+    setSelectedExchange(exchange || null);
+    setExchangeSchoolId(exchange?.schoolId?.toString() || '');
+    setDomesticSchoolId(exchange?.domesticSchoolId?.toString() || '');
+    setExchangeDate(exchange?.exchangeDate ? String(exchange.exchangeDate).split('T')[0] : '');
+    setStartTime(exchange?.startTime || '');
+    setEndTime(exchange?.endTime || '');
+    setStudentCount(exchange?.studentCount || 0);
+    setTeacherCount(exchange?.teacherCount || 0);
+    setLunch(exchange?.lunch || '');
+    setActivities(exchange?.activities || '');
+    setNotes(exchange?.notes || '');
+    setOpen(true);
+  };
 
-  const createExchange = { mutate: () => {}, isPending: false } as any;
-  const deleteExchange = { mutate: () => {}, isPending: false } as any;
+  const createExchange = trpc.schoolExchanges.create.useMutation({
+    onSuccess: () => {
+      utils.schoolExchanges.listByGroup.invalidate({ groupId });
+      setOpen(false);
+      setSelectedExchange(null);
+      toast.success("學校交流記錄已保存");
+    },
+    onError: (error) => {
+      toast.error(`保存失敗：${error.message}`);
+    },
+  });
+
+  const updateExchange = trpc.schoolExchanges.update.useMutation({
+    onSuccess: () => {
+      utils.schoolExchanges.listByGroup.invalidate({ groupId });
+      setOpen(false);
+      setSelectedExchange(null);
+      toast.success("學校交流記錄已更新");
+    },
+    onError: (error) => {
+      toast.error(`更新失敗：${error.message}`);
+    },
+  });
+
+  const deleteExchange = trpc.schoolExchanges.delete.useMutation({
+    onSuccess: () => {
+      utils.schoolExchanges.listByGroup.invalidate({ groupId });
+      toast.success("學校交流記錄已刪除");
+    },
+    onError: (error) => {
+      toast.error(`刪除失敗：${error.message}`);
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const domesticSchool = domesticSchools?.find((school: any) => school.id.toString() === domesticSchoolId);
     const data = {
       groupId,
-      schoolId: parseInt(formData.get("schoolId") as string),
-      exchangeDate: formData.get("exchangeDate") as string,
-      startTime: formData.get("startTime") as string,
-      endTime: formData.get("endTime") as string,
-      activities: formData.get("activities") as string,
-      notes: formData.get("notes") as string,
+      schoolId: parseInt(exchangeSchoolId),
+      domesticSchoolId: domesticSchoolId ? parseInt(domesticSchoolId) : null,
+      domesticSchoolName: domesticSchool?.name || selectedExchange?.domesticSchoolName || null,
+      exchangeDate,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      studentCount,
+      teacherCount,
+      lunch: lunch || null,
+      activities: activities || null,
+      notes: notes || null,
     };
-    createExchange.mutate(data);
+    if (selectedExchange) {
+      updateExchange.mutate({ id: selectedExchange.id, ...data, syncScheduleBlock: true });
+    } else {
+      createExchange.mutate(data);
+    }
   };
 
   return (
@@ -2869,24 +2980,40 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
           <CardTitle>學校交流記錄</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setSelectedExchange(null)}>
+              <Button onClick={() => resetForm()}>
                 <Plus className="mr-2 h-4 w-4" />
                 添加交流記錄
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>添加學校交流記錄</DialogTitle>
+                <DialogTitle>{selectedExchange ? '編輯學校交流記錄' : '添加學校交流記錄'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="schoolId">交流學校</Label>
-                  <Select name="schoolId" required>
+                  <Label>前來交流學校</Label>
+                  <Select value={domesticSchoolId} onValueChange={setDomesticSchoolId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="選擇學校" />
+                      <SelectValue placeholder="選擇前來交流學校" />
                     </SelectTrigger>
                     <SelectContent>
-                      {schools?.map((school: any) => (
+                      {domesticSchools?.map((school: any) => (
+                        <SelectItem key={school.id} value={school.id.toString()}>
+                          {school.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>姊妹/接待學校</Label>
+                  <Select value={exchangeSchoolId} onValueChange={setExchangeSchoolId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇姊妹學校" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exchangeSchools?.map((school: any) => (
                         <SelectItem key={school.id} value={school.id.toString()}>
                           {school.name}
                         </SelectItem>
@@ -2897,35 +3024,51 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
 
                 <div className="space-y-2">
                   <Label htmlFor="exchangeDate">交流日期</Label>
-                  <Input type="date" name="exchangeDate" required />
+                  <Input type="date" name="exchangeDate" value={exchangeDate} onChange={e => setExchangeDate(e.target.value)} required />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="startTime">開始時間</Label>
-                    <Input type="time" name="startTime" />
+                    <Input type="time" name="startTime" value={startTime} onChange={e => setStartTime(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="endTime">結束時間</Label>
-                    <Input type="time" name="endTime" />
+                    <Input type="time" name="endTime" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>學生人數</Label>
+                    <Input type="number" min={0} value={studentCount} onChange={e => setStudentCount(parseInt(e.target.value) || 0)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>帶隊人數</Label>
+                    <Input type="number" min={0} value={teacherCount} onChange={e => setTeacherCount(parseInt(e.target.value) || 0)} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="activities">交流活動</Label>
-                  <Textarea name="activities" placeholder="例如：學校參觀、課堂體驗、文化交流..." rows={3} />
+                  <Textarea name="activities" placeholder="例如：學校參觀、課堂體驗、文化交流..." rows={3} value={activities} onChange={e => setActivities(e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>午餐安排</Label>
+                  <Textarea placeholder="午餐是否由對方學校提供、是否需結算等" rows={2} value={lunch} onChange={e => setLunch(e.target.value)} />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="notes">備註</Label>
-                  <Textarea name="notes" placeholder="其他備註信息..." rows={2} />
+                  <Textarea name="notes" placeholder="其他備註信息..." rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
 
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                     取消
                   </Button>
-                  <Button type="submit" disabled={createExchange.isPending}>
+                  <Button type="submit" disabled={createExchange.isPending || updateExchange.isPending || !exchangeSchoolId || !exchangeDate}>
                     保存
                   </Button>
                 </div>
@@ -2943,7 +3086,7 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
         ) : (
           <div className="space-y-4">
             {schoolExchanges.map((exchange: any) => {
-              const school = schools?.find((s: any) => s.id === exchange.schoolId);
+              const school = exchangeSchools?.find((s: any) => s.id === exchange.schoolId);
               return (
                 <div key={exchange.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
@@ -2953,6 +3096,10 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
                         <h3 className="font-semibold text-lg">{school?.name || "未知學校"}</h3>
                       </div>
                       <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">前來學校：</span>
+                          <span className="font-medium">{exchange.domesticSchoolName || "未指定"}</span>
+                        </div>
                         <div>
                           <span className="text-muted-foreground">交流日期：</span>
                           <span className="font-medium">{format(new Date(exchange.exchangeDate), "yyyy-MM-dd", { locale: zhCN })}</span>
@@ -2965,6 +3112,10 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
                             </span>
                           </div>
                         )}
+                        <div>
+                          <span className="text-muted-foreground">人數：</span>
+                          <span className="font-medium">{exchange.studentCount || 0}+{exchange.teacherCount || 0}</span>
+                        </div>
                       </div>
                       {school?.address && (
                         <div className="mt-2 text-sm">
@@ -2978,6 +3129,12 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
                           <p className="mt-1 text-foreground">{exchange.activities}</p>
                         </div>
                       )}
+                      {exchange.lunch && (
+                        <div className="mt-2 text-sm">
+                          <span className="text-muted-foreground">午餐安排：</span>
+                          <p className="mt-1 text-foreground">{exchange.lunch}</p>
+                        </div>
+                      )}
                       {exchange.notes && (
                         <div className="mt-2 text-sm">
                           <span className="text-muted-foreground">備註：</span>
@@ -2985,17 +3142,22 @@ function SchoolExchangeTab({ groupId, schoolExchanges, schools, utils }: any) {
                         </div>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (confirm("確定要刪除此學校交流記錄嗎？")) {
-                          deleteExchange.mutate({ id: exchange.id });
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => resetForm(exchange)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm("確定要刪除此學校交流記錄嗎？")) {
+                            deleteExchange.mutate({ id: exchange.id });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );

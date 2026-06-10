@@ -9,7 +9,7 @@ import { nanoid } from "nanoid";
 import * as notificationService from "./notificationService";
 import webpush from "web-push";
 import { pushSubscriptions as pushSubTable } from "../drizzle/schema";
-import { eq, inArray, and, gte, lte, isNotNull } from "drizzle-orm";
+import { eq, inArray, and, gte, lte, isNotNull, sql } from "drizzle-orm";
 
 // 初始化 VAPID 配置
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -656,6 +656,93 @@ export const appRouter = router({
     listAll: protectedProcedure
       .query(async () => {
         return await db.getAllItineraries();
+      }),
+
+    previewUpdate: protectedProcedure
+      .input(z.object({
+        id: z.number().optional(),
+        groupId: z.number(),
+        date: z.string(),
+        startTime: z.string().optional().nullable(),
+        endTime: z.string().optional().nullable(),
+        locationId: z.number().optional().nullable(),
+        locationName: z.string().optional().nullable(),
+      }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return { impacts: [] };
+        const startTime = input.startTime || '00:00';
+        const endTime = input.endTime || '23:59';
+        const impacts: Array<{ level: 'error' | 'warning' | 'info'; title: string; message: string }> = [];
+
+        const [sameGroupRows] = await dbConn.execute(sql`
+          SELECT id, locationName, startTime, endTime
+          FROM itineraries
+          WHERE groupId = ${input.groupId}
+            AND date = ${input.date}
+            AND (${input.id || 0} = 0 OR id <> ${input.id || 0})
+            AND COALESCE(startTime, '00:00') < ${endTime}
+            AND COALESCE(endTime, '23:59') > ${startTime}
+          ORDER BY startTime
+        `);
+        const sameGroup = sameGroupRows as unknown as any[];
+        if (sameGroup.length > 0) {
+          impacts.push({
+            level: 'error',
+            title: '同團行程時間重疊',
+            message: sameGroup.map(r => `${r.startTime || '未定'}-${r.endTime || '未定'} ${r.locationName || '未命名行程'}`).join('、'),
+          });
+        }
+
+        if (input.locationId) {
+          const [locationRows] = await dbConn.execute(sql`
+            SELECT i.id, g.code AS groupCode, g.totalCount, i.startTime, i.endTime, l.maxCapacity
+            FROM itineraries i
+            JOIN \`groups\` g ON g.id = i.groupId
+            LEFT JOIN locations l ON l.id = i.locationId
+            WHERE i.locationId = ${input.locationId}
+              AND i.date = ${input.date}
+              AND (${input.id || 0} = 0 OR i.id <> ${input.id || 0})
+              AND COALESCE(i.startTime, '00:00') < ${endTime}
+              AND COALESCE(i.endTime, '23:59') > ${startTime}
+            ORDER BY i.startTime, g.code
+          `);
+          const locationConflicts = locationRows as unknown as any[];
+          if (locationConflicts.length > 0) {
+            const totalPeople = locationConflicts.reduce((sum, row) => sum + (Number(row.totalCount) || 0), 0);
+            const maxCapacity = Number(locationConflicts[0]?.maxCapacity) || 0;
+            impacts.push({
+              level: maxCapacity && totalPeople > maxCapacity ? 'error' : 'warning',
+              title: maxCapacity && totalPeople > maxCapacity ? '景點容量超載' : '同時段有其他團組',
+              message: `${locationConflicts.map(r => `${r.groupCode} ${r.startTime || '未定'}-${r.endTime || '未定'}`).join('、')}${maxCapacity ? `；已有人數 ${totalPeople} / 容量 ${maxCapacity}` : ''}`,
+            });
+          }
+        }
+
+        const [exchangeRows] = await dbConn.execute(sql`
+          SELECT se.id, es.name AS schoolName, se.startTime, se.endTime
+          FROM schoolExchanges se
+          LEFT JOIN exchangeSchools es ON es.id = se.schoolId
+          WHERE se.groupId = ${input.groupId}
+            AND se.exchangeDate = ${input.date}
+            AND COALESCE(se.startTime, '00:00') < ${endTime}
+            AND COALESCE(se.endTime, '23:59') > ${startTime}
+          ORDER BY se.startTime
+        `);
+        const exchanges = exchangeRows as unknown as any[];
+        if (exchanges.length > 0) {
+          impacts.push({
+            level: 'warning',
+            title: '同團交流安排重疊',
+            message: exchanges.map(r => `${r.startTime || '未定'}-${r.endTime || '未定'} ${r.schoolName || '姊妹學校'}`).join('、'),
+          });
+        }
+
+        if (impacts.length === 0) {
+          impacts.push({ level: 'info', title: '未發現直接衝突', message: '目前沒有同團時間重疊、同景點重疊或交流安排重疊。' });
+        }
+
+        return { impacts };
       }),
     
     create: editorProcedure
@@ -1696,36 +1783,220 @@ export const appRouter = router({
       }),
   }),
   
-  // 學校交流管理 - 暫時移除，待後續實現
-  // schoolExchanges: router({
-  //   listByGroup: protectedProcedure
-  //     .input(z.object({ groupId: z.number() }))
-  //     .query(async ({ input }) => {
-  //       return await db.getSchoolExchangesByGroup(input.groupId);
-  //     }),
-  //   
-  //   create: editorProcedure
-  //     .input(z.object({
-  //       groupId: z.number(),
-  //       schoolId: z.number(),
-  //       exchangeDate: z.string(),
-  //       startTime: z.string().optional(),
-  //       endTime: z.string().optional(),
-  //       activities: z.string().optional(),
-  //       notes: z.string().optional(),
-  //     }))
-  //     .mutation(async ({ input }) => {
-  //       await db.createSchoolExchange(input);
-  //       return { success: true };
-  //     }),
-  //   
-  //   delete: editorProcedure
-  //     .input(z.object({ id: z.number() }))
-  //     .mutation(async ({ input }) => {
-  //       await db.deleteSchoolExchange(input.id);
-  //       return { success: true };
-  //     }),
-  // }),
+  // 學校交流管理
+  schoolExchanges: router({
+    listByGroup: protectedProcedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getSchoolExchangesByGroup(input.groupId);
+      }),
+
+    listByProject: protectedProcedure
+      .input(z.object({ projectId: z.number() }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return [];
+        const [rows] = await dbConn.execute(sql`
+          SELECT
+            se.*,
+            DATE_FORMAT(se.exchangeDate, '%Y-%m-%d') AS exchangeDate,
+            g.projectId,
+            g.code AS groupCode,
+            g.name AS groupName,
+            g.batch_code AS batchCode,
+            DATE_FORMAT(g.startDate, '%Y-%m-%d') AS groupStartDate,
+            JSON_UNQUOTE(JSON_EXTRACT(g.flight_info, '$.arrivalFlight')) AS arrivalFlight,
+            JSON_UNQUOTE(JSON_EXTRACT(g.flight_info, '$.departureFlight')) AS departureFlight,
+            es.name AS exchangeSchoolName,
+            es.address AS exchangeSchoolAddress
+          FROM schoolExchanges se
+          JOIN \`groups\` g ON g.id = se.groupId
+          LEFT JOIN exchangeSchools es ON es.id = se.schoolId
+          WHERE g.projectId = ${input.projectId}
+          ORDER BY se.exchangeDate, se.startTime, g.code, se.id
+        `);
+        return rows as unknown as any[];
+      }),
+
+    previewUpdate: protectedProcedure
+      .input(z.object({
+        id: z.number().optional(),
+        groupId: z.number(),
+        schoolId: z.number(),
+        exchangeDate: z.string(),
+        startTime: z.string().optional().nullable(),
+        endTime: z.string().optional().nullable(),
+      }))
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return { impacts: [] };
+        const startTime = input.startTime || '00:00';
+        const endTime = input.endTime || '23:59';
+        const impacts: Array<{ level: 'error' | 'warning' | 'info'; title: string; message: string }> = [];
+
+        const [schoolConflicts] = await dbConn.execute(sql`
+          SELECT se.id, g.code AS groupCode, g.name AS groupName, se.startTime, se.endTime
+          FROM schoolExchanges se
+          JOIN \`groups\` g ON g.id = se.groupId
+          WHERE se.schoolId = ${input.schoolId}
+            AND se.exchangeDate = ${input.exchangeDate}
+            AND (${input.id || 0} = 0 OR se.id <> ${input.id || 0})
+            AND COALESCE(se.startTime, '00:00') < ${endTime}
+            AND COALESCE(se.endTime, '23:59') > ${startTime}
+          ORDER BY se.startTime, g.code
+        `);
+        const schoolRows = schoolConflicts as unknown as any[];
+        if (schoolRows.length > 0) {
+          impacts.push({
+            level: 'error',
+            title: '姊妹學校時段衝突',
+            message: schoolRows.map(r => `${r.groupCode} ${r.startTime || '未定'}-${r.endTime || '未定'}`).join('、'),
+          });
+        }
+
+        const [groupItineraryConflicts] = await dbConn.execute(sql`
+          SELECT id, locationName, startTime, endTime
+          FROM itineraries
+          WHERE groupId = ${input.groupId}
+            AND date = ${input.exchangeDate}
+            AND COALESCE(startTime, '00:00') < ${endTime}
+            AND COALESCE(endTime, '23:59') > ${startTime}
+          ORDER BY startTime
+        `);
+        const itineraryRows = groupItineraryConflicts as unknown as any[];
+        if (itineraryRows.length > 0) {
+          impacts.push({
+            level: 'warning',
+            title: '同團既有行程重疊',
+            message: itineraryRows.map(r => `${r.startTime || '未定'}-${r.endTime || '未定'} ${r.locationName || '未命名行程'}`).join('、'),
+          });
+        }
+
+        const [blockRows] = await dbConn.execute(sql`
+          SELECT blockType, isExchangeDay
+          FROM scheduleBlocks
+          WHERE groupId = ${input.groupId} AND date = ${input.exchangeDate}
+          LIMIT 1
+        `);
+        const block = (blockRows as unknown as any[])[0];
+        if (!block || block.blockType !== 'exchange') {
+          impacts.push({
+            level: 'info',
+            title: '排程色塊需同步',
+            message: '保存時可同步把該日標記為交流日，避免總覽色塊與交流記錄不一致。',
+          });
+        }
+
+        return { impacts };
+      }),
+
+    create: editorProcedure
+      .input(z.object({
+        groupId: z.number(),
+        schoolId: z.number(),
+        domesticSchoolId: z.number().optional().nullable(),
+        domesticSchoolName: z.string().optional().nullable(),
+        exchangeDate: z.string(),
+        startTime: z.string().optional().nullable(),
+        endTime: z.string().optional().nullable(),
+        studentCount: z.number().optional().default(0),
+        teacherCount: z.number().optional().default(0),
+        lunch: z.string().optional().nullable(),
+        activities: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.createSchoolExchange({
+          ...input,
+          exchangeDate: input.exchangeDate as any,
+        });
+        return { success: true };
+      }),
+
+    update: editorProcedure
+      .input(z.object({
+        id: z.number(),
+        groupId: z.number(),
+        schoolId: z.number(),
+        domesticSchoolId: z.number().optional().nullable(),
+        domesticSchoolName: z.string().optional().nullable(),
+        exchangeDate: z.string(),
+        startTime: z.string().optional().nullable(),
+        endTime: z.string().optional().nullable(),
+        studentCount: z.number().optional().default(0),
+        teacherCount: z.number().optional().default(0),
+        lunch: z.string().optional().nullable(),
+        activities: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        syncScheduleBlock: z.boolean().optional().default(true),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { id, syncScheduleBlock, ...updateData } = input;
+        await db.updateSchoolExchange(id, {
+          ...updateData,
+          exchangeDate: input.exchangeDate as any,
+        });
+
+        const [groupRows] = await dbConn.execute(sql`SELECT school_list, tags FROM \`groups\` WHERE id = ${input.groupId} LIMIT 1`);
+        const group = (groupRows as unknown as any[])[0];
+        if (group?.school_list) {
+          const list = typeof group.school_list === 'string' ? JSON.parse(group.school_list) : group.school_list;
+          const nextList = Array.isArray(list) ? list.map((school: any) => {
+            const sameDomestic = input.domesticSchoolName && school.name === input.domesticSchoolName;
+            const sameDomesticId = input.domesticSchoolId && school.domesticSchoolId === input.domesticSchoolId;
+            const sameExchange = school.exchangeSchoolId === input.schoolId;
+            if (!sameDomestic && !sameDomesticId && !sameExchange) return school;
+            return {
+              ...school,
+              domesticSchoolId: input.domesticSchoolId ?? school.domesticSchoolId,
+              exchangeSchoolId: input.schoolId,
+              studentCount: input.studentCount,
+              teacherCount: input.teacherCount,
+              exchangeDate: input.exchangeDate,
+              timeSlot: [input.startTime, input.endTime].filter(Boolean).join('-') || school.timeSlot,
+              lunch: input.lunch || undefined,
+              notes: input.notes || undefined,
+            };
+          }) : list;
+          const tags = typeof group.tags === 'string' ? JSON.parse(group.tags || '{}') : (group.tags || {});
+          await dbConn.execute(sql`
+            UPDATE \`groups\`
+            SET school_list = ${JSON.stringify(nextList)}, tags = ${JSON.stringify({ ...tags, exchangeDate: input.exchangeDate })}
+            WHERE id = ${input.groupId}
+          `);
+        }
+
+        if (syncScheduleBlock) {
+          const [existingBlockRows] = await dbConn.execute(sql`
+            SELECT id FROM scheduleBlocks WHERE groupId = ${input.groupId} AND date = ${input.exchangeDate} LIMIT 1
+          `);
+          const existingBlock = (existingBlockRows as unknown as any[])[0];
+          if (existingBlock) {
+            await dbConn.execute(sql`
+              UPDATE scheduleBlocks
+              SET blockType = 'exchange', isExchangeDay = true, hotelCity = 'hk', notes = '由學校交流記錄同步'
+              WHERE id = ${existingBlock.id}
+            `);
+          } else {
+            await dbConn.execute(sql`
+              INSERT INTO scheduleBlocks (groupId, date, blockType, isExchangeDay, hotelCity, notes)
+              VALUES (${input.groupId}, ${input.exchangeDate}, 'exchange', true, 'hk', '由學校交流記錄同步')
+            `);
+          }
+        }
+
+        return { success: true };
+      }),
+
+    delete: editorProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteSchoolExchange(input.id);
+        return { success: true };
+      }),
+  }),
   
   // 行程模板管理
   templates: router({

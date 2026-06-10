@@ -4,7 +4,7 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, GripHorizontal, X, AlertTriangle, CalendarX, ChevronUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, GripHorizontal, X, AlertTriangle, CalendarX, ChevronUp, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 // ===== 色塊類型定義 =====
 type BlockType = 'sz_arrive' | 'sz_stay' | 'hk_arrive' | 'hk_stay' | 'exchange' | 'border_sz_hk' | 'border_hk_sz' | 'departure' | 'free';
@@ -240,6 +241,7 @@ export default function ScheduleOverview() {
   const { data: batchList = [] } = trpc.batches.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
   const { data: allItineraries = [] } = trpc.itineraries.listAll.useQuery(undefined, { enabled: !!pid });
   const { data: locations = [] } = trpc.locations.list.useQuery(undefined, { enabled: !!pid });
+  const { data: schoolExchangeRows = [] } = trpc.schoolExchanges.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
 
   // 批次航班信息 Map：batch_code -> { arrivalFlight, departureFlight, arrivalTime, departureTime }
   const batchFlightMap = useMemo(() => {
@@ -263,8 +265,30 @@ export default function ScheduleOverview() {
 
   // 新建項目
   const utils = trpc.useUtils();
+  const updateSchoolExchange = trpc.schoolExchanges.update.useMutation({
+    onSuccess: async () => {
+      toast.success('交流記錄已更新');
+      await utils.schoolExchanges.listByProject.invalidate();
+      await refetchBlocks();
+      setEditingExchange(null);
+      setExchangeImpacts([]);
+    },
+    onError: (err: any) => toast.error(err.message || '交流記錄更新失敗'),
+  });
   const [newProjectDialog, setNewProjectDialog] = useState(false);
   const [newProjectForm, setNewProjectForm] = useState({ code: '', name: '', startDate: '', endDate: '', description: '' });
+  const [editingExchange, setEditingExchange] = useState<any | null>(null);
+  const [exchangeForm, setExchangeForm] = useState({
+    exchangeDate: '',
+    startTime: '',
+    endTime: '',
+    studentCount: 0,
+    teacherCount: 0,
+    lunch: '',
+    notes: '',
+  });
+  const [exchangeImpacts, setExchangeImpacts] = useState<Array<{ level: 'error' | 'warning' | 'info'; title: string; message: string }>>([]);
+  const [checkingExchangeImpact, setCheckingExchangeImpact] = useState(false);
   const createProject = trpc.projects.create.useMutation({
     onSuccess: (data: any) => {
       toast.success('項目創建成功');
@@ -498,6 +522,69 @@ export default function ScheduleOverview() {
       }));
     });
   }, [groups]);
+
+  function openExchangeEditor(row: any) {
+    setEditingExchange(row);
+    setExchangeForm({
+      exchangeDate: toDateStr(row.exchangeDate),
+      startTime: row.startTime || '',
+      endTime: row.endTime || '',
+      studentCount: row.studentCount || 0,
+      teacherCount: row.teacherCount || 0,
+      lunch: row.lunch || '',
+      notes: row.notes || '',
+    });
+    setExchangeImpacts([]);
+  }
+
+  async function handlePreviewExchange(row = editingExchange, form = exchangeForm) {
+    if (!row) return [];
+    setCheckingExchangeImpact(true);
+    try {
+      const result = await utils.client.schoolExchanges.previewUpdate.query({
+        id: row.id,
+        groupId: row.groupId,
+        schoolId: row.schoolId,
+        exchangeDate: form.exchangeDate,
+        startTime: form.startTime || null,
+        endTime: form.endTime || null,
+      });
+      const impacts = result.impacts || [];
+      setExchangeImpacts(impacts);
+      return impacts;
+    } catch (err: any) {
+      toast.error(err.message || '影響檢查失敗');
+      setExchangeImpacts([]);
+      return [];
+    } finally {
+      setCheckingExchangeImpact(false);
+    }
+  }
+
+  async function handleSaveExchange() {
+    if (!editingExchange) return;
+    const impacts = await handlePreviewExchange(editingExchange, exchangeForm);
+    if (impacts.some(impact => impact.level === 'error')) {
+      toast.error('存在必須先處理的交流衝突');
+      return;
+    }
+    updateSchoolExchange.mutate({
+      id: editingExchange.id,
+      groupId: editingExchange.groupId,
+      schoolId: editingExchange.schoolId,
+      domesticSchoolId: editingExchange.domesticSchoolId || null,
+      domesticSchoolName: editingExchange.domesticSchoolName || null,
+      exchangeDate: exchangeForm.exchangeDate,
+      startTime: exchangeForm.startTime || null,
+      endTime: exchangeForm.endTime || null,
+      studentCount: Number(exchangeForm.studentCount) || 0,
+      teacherCount: Number(exchangeForm.teacherCount) || 0,
+      lunch: exchangeForm.lunch || null,
+      activities: editingExchange.activities || null,
+      notes: exchangeForm.notes || null,
+      syncScheduleBlock: true,
+    });
+  }
 
   function handleCellClick(groupId: number, date: string) {
     const existing = blockMap.get(`${groupId}_${date}`);
@@ -1414,17 +1501,18 @@ export default function ScheduleOverview() {
                 </tbody>
               </table>
 
-              {exchangeSupplementRows.length > 0 && (
+              {schoolExchangeRows.length > 0 && (
                 <div className="mt-4">
                   <div className="bg-[#1F4E79] text-white text-xs font-semibold px-3 py-1.5 rounded-t">
                     交流日補充明細
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1120px] border-collapse text-xs">
+                    <table className="w-full min-w-[1260px] border-collapse text-xs">
                       <thead>
                         <tr className="bg-[#2E75B6] text-white">
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">團組</th>
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">前來交流學校</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">姊妹學校</th>
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">去程航班</th>
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">返程航班</th>
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">出發日</th>
@@ -1434,48 +1522,62 @@ export default function ScheduleOverview() {
                           <th className="border border-gray-300 px-2 py-1 text-center text-[10px]">帶隊</th>
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">午餐安排</th>
                           <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">接待/其他</th>
+                          <th className="border border-gray-300 px-2 py-1 text-center text-[10px]">操作</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {exchangeSupplementRows.map(({ group, school, arrivalFlight, departureFlight }, index) => {
-                          const types: string[] = Array.isArray(group.type) ? group.type : [];
-                          const isSecondary = types.some(t => t.includes('中學') || t.includes('中学'));
+                        {(schoolExchangeRows as any[]).map((row: any, index) => {
+                          const isSecondary = String(row.groupCode || '').startsWith('S');
                           const rowBg = isSecondary ? '#FFF4EC' : index % 2 === 0 ? '#FFFFFF' : '#F8FBFF';
                           return (
-                            <tr key={`${group.id}_${school.name}_${index}`} style={{ backgroundColor: rowBg }}>
+                            <tr key={row.id} style={{ backgroundColor: rowBg }}>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] font-semibold text-gray-800">
-                                <div>{group.code || group.name}</div>
-                                <div className="text-[8px] font-normal text-gray-400">{vehicleLabelForGroup(group)}</div>
+                                <div>{row.groupCode || '-'}</div>
+                                <div className="text-[8px] font-normal text-gray-400">{vehicleLabelForGroup({ code: row.groupCode })}</div>
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                                {school.name || '-'}
+                                {row.domesticSchoolName || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-blue-800">
+                                {row.exchangeSchoolName || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-green-800">
-                                {arrivalFlight || '-'}
+                                {row.arrivalFlight || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-amber-800">
-                                {departureFlight || '-'}
+                                {row.departureFlight || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                                {toDateStr(group.startDate) || '-'}
+                                {toDateStr(row.groupStartDate) || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] font-medium text-blue-800">
-                                {school.exchangeDate ? toDateStr(school.exchangeDate) : '-'}
+                                {toDateStr(row.exchangeDate) || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                                {school.timeSlot || '-'}
+                                {[row.startTime, row.endTime].filter(Boolean).join('-') || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-center text-[10px] font-semibold text-gray-800">
-                                {school.studentCount || 0}
+                                {row.studentCount || 0}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-center text-[10px] text-gray-700">
-                                {school.teacherCount || 0}
+                                {row.teacherCount || 0}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                                {school.lunch || '-'}
+                                {row.lunch || '-'}
                               </td>
                               <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-600">
-                                {school.notes || '-'}
+                                {row.notes || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-center">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-[10px] text-blue-700 hover:bg-blue-50"
+                                  onClick={() => openExchangeEditor(row)}
+                                >
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  編輯
+                                </Button>
                               </td>
                             </tr>
                           );
@@ -1489,6 +1591,142 @@ export default function ScheduleOverview() {
           )}
         </div>
       )}
+
+      {/* 交流記錄快捷調整 */}
+      <Dialog
+        open={!!editingExchange}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingExchange(null);
+            setExchangeImpacts([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-sm">
+              調整交流安排 · {editingExchange?.groupCode || ''} {editingExchange?.domesticSchoolName || ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs text-gray-600">交流日期</Label>
+                <Input
+                  type="date"
+                  className="h-8 text-sm mt-1"
+                  value={exchangeForm.exchangeDate}
+                  onChange={e => setExchangeForm(f => ({ ...f, exchangeDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">開始時間</Label>
+                <Input
+                  type="time"
+                  className="h-8 text-sm mt-1"
+                  value={exchangeForm.startTime}
+                  onChange={e => setExchangeForm(f => ({ ...f, startTime: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">結束時間</Label>
+                <Input
+                  type="time"
+                  className="h-8 text-sm mt-1"
+                  value={exchangeForm.endTime}
+                  onChange={e => setExchangeForm(f => ({ ...f, endTime: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-gray-600">學生人數</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  className="h-8 text-sm mt-1"
+                  value={exchangeForm.studentCount}
+                  onChange={e => setExchangeForm(f => ({ ...f, studentCount: Number(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">帶隊人數</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  className="h-8 text-sm mt-1"
+                  value={exchangeForm.teacherCount}
+                  onChange={e => setExchangeForm(f => ({ ...f, teacherCount: Number(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs text-gray-600">午餐安排</Label>
+              <Textarea
+                className="mt-1 text-sm"
+                rows={2}
+                value={exchangeForm.lunch}
+                onChange={e => setExchangeForm(f => ({ ...f, lunch: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">接待/其他備註</Label>
+              <Textarea
+                className="mt-1 text-sm"
+                rows={3}
+                value={exchangeForm.notes}
+                onChange={e => setExchangeForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            {exchangeImpacts.length > 0 && (
+              <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                <div className="text-xs font-semibold text-gray-700">影響預覽</div>
+                {exchangeImpacts.map((impact, index) => (
+                  <div
+                    key={index}
+                    className={`rounded px-2 py-1.5 text-xs ${
+                      impact.level === 'error'
+                        ? 'bg-red-50 text-red-800 border border-red-200'
+                        : impact.level === 'warning'
+                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : 'bg-blue-50 text-blue-800 border border-blue-200'
+                    }`}
+                  >
+                    <div className="font-semibold">{impact.title}</div>
+                    <div className="mt-0.5">{impact.message}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <Button variant="outline" size="sm" onClick={() => setEditingExchange(null)}>
+                取消
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={checkingExchangeImpact || !editingExchange}
+                onClick={() => handlePreviewExchange()}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                {checkingExchangeImpact ? '檢查中...' : '檢查影響'}
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[#1F4E79] hover:bg-[#1a3f63]"
+                disabled={updateSchoolExchange.isPending || !exchangeForm.exchangeDate || exchangeImpacts.some(i => i.level === 'error')}
+                onClick={handleSaveExchange}
+              >
+                保存並同步排程
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 色塊編輯側邊面板 */}
       {editDialog && (
