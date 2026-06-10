@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Users, Calendar, MapPin, TrendingUp, Clock, Award, Briefcase, Car, UserCheck } from "lucide-react";
+import { Users, Calendar, MapPin, TrendingUp, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -160,14 +160,14 @@ export default function Home() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
               <div className="text-center p-3 bg-muted/50 rounded-lg">
                 <p className="text-2xl font-bold">{staffStats.total}</p>
                 <p className="text-xs text-muted-foreground mt-1">工作人員總數</p>
               </div>
               <div className="text-center p-3 bg-purple-50 rounded-lg">
                 <p className="text-2xl font-bold text-purple-700">{staffStats.coordinator}</p>
-                <p className="text-xs text-purple-600 mt-1">總統籌</p>
+                <p className="text-xs text-purple-600 mt-1">負責人</p>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <p className="text-2xl font-bold text-green-700">{staffStats.guide}</p>
@@ -177,9 +177,13 @@ export default function Home() {
                 <p className="text-2xl font-bold text-orange-700">{staffStats.driver}</p>
                 <p className="text-xs text-orange-600 mt-1">司機</p>
               </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg">
+                <p className="text-2xl font-bold text-red-700">{staffStats.security}</p>
+                <p className="text-xs text-red-600 mt-1">安全員</p>
+              </div>
               <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-700">{staffStats.assigned}</p>
-                <p className="text-xs text-blue-600 mt-1">已指派</p>
+                <p className="text-2xl font-bold text-blue-700">{staffStats.sharing}</p>
+                <p className="text-xs text-blue-600 mt-1">位置共享</p>
               </div>
             </div>
           </CardContent>

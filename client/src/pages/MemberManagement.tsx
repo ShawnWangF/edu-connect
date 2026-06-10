@@ -48,19 +48,30 @@ import {
   UserCheck,
   Clock,
   X,
+  Shield,
+  Navigation,
 } from "lucide-react";
 
 // ===== 類型定義 =====
+type StaffRole = "coordinator" | "staff" | "guide" | "driver" | "security" | "other";
+
 type StaffMember = {
   id: number;
   name: string;
-  role: "coordinator" | "staff" | "guide" | "driver";
+  role: StaffRole;
+  customRole?: string | null;
+  userId?: number | null;
   phone?: string | null;
   email?: string | null;
   wechat?: string | null;
   languages?: string | null;
   licenseNumber?: string | null;
   notes?: string | null;
+  locationSharingEnabled?: boolean;
+  lastLatitude?: string | null;
+  lastLongitude?: string | null;
+  lastLocationAccuracy?: number | null;
+  lastLocationAt?: string | Date | null;
   isActive: boolean;
 };
 
@@ -68,8 +79,12 @@ type Assignment = {
   id: number;
   groupId: number;
   staffId: number;
-  role: "coordinator" | "staff" | "guide" | "driver";
+  role: StaffRole;
+  customRole?: string | null;
   date?: string | null;
+  itineraryId?: number | null;
+  itineraryLocationName?: string | null;
+  itineraryDescription?: string | null;
   taskName?: string | null;
   startTime?: string | null;
   endTime?: string | null;
@@ -82,7 +97,9 @@ type Assignment = {
 
 type FormData = {
   name: string;
-  role: "coordinator" | "staff" | "guide" | "driver";
+  role: StaffRole;
+  customRole: string;
+  userId: string;
   phone: string;
   email: string;
   wechat: string;
@@ -93,10 +110,12 @@ type FormData = {
 
 // ===== 工具函數 =====
 const roleLabel: Record<string, string> = {
-  coordinator: "總統籌",
+  coordinator: "負責人",
   staff: "工作人員",
   guide: "導遊",
   driver: "司機",
+  security: "安全員",
+  other: "自定義",
 };
 
 const roleColor: Record<string, string> = {
@@ -104,6 +123,8 @@ const roleColor: Record<string, string> = {
   staff: "bg-blue-100 text-blue-800",
   guide: "bg-green-100 text-green-800",
   driver: "bg-orange-100 text-orange-800",
+  security: "bg-red-100 text-red-800",
+  other: "bg-slate-100 text-slate-800",
 };
 
 const roleIcon: Record<string, React.ReactNode> = {
@@ -111,11 +132,38 @@ const roleIcon: Record<string, React.ReactNode> = {
   staff: <Briefcase className="w-4 h-4" />,
   guide: <MapPin className="w-4 h-4" />,
   driver: <Car className="w-4 h-4" />,
+  security: <Shield className="w-4 h-4" />,
+  other: <Users className="w-4 h-4" />,
 };
+
+const roleOptions: Array<{ value: StaffRole; label: string }> = [
+  { value: "coordinator", label: "負責人" },
+  { value: "guide", label: "導遊" },
+  { value: "driver", label: "司機" },
+  { value: "security", label: "安全員" },
+  { value: "staff", label: "工作人員" },
+  { value: "other", label: "自定義角色" },
+];
+
+function getRoleLabel(role: string, customRole?: string | null) {
+  return role === "other" ? customRole || "自定義" : roleLabel[role] || role;
+}
+
+function formatLastLocationAt(value?: string | Date | null) {
+  if (!value) return "未上報";
+  return new Date(value).toLocaleString("zh-HK", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const defaultForm: FormData = {
   name: "",
   role: "staff",
+  customRole: "",
+  userId: "",
   phone: "",
   email: "",
   wechat: "",
@@ -142,8 +190,10 @@ export default function MemberManagement() {
   // 指派表單狀態
   const [assignForm, setAssignForm] = useState({
     groupId: "",
-    role: "staff" as "coordinator" | "staff" | "guide" | "driver",
+    role: "staff" as StaffRole,
+    customRole: "",
     date: "",
+    itineraryId: "",
     taskName: "",
     startTime: "",
     endTime: "",
@@ -153,6 +203,8 @@ export default function MemberManagement() {
   // ===== 數據查詢 =====
   const { data: staffList = [], refetch: refetchStaff } = trpc.staff.list.useQuery();
   const { data: groups = [] } = trpc.groups.list.useQuery();
+  const { data: userOptions = [] } = trpc.staff.userOptions.useQuery();
+  const { data: allItineraries = [] } = trpc.itineraries.listAll.useQuery();
 
   // 獲取選中工作人員的指派列表
   const { data: assignments = [], refetch: refetchAssignments } =
@@ -193,7 +245,7 @@ export default function MemberManagement() {
     onSuccess: () => {
       toast.success("指派成功");
       setShowAssignDialog(false);
-      setAssignForm({ groupId: "", role: "staff", date: "", taskName: "", startTime: "", endTime: "", notes: "" });
+      setAssignForm({ groupId: "", role: "staff", customRole: "", date: "", itineraryId: "", taskName: "", startTime: "", endTime: "", notes: "" });
       refetchAssignments();
     },
     onError: (err) => toast.error(`指派失敗：${err.message}`),
@@ -229,8 +281,17 @@ export default function MemberManagement() {
       staff: list.filter((s) => s.role === "staff").length,
       guide: list.filter((s) => s.role === "guide").length,
       driver: list.filter((s) => s.role === "driver").length,
+      security: list.filter((s) => s.role === "security").length,
+      other: list.filter((s) => s.role === "other").length,
     };
   }, [staffList]);
+
+  const filteredItineraries = useMemo(() => {
+    if (!assignForm.groupId) return [];
+    return (allItineraries as any[])
+      .filter((item: any) => item.groupId === Number(assignForm.groupId))
+      .sort((a: any, b: any) => `${a.date || ""} ${a.startTime || ""}`.localeCompare(`${b.date || ""} ${b.startTime || ""}`));
+  }, [allItineraries, assignForm.groupId]);
 
   // ===== 操作函數 =====
   const openEditDialog = (staff: StaffMember) => {
@@ -238,6 +299,8 @@ export default function MemberManagement() {
     setFormData({
       name: staff.name,
       role: staff.role,
+      customRole: staff.customRole ?? "",
+      userId: staff.userId ? String(staff.userId) : "",
       phone: staff.phone ?? "",
       email: staff.email ?? "",
       wechat: staff.wechat ?? "",
@@ -261,6 +324,8 @@ export default function MemberManagement() {
     createStaff.mutate({
       name: formData.name.trim(),
       role: formData.role,
+      customRole: formData.role === "other" ? formData.customRole || undefined : undefined,
+      userId: formData.userId ? Number(formData.userId) : undefined,
       phone: formData.phone || undefined,
       email: formData.email || undefined,
       wechat: formData.wechat || undefined,
@@ -276,6 +341,8 @@ export default function MemberManagement() {
       id: selectedStaff.id,
       name: formData.name.trim(),
       role: formData.role,
+      customRole: formData.role === "other" ? formData.customRole || null : null,
+      userId: formData.userId ? Number(formData.userId) : null,
       phone: formData.phone || null,
       email: formData.email || null,
       wechat: formData.wechat || null,
@@ -298,7 +365,9 @@ export default function MemberManagement() {
       staffId: selectedStaff.id,
       groupId: Number(assignForm.groupId),
       role: assignForm.role,
+      customRole: assignForm.role === "other" ? assignForm.customRole || undefined : undefined,
       date: assignForm.date,
+      itineraryId: assignForm.itineraryId ? Number(assignForm.itineraryId) : undefined,
       taskName: assignForm.taskName || undefined,
       startTime: assignForm.startTime || undefined,
       endTime: assignForm.endTime || undefined,
@@ -329,7 +398,7 @@ export default function MemberManagement() {
       </div>
 
       {/* 統計卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
@@ -341,7 +410,7 @@ export default function MemberManagement() {
             </div>
           </CardContent>
         </Card>
-        {(["coordinator", "staff", "guide", "driver"] as const).map((role) => (
+        {roleOptions.map(({ value: role }) => (
           <Card key={role}>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
@@ -387,10 +456,9 @@ export default function MemberManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">全部角色</SelectItem>
-                <SelectItem value="coordinator">總統籌</SelectItem>
-                <SelectItem value="staff">工作人員</SelectItem>
-                <SelectItem value="guide">導遊</SelectItem>
-                <SelectItem value="driver">司機</SelectItem>
+                {roleOptions.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -422,9 +490,14 @@ export default function MemberManagement() {
                         <Badge className={`${roleColor[staff.role]} border-0`}>
                           <span className="flex items-center gap-1">
                             {roleIcon[staff.role]}
-                            {roleLabel[staff.role]}
+                            {getRoleLabel(staff.role, staff.customRole)}
                           </span>
                         </Badge>
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Navigation className="w-3 h-3" />
+                          {staff.locationSharingEnabled ? "已開啟共享" : "未開啟共享"}
+                          <span>· {formatLastLocationAt(staff.lastLocationAt)}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-sm">
@@ -525,7 +598,7 @@ export default function MemberManagement() {
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm">{staff.name}</span>
                         <Badge className={`${roleColor[staff.role]} border-0 text-xs`}>
-                          {roleLabel[staff.role]}
+                          {getRoleLabel(staff.role, staff.customRole)}
                         </Badge>
                       </div>
                       {staff.phone && (
@@ -545,7 +618,7 @@ export default function MemberManagement() {
                     <div>
                       <h3 className="font-semibold">{selectedStaff.name}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {roleLabel[selectedStaff.role]}
+                        {getRoleLabel(selectedStaff.role, selectedStaff.customRole)}
                         {selectedStaff.phone && ` · ${selectedStaff.phone}`}
                       </p>
                     </div>
@@ -573,7 +646,7 @@ export default function MemberManagement() {
                                     {item.groupName ?? `團組 #${item.groupId}`}
                                   </span>
                                   <Badge className={`${roleColor[item.role]} border-0 text-xs`}>
-                                    {roleLabel[item.role]}
+                                    {getRoleLabel(item.role, item.customRole)}
                                   </Badge>
                                 </div>
                                 {item.groupCode && (
@@ -587,10 +660,10 @@ export default function MemberManagement() {
                                     {item.endTime && ` → ${item.endTime}`}
                                   </div>
                                 )}
-                                {item.taskName && (
+                                {(item.taskName || item.itineraryLocationName) && (
                                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="w-3 h-3" />
-                                    {item.taskName}
+                                    {item.taskName || item.itineraryLocationName}
                                   </div>
                                 )}
                                 {item.notes && (
@@ -634,7 +707,7 @@ export default function MemberManagement() {
           <DialogHeader>
             <DialogTitle>添加工作人員</DialogTitle>
           </DialogHeader>
-          <StaffForm formData={formData} setFormData={setFormData} />
+          <StaffForm formData={formData} setFormData={setFormData} userOptions={userOptions as any[]} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               取消
@@ -652,7 +725,7 @@ export default function MemberManagement() {
           <DialogHeader>
             <DialogTitle>編輯工作人員 — {selectedStaff?.name}</DialogTitle>
           </DialogHeader>
-          <StaffForm formData={formData} setFormData={setFormData} />
+          <StaffForm formData={formData} setFormData={setFormData} userOptions={userOptions as any[]} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               取消
@@ -675,7 +748,7 @@ export default function MemberManagement() {
               <Label>選擇團組 *</Label>
               <Select
                 value={assignForm.groupId}
-                onValueChange={(v) => setAssignForm((f) => ({ ...f, groupId: v }))}
+                onValueChange={(v) => setAssignForm((f) => ({ ...f, groupId: v, itineraryId: "", taskName: "", startTime: "", endTime: "" }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="請選擇團組" />
@@ -697,7 +770,7 @@ export default function MemberManagement() {
                 onValueChange={(v) =>
                   setAssignForm((f) => ({
                     ...f,
-                    role: v as "coordinator" | "staff" | "guide" | "driver",
+                    role: v as StaffRole,
                   }))
                 }
               >
@@ -705,13 +778,23 @@ export default function MemberManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="coordinator">總統籌</SelectItem>
-                  <SelectItem value="staff">工作人員</SelectItem>
-                  <SelectItem value="guide">導遊</SelectItem>
-                  <SelectItem value="driver">司機</SelectItem>
+                  {roleOptions.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {assignForm.role === "other" && (
+              <div className="space-y-2">
+                <Label>自定義角色名稱</Label>
+                <Input
+                  placeholder="如：攝影、醫護、翻譯"
+                  value={assignForm.customRole}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, customRole: e.target.value }))}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>具體日期 *</Label>
@@ -720,6 +803,41 @@ export default function MemberManagement() {
                 value={assignForm.date}
                 onChange={(e) => setAssignForm((f) => ({ ...f, date: e.target.value }))}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>指派到具體行程點</Label>
+              <Select
+                value={assignForm.itineraryId || "group"}
+                onValueChange={(v) => {
+                  if (v === "group") {
+                    setAssignForm((f) => ({ ...f, itineraryId: "", taskName: "", startTime: "", endTime: "" }));
+                    return;
+                  }
+                  const itinerary = filteredItineraries.find((item: any) => String(item.id) === v) as any;
+                  setAssignForm((f) => ({
+                    ...f,
+                    itineraryId: v,
+                    date: itinerary?.date || f.date,
+                    taskName: itinerary?.locationName || itinerary?.description || f.taskName,
+                    startTime: itinerary?.startTime || f.startTime,
+                    endTime: itinerary?.endTime || f.endTime,
+                  }));
+                }}
+                disabled={!assignForm.groupId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="團組全天或選擇行程點" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="group">團組全天 / 不指定行程點</SelectItem>
+                  {filteredItineraries.map((item: any) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.date} {item.startTime || "全天"} · {item.locationName || item.description || "未命名行程"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -778,9 +896,11 @@ export default function MemberManagement() {
 function StaffForm({
   formData,
   setFormData,
+  userOptions,
 }: {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+  userOptions: any[];
 }) {
   return (
     <div className="space-y-4 py-2">
@@ -800,7 +920,8 @@ function StaffForm({
             onValueChange={(v) =>
               setFormData((f) => ({
                 ...f,
-                role: v as "coordinator" | "staff" | "guide" | "driver",
+                role: v as StaffRole,
+                customRole: v === "other" ? f.customRole : "",
               }))
             }
           >
@@ -808,13 +929,43 @@ function StaffForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="coordinator">總統籌</SelectItem>
-              <SelectItem value="staff">工作人員</SelectItem>
-              <SelectItem value="guide">導遊</SelectItem>
-              <SelectItem value="driver">司機</SelectItem>
+              {roleOptions.map((role) => (
+                <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {formData.role === "other" && (
+        <div className="space-y-2">
+          <Label>自定義角色名稱</Label>
+          <Input
+            placeholder="如：攝影、醫護、翻譯"
+            value={formData.customRole}
+            onChange={(e) => setFormData((f) => ({ ...f, customRole: e.target.value }))}
+          />
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label>綁定登入帳號</Label>
+        <Select
+          value={formData.userId || "none"}
+          onValueChange={(v) => setFormData((f) => ({ ...f, userId: v === "none" ? "" : v }))}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="可選，用於工作人員登入後查看任務/上報位置" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">暫不綁定</SelectItem>
+            {userOptions.map((user) => (
+              <SelectItem key={user.id} value={String(user.id)}>
+                {user.name || user.username || `用戶 #${user.id}`} {user.username ? `(${user.username})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

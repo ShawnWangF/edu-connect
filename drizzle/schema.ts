@@ -590,18 +590,25 @@ export const scheduleBlocks = mysqlTable("scheduleBlocks", {
 });
 
 /**
- * 工作人員表 - 總統籌、工作人員、導遊、司機
+ * 工作人員表 - 負責人、工作人員、導遊、司機、安全員、自定義角色
  */
 export const staff = mysqlTable("staff", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
-  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver"]).notNull(),
+  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver", "security", "other"]).notNull(),
+  customRole: varchar("customRole", { length: 100 }),
+  userId: int("userId"), // 綁定 users 表，供工作人員登入後查看任務與上報位置
   phone: varchar("phone", { length: 50 }),
   email: varchar("email", { length: 100 }),
   wechat: varchar("wechat", { length: 100 }),
   languages: text("languages"), // 語言能力（導遊用）
   licenseNumber: varchar("licenseNumber", { length: 50 }), // 駕照/導遊證號
   notes: text("notes"),
+  locationSharingEnabled: boolean("locationSharingEnabled").default(false).notNull(),
+  lastLatitude: varchar("lastLatitude", { length: 32 }),
+  lastLongitude: varchar("lastLongitude", { length: 32 }),
+  lastLocationAccuracy: int("lastLocationAccuracy"),
+  lastLocationAt: timestamp("lastLocationAt"),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -614,7 +621,8 @@ export const batchStaff = mysqlTable("batchStaff", {
   id: int("id").autoincrement().primaryKey(),
   groupId: int("groupId").notNull(), // 關聯團組（groups 表）
   staffId: int("staffId").notNull(), // 關聯工作人員
-  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver"]).notNull(), // 在此任務的角色
+  role: mysqlEnum("role", ["coordinator", "staff", "guide", "driver", "security", "other"]).notNull(), // 在此任務的角色
+  customRole: varchar("customRole", { length: 100 }),
   // 行程點級別指派字段
   date: date("date"), // 具體指派日期（必填）
   itineraryId: int("itineraryId"), // 關聯 itineraries 表（可為空，空表示全天指派）

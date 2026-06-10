@@ -1,5 +1,7 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
+import { MapView } from "@/components/Map";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -7,7 +9,7 @@ import {
   Users, MapPin, Clock, AlertTriangle, CheckCircle2, Circle,
   Utensils, Plane, Building2, UserCheck, UserX, Activity,
   TrendingUp, Navigation, CalendarClock, ChevronRight, RefreshCw,
-  Hotel, Bus, Star, Zap, Bell, BellRing, Edit3, Info
+  Hotel, Bus, Star, Zap, Bell, BellRing, Edit3, Info, LocateFixed, Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -20,14 +22,20 @@ import { toast } from "sonner";
 
 // ===== 辅助函数 =====
 const roleLabel: Record<string, string> = {
-  coordinator: "總統籌", staff: "工作人員", guide: "導遊", driver: "司機",
+  coordinator: "負責人", staff: "工作人員", guide: "導遊", driver: "司機", security: "安全員", other: "自定義",
 };
 const roleColor: Record<string, string> = {
   coordinator: "bg-purple-100 text-purple-800",
   staff: "bg-blue-100 text-blue-800",
   guide: "bg-green-100 text-green-800",
   driver: "bg-orange-100 text-orange-800",
+  security: "bg-red-100 text-red-800",
+  other: "bg-slate-100 text-slate-800",
 };
+
+function roleName(role: string, customRole?: string | null) {
+  return role === 'other' ? customRole || '自定義' : roleLabel[role] || role;
+}
 const statusConfig = {
   in_progress: { label: "進行中", color: "bg-emerald-500", textColor: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
   upcoming: { label: "即將開始", color: "bg-blue-400", textColor: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
@@ -159,7 +167,7 @@ function StaffStatusCard({ staff }: { staff: any }) {
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="font-medium text-sm">{staff.name}</span>
           <Badge variant="outline" className={`text-xs px-1 py-0 ${roleColor[staff.role]} border-0`}>
-            {roleLabel[staff.role]}
+            {roleName(staff.role, staff.customRole)}
           </Badge>
         </div>
         {isBusy && staff.currentAssignment ? (
@@ -186,6 +194,125 @@ function StaffStatusCard({ staff }: { staff: any }) {
         'bg-gray-300'
       }`} />
     </div>
+  );
+}
+
+function StaffLocationMap({ data, onRemind }: { data: any; onRemind: (staffId: number) => void }) {
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const located = data?.located || [];
+  const missing = data?.missing || [];
+  const center = located[0]?.latitude && located[0]?.longitude
+    ? { lat: located[0].latitude, lng: located[0].longitude }
+    : { lat: 22.3193, lng: 114.1694 };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.google?.maps?.marker) return;
+    markersRef.current.forEach(marker => marker.map = null);
+    markersRef.current = [];
+    const bounds = new window.google.maps.LatLngBounds();
+    located.forEach((item: any) => {
+      if (!item.latitude || !item.longitude) return;
+      const position = { lat: item.latitude, lng: item.longitude };
+      const pin = document.createElement("div");
+      pin.className = "rounded-full bg-blue-600 text-white text-xs font-bold px-2 py-1 shadow-lg border-2 border-white";
+      pin.textContent = item.groupCode || item.staffName?.slice(0, 1) || "人";
+      const marker = new window.google.maps.marker.AdvancedMarkerElement({
+        map,
+        position,
+        title: `${item.staffName} · ${item.groupCode || ""}`,
+        content: pin,
+      });
+      marker.addListener("click", () => {
+        const info = new window.google.maps.InfoWindow({
+          content: `
+            <div style="font-size:12px;line-height:1.5;min-width:180px">
+              <strong>${item.staffName}</strong> · ${roleName(item.role, item.customRole)}<br/>
+              ${item.groupCode || ""} ${item.groupName || ""}<br/>
+              ${item.taskName || "團組指派"}<br/>
+              最近上報：${item.lastLocationAt ? new Date(item.lastLocationAt).toLocaleString("zh-HK") : "未記錄"}
+            </div>
+          `,
+        });
+        info.open({ map, anchor: marker });
+      });
+      markersRef.current.push(marker);
+      bounds.extend(position);
+    });
+    if (located.length > 1) {
+      map.fitBounds(bounds, 48);
+    } else if (located.length === 1) {
+      map.setCenter(center);
+      map.setZoom(14);
+    }
+  }, [located, center]);
+
+  return (
+    <Card className="bg-white border-0 shadow-sm">
+      <CardHeader className="pb-3 pt-4 px-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <LocateFixed className="w-4 h-4 text-blue-500" />
+            團組位置追蹤地圖
+          </CardTitle>
+          <div className="flex gap-3 text-xs text-muted-foreground">
+            <span>{located.length} 人已上報位置</span>
+            <span>{missing.length} 人待開啟/待上報</span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-5 pb-5 space-y-4">
+        <MapView
+          className="h-[420px] rounded-lg border overflow-hidden"
+          initialCenter={center}
+          initialZoom={12}
+          onMapReady={(map) => { mapRef.current = map; }}
+        />
+        {located.length === 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            目前沒有可顯示的位置。可從下方提醒已指派工作人員開啟位置共享。
+          </div>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {located.slice(0, 6).map((item: any) => (
+            <div key={`loc-${item.staffId}`} className="rounded-lg border bg-blue-50/50 p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{item.staffName}</span>
+                <Badge variant="outline">{roleName(item.role, item.customRole)}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{item.groupCode} · {item.groupName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{item.taskName || "團組指派"}</p>
+              <p className="mt-1 text-xs text-blue-700">
+                最近：{item.lastLocationAt ? new Date(item.lastLocationAt).toLocaleString("zh-HK") : "未記錄"}
+                {item.lastLocationAccuracy ? ` · 約 ${item.lastLocationAccuracy} 米` : ""}
+              </p>
+            </div>
+          ))}
+        </div>
+        {missing.length > 0 && (
+          <div className="rounded-lg border">
+            <div className="border-b bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+              未顯示位置的已指派工作人員
+            </div>
+            <div className="divide-y">
+              {missing.slice(0, 8).map((item: any) => (
+                <div key={`missing-${item.staffId}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{item.staffName} <span className="text-xs text-muted-foreground">· {roleName(item.role, item.customRole)}</span></div>
+                    <div className="text-xs text-muted-foreground truncate">{item.groupCode} · {item.groupName} · {item.taskName || "團組指派"}</div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => onRemind(item.staffId)}>
+                    <Send className="mr-1.5 h-3.5 w-3.5" />
+                    提醒開啟
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -291,178 +418,574 @@ function DiningCard({ booking }: { booking: any }) {
 }
 
 // ===== 紧急调整快捷窗口 =====
-function UrgentAdjustPanel({ allItins }: { allItins: any[] }) {
+function EmergencyCommandButton({
+  commandScope,
+  staffLocations,
+  onRemindLocation,
+}: {
+  commandScope: any;
+  staffLocations: any;
+  onRemindLocation: (staffId: number) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [activeCommand, setActiveCommand] = useState<'notice' | 'adjust' | 'location'>('notice');
   const [selectedItinId, setSelectedItinId] = useState<string>("");
   const [form, setForm] = useState({
+    scopeType: "batch" as "single" | "group" | "batch",
+    groupIds: [] as string[],
+    batchCode: "",
+    matchText: "",
+    date: "",
     locationName: "", description: "", startTime: "", endTime: "",
     notes: "", reason: "", notifyAll: true
   });
+  const [noticeForm, setNoticeForm] = useState({
+    title: "",
+    content: "",
+    relatedGroupId: "all",
+  });
+  const [impactPreview, setImpactPreview] = useState<any>(null);
   const utils = trpc.useUtils();
   const { data: recentAdj = [] } = trpc.dashboard.recentAdjustments.useQuery(undefined, { refetchInterval: 30000 });
+  const allItins = commandScope?.itineraries || [];
+  const groupOptions = useMemo(() => {
+    return (commandScope?.groups || []).map((group: any) => ({
+      id: group.id,
+      label: `${group.code || ''} ${group.name || ''}`.trim() || `團組 #${group.id}`,
+    }));
+  }, [commandScope]);
+  const batchOptions = useMemo(() => {
+    return (commandScope?.batches || []).map((batch: any) => batch.code).filter(Boolean);
+  }, [commandScope]);
+  const itineraryNameOptions = useMemo(() => {
+    const set = new Set<string>();
+    allItins.forEach((itin: any) => {
+      const label = (itin.locationName || itin.description || "").trim();
+      if (label) set.add(label);
+    });
+    return Array.from(set).sort();
+  }, [allItins]);
+  const broadcastMutation = trpc.dashboard.emergencyBroadcast.useMutation({
+    onSuccess: (data) => {
+      toast.success("緊急通知已發布", {
+        description: `已寫入 ${data.recipients} 位用戶通知中心${data.pushed ? `，推送 ${data.pushed} 個端點` : ""}`,
+      });
+      utils.notifications.list.invalidate();
+      setNoticeForm({ title: "", content: "", relatedGroupId: "all" });
+      setOpen(false);
+    },
+    onError: (e) => toast.error("發布失敗", { description: e.message }),
+  });
+  const previewMutation = trpc.dashboard.previewUrgentAdjust.useMutation({
+    onSuccess: (data) => setImpactPreview(data),
+    onError: (e) => {
+      setImpactPreview(null);
+      toast.error("預檢失敗", { description: e.message });
+    },
+  });
   const adjustMutation = trpc.dashboard.urgentAdjust.useMutation({
     onSuccess: (data) => {
       toast.success("調整已提交", {
-        description: `${data.groupName} ${data.date} 行程點已更新${form.notifyAll ? "，已通知全员" : ""}`,
+        description: `${data.groupName} ${data.date} 已更新 ${data.affectedGroups || 1} 個團組、${data.affectedItineraries || 1} 個行程點${form.notifyAll ? "，已通知全員" : ""}`,
       });
       utils.dashboard.recentAdjustments.invalidate();
       utils.dashboard.overview.invalidate();
+      utils.dashboard.commandScope.invalidate();
+      utils.dashboard.staffStatus.invalidate();
+      utils.dashboard.staffLocations.invalidate();
+      utils.batchStaff.invalidate();
       setOpen(false);
-      setForm({ locationName: "", description: "", startTime: "", endTime: "", notes: "", reason: "", notifyAll: true });
+      setForm({ scopeType: "batch", groupIds: [], batchCode: "", matchText: "", date: "", locationName: "", description: "", startTime: "", endTime: "", notes: "", reason: "", notifyAll: true });
       setSelectedItinId("");
+      setImpactPreview(null);
     },
     onError: (e) => toast.error("提交失敗", { description: e.message }),
   });
   const selectedItin = useMemo(
-    () => allItins.find(i => String(i.itinId) === selectedItinId),
+    () => allItins.find((i: any) => String(i.itinId) === selectedItinId),
     [allItins, selectedItinId]
   );
+  useEffect(() => {
+    setImpactPreview(null);
+  }, [form.scopeType, form.groupIds, form.batchCode, form.matchText, form.date, form.locationName, form.description, form.startTime, form.endTime, form.notes, selectedItinId]);
+  const buildAdjustPayload = () => ({
+    itineraryId: selectedItinId ? Number(selectedItinId) : undefined,
+    scopeType: form.scopeType,
+    groupIds: form.groupIds.map(Number),
+    batchCode: form.batchCode || undefined,
+    matchText: form.matchText || undefined,
+    date: form.date || undefined,
+    locationName: form.locationName || undefined,
+    description: form.description || undefined,
+    startTime: form.startTime || undefined,
+    endTime: form.endTime || undefined,
+    notes: form.notes || undefined,
+  });
+  const validateAdjustForm = () => {
+    if (form.scopeType === "single" && !selectedItinId) {
+      toast.error("請選擇單個行程點");
+      return false;
+    }
+    if (form.scopeType === "group" && (form.groupIds.length === 0 || !form.matchText.trim())) {
+      toast.error("請選擇團組並指定原行程點");
+      return false;
+    }
+    if (form.scopeType === "batch" && (!form.batchCode || !form.matchText.trim())) {
+      toast.error("請選擇批次並指定原行程點");
+      return false;
+    }
+    if (!form.locationName.trim() && !form.description.trim() && !form.startTime && !form.endTime && !form.notes.trim()) {
+      toast.error("請至少填寫一項要調整的內容");
+      return false;
+    }
+    return true;
+  };
+  const handlePreview = () => {
+    if (!validateAdjustForm()) return;
+    previewMutation.mutate(buildAdjustPayload());
+  };
   const handleSubmit = () => {
-    if (!selectedItinId || !form.reason.trim()) {
-      toast.error("請選擇行程點並填寫調整原因");
+    if (!form.reason.trim()) {
+      toast.error("請填寫調整原因");
       return;
     }
+    if (!validateAdjustForm()) return;
     adjustMutation.mutate({
-      itineraryId: Number(selectedItinId),
-      locationName: form.locationName || undefined,
-      description: form.description || undefined,
-      startTime: form.startTime || undefined,
-      endTime: form.endTime || undefined,
-      notes: form.notes || undefined,
+      ...buildAdjustPayload(),
       reason: form.reason,
       notifyAll: form.notifyAll,
     });
   };
+  const handleBroadcast = () => {
+    if (!noticeForm.title.trim() || !noticeForm.content.trim()) {
+      toast.error("請填寫通知標題和內容");
+      return;
+    }
+    broadcastMutation.mutate({
+      title: noticeForm.title.trim(),
+      content: noticeForm.content.trim(),
+      relatedGroupId: noticeForm.relatedGroupId === "all" ? undefined : Number(noticeForm.relatedGroupId),
+    });
+  };
+  const missingLocations = staffLocations?.missing || [];
+  const blockingImpacts = (impactPreview?.impacts || []).filter((impact: any) => impact.level === "error");
+  const warningImpacts = (impactPreview?.impacts || []).filter((impact: any) => impact.level === "warning");
+
   return (
     <>
-      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-red-500 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-red-800">緊急行程調整</div>
-              <div className="text-xs text-red-600">快速修改行程點 · 可一鍵通知全員</div>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setOpen(true)}
-            className="bg-red-500 hover:bg-red-600 text-white text-xs h-8 px-3 gap-1.5 shadow-sm"
-          >
-            <Edit3 className="w-3.5 h-3.5" />發起調整
-          </Button>
-        </div>
-        {recentAdj.length > 0 ? (
-          <div className="space-y-1.5">
-            <div className="text-xs font-semibold text-red-700 mb-1.5">最近調整記錄</div>
-            {(recentAdj as any[]).slice(0, 3).map((r: any, i: number) => (
-              <div key={i} className="flex items-start gap-2 p-2 bg-white rounded-lg border border-red-100">
-                <BellRing className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-red-800 truncate">{r.title}</div>
-                  <div className="text-xs text-muted-foreground">{r.createdAt}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-xs text-red-500 text-center py-1">暂無調整記錄</div>
-        )}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button
+          onClick={() => setOpen(true)}
+          className="h-14 rounded-full bg-red-600 px-5 text-white shadow-2xl hover:bg-red-700"
+        >
+          <Zap className="mr-2 h-5 w-5" />
+          緊急指揮
+        </Button>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[86vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-700">
-              <Zap className="w-5 h-5" />緊急行程點調整
+              <Zap className="w-5 h-5" />緊急指揮快捷指令
             </DialogTitle>
+            {commandScope?.project && (
+              <p className="text-xs text-muted-foreground">
+                目前作用範圍：{commandScope.project.name} · 全部批次/團組/行程點
+              </p>
+            )}
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">選擇行程點 <span className="text-red-500">*</span></Label>
-              <Select value={selectedItinId} onValueChange={setSelectedItinId}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="選擇需要調整的行程點..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {allItins.map((itin: any) => (
-                    <SelectItem key={itin.itinId} value={String(itin.itinId)}>
-                      <span className="font-semibold text-blue-700 mr-2">{itin.groupCode}</span>
-                      {itin.description || itin.locationName}
-                      {itin.startTime && <span className="text-muted-foreground ml-1">({formatTime(itin.startTime)})</span>}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedItin && (
-                <div className="text-xs text-muted-foreground bg-slate-50 rounded p-2 border">
-                  當前：{selectedItin.description || selectedItin.locationName}
-                  {selectedItin.startTime && ` · ${formatTime(selectedItin.startTime)}–${formatTime(selectedItin.endTime)}`}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">新地點名稱</Label>
-                <Input placeholder="留空則不修改" value={form.locationName}
-                  onChange={e => setForm(f => ({ ...f, locationName: e.target.value }))} className="text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">新行程描述</Label>
-                <Input placeholder="留空則不修改" value={form.description}
-                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">新開始時間</Label>
-                <Input type="time" value={form.startTime}
-                  onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className="text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">新結束時間</Label>
-                <Input type="time" value={form.endTime}
-                  onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className="text-sm" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">備註</Label>
-              <Input placeholder="其他補充說明" value={form.notes}
-                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">調整原因 <span className="text-red-500">*</span></Label>
-              <Textarea
-                placeholder="請說明調整原因，此內容將包含在通知中..."
-                value={form.reason}
-                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-                className="text-sm resize-none" rows={2}
-              />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-amber-600" />
-                <div>
-                  <div className="text-sm font-medium text-amber-800">通知全員</div>
-                  <div className="text-xs text-amber-600">向所有平台用戶發送調整通知</div>
-                </div>
-              </div>
-              <Switch checked={form.notifyAll} onCheckedChange={v => setForm(f => ({ ...f, notifyAll: v }))} />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)} size="sm">取消</Button>
+
+          <div className="grid grid-cols-3 gap-2">
             <Button
-              onClick={handleSubmit}
-              disabled={adjustMutation.isPending}
-              className="bg-red-500 hover:bg-red-600 text-white"
-              size="sm"
+              type="button"
+              variant={activeCommand === 'notice' ? 'default' : 'outline'}
+              onClick={() => setActiveCommand('notice')}
+              className={activeCommand === 'notice' ? 'bg-red-600 hover:bg-red-700' : ''}
             >
-              {adjustMutation.isPending ? "提交中..." : (
-                <><Zap className="w-3.5 h-3.5 mr-1" />{form.notifyAll ? "調整並通知全員" : "僅調整行程"}</>
-              )}
+              <Bell className="mr-2 h-4 w-4" />
+              全員通知
             </Button>
-          </DialogFooter>
+            <Button
+              type="button"
+              variant={activeCommand === 'adjust' ? 'default' : 'outline'}
+              onClick={() => setActiveCommand('adjust')}
+              className={activeCommand === 'adjust' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              <Edit3 className="mr-2 h-4 w-4" />
+              改行程
+            </Button>
+            <Button
+              type="button"
+              variant={activeCommand === 'location' ? 'default' : 'outline'}
+              onClick={() => setActiveCommand('location')}
+              className={activeCommand === 'location' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              <LocateFixed className="mr-2 h-4 w-4" />
+              定位提醒
+            </Button>
+          </div>
+
+          {activeCommand === 'notice' && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                用於突發天氣、交通延誤、集合點變更等需要所有系統用戶立即看到的事項。發布後會寫入通知中心，並嘗試推送到已訂閱設備。
+              </div>
+              <div className="space-y-1.5">
+                <Label>通知標題 *</Label>
+                <Input
+                  placeholder="如：所有團組暫停前往戶外景點"
+                  value={noticeForm.title}
+                  onChange={(e) => setNoticeForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>關聯團組</Label>
+                <Select
+                  value={noticeForm.relatedGroupId}
+                  onValueChange={(value) => setNoticeForm((f) => ({ ...f, relatedGroupId: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部 / 不指定團組</SelectItem>
+                    {groupOptions.map((group: any) => (
+                      <SelectItem key={group.id} value={String(group.id)}>{group.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>通知內容 *</Label>
+                <Textarea
+                  rows={4}
+                  placeholder="請寫明處理指令、集合時間、負責人和下一步安排..."
+                  value={noticeForm.content}
+                  onChange={(e) => setNoticeForm((f) => ({ ...f, content: e.target.value }))}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
+                <Button onClick={handleBroadcast} disabled={broadcastMutation.isPending} className="bg-red-600 hover:bg-red-700">
+                  <Send className="mr-2 h-4 w-4" />
+                  {broadcastMutation.isPending ? "發布中..." : "發布緊急通知"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+              {activeCommand === 'adjust' && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                適用於景點、學校交流或餐廳突然改時間：先選團組或批次範圍，再指定要匹配的原行程點，系統會先預檢跨團衝突，確認後才批量更新。
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ["batch", "按批次"],
+                  ["group", "按團組"],
+                  ["single", "單個行程"],
+                ] as const).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={form.scopeType === value ? "default" : "outline"}
+                    onClick={() => setForm((f) => ({ ...f, scopeType: value, groupIds: value === "group" ? f.groupIds : [], batchCode: value === "batch" ? f.batchCode : "" }))}
+                    className={form.scopeType === value ? "bg-slate-900 hover:bg-slate-800" : ""}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+
+              {form.scopeType === "batch" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>批次代號 *</Label>
+                    <Select value={form.batchCode} onValueChange={(value) => setForm((f) => ({ ...f, batchCode: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇批次" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {batchOptions.map((code: string) => (
+                          <SelectItem key={code} value={code}>{code}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>指定日期</Label>
+                    <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+
+              {form.scopeType === "group" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>團組代號 *</Label>
+                    <Select
+                      value={form.groupIds[0] || ""}
+                      onValueChange={(value) => setForm((f) => ({ ...f, groupIds: [value] }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇團組" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groupOptions.map((group: any) => (
+                          <SelectItem key={group.id} value={String(group.id)}>{group.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>指定日期</Label>
+                    <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+
+              {form.scopeType !== "single" && (
+                <div className="space-y-1.5">
+                  <Label>原行程點 / 關鍵詞 *</Label>
+                  <Select
+                    value={itineraryNameOptions.includes(form.matchText) ? form.matchText : "manual"}
+                    onValueChange={(value) => setForm((f) => ({ ...f, matchText: value === "manual" ? "" : value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇常見行程點，或手動輸入" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="manual">手動輸入關鍵詞</SelectItem>
+                      {itineraryNameOptions.map((name) => (
+                        <SelectItem key={name} value={name}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="如：香港海洋公園、姊妹學校交流、晚餐"
+                    value={form.matchText}
+                    onChange={(e) => setForm((f) => ({ ...f, matchText: e.target.value }))}
+                  />
+                </div>
+              )}
+
+              {form.scopeType === "single" && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">選擇行程點 <span className="text-red-500">*</span></Label>
+                <Select value={selectedItinId} onValueChange={setSelectedItinId}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="選擇需要調整的行程點..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {allItins.map((itin: any) => (
+                      <SelectItem key={itin.itinId} value={String(itin.itinId)}>
+                        <span className="font-semibold text-blue-700 mr-2">{itin.groupCode}</span>
+                        {itin.description || itin.locationName}
+                        {itin.startTime && <span className="text-muted-foreground ml-1">({formatTime(itin.startTime)})</span>}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedItin && (
+                  <div className="text-xs text-muted-foreground bg-slate-50 rounded p-2 border">
+                    當前：{selectedItin.description || selectedItin.locationName}
+                    {selectedItin.startTime && ` · ${formatTime(selectedItin.startTime)}–${formatTime(selectedItin.endTime)}`}
+                  </div>
+                )}
+              </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">新地點名稱</Label>
+                  <Input placeholder="留空則不修改" value={form.locationName}
+                    onChange={e => setForm(f => ({ ...f, locationName: e.target.value }))} className="text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">新行程描述</Label>
+                  <Input placeholder="留空則不修改" value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">新開始時間</Label>
+                  <Input type="time" value={form.startTime}
+                    onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className="text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">新結束時間</Label>
+                  <Input type="time" value={form.endTime}
+                    onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className="text-sm" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">備註</Label>
+                <Input placeholder="其他補充說明" value={form.notes}
+                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="text-sm" />
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">調整前預檢</div>
+                    <div className="text-xs text-muted-foreground">檢查受影響團組、同團重疊、同地點/學校/工作人員衝突</div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreview}
+                    disabled={previewMutation.isPending}
+                  >
+                    <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
+                    {previewMutation.isPending ? "預檢中..." : "預檢影響"}
+                  </Button>
+                </div>
+
+                {impactPreview && (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-md bg-white p-2 border">
+                        <div className="text-lg font-bold text-slate-900">{impactPreview.affectedGroups}</div>
+                        <div className="text-[11px] text-muted-foreground">受影響團組</div>
+                      </div>
+                      <div className="rounded-md bg-white p-2 border">
+                        <div className="text-lg font-bold text-slate-900">{impactPreview.affectedItineraries}</div>
+                        <div className="text-[11px] text-muted-foreground">匹配行程點</div>
+                      </div>
+                      <div className="rounded-md bg-white p-2 border">
+                        <div className={cn("text-lg font-bold", blockingImpacts.length > 0 ? "text-red-600" : warningImpacts.length > 0 ? "text-amber-600" : "text-emerald-600")}>
+                          {blockingImpacts.length + warningImpacts.length}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">風險提示</div>
+                      </div>
+                    </div>
+                    {impactPreview.targetGroups?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {impactPreview.targetGroups.slice(0, 18).map((code: string) => (
+                          <Badge key={code} variant="outline" className="bg-white text-xs">{code}</Badge>
+                        ))}
+                        {impactPreview.targetGroups.length > 18 && (
+                          <Badge variant="outline" className="bg-white text-xs">+{impactPreview.targetGroups.length - 18}</Badge>
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {(impactPreview.impacts || []).slice(0, 8).map((impact: any, index: number) => (
+                        <div
+                          key={`${impact.type}-${index}`}
+                          className={cn(
+                            "rounded-md border p-2 text-xs",
+                            impact.level === "error" && "border-red-200 bg-red-50 text-red-800",
+                            impact.level === "warning" && "border-amber-200 bg-amber-50 text-amber-800",
+                            impact.level === "info" && "border-emerald-200 bg-emerald-50 text-emerald-800",
+                          )}
+                        >
+                          <div className="flex items-center gap-1.5 font-semibold">
+                            {impact.level === "info" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                            {impact.title}
+                          </div>
+                          <div className="mt-1 leading-relaxed">{impact.message}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {impactPreview.targets?.length > 0 && (
+                      <div className="rounded-md border bg-white p-2">
+                        <div className="mb-1 text-xs font-semibold text-slate-700">將被更新的行程點</div>
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          {impactPreview.targets.slice(0, 5).map((target: any) => (
+                            <div key={target.id} className="truncate">
+                              {target.groupCode} · {target.date} · {target.startTime || "未定"} · {target.locationName || target.description || "未命名行程"}
+                            </div>
+                          ))}
+                          {impactPreview.targets.length > 5 && <div>另有 {impactPreview.targets.length - 5} 個行程點...</div>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">調整原因 <span className="text-red-500">*</span></Label>
+                <Textarea
+                  placeholder="請說明調整原因，此內容將包含在通知中..."
+                  value={form.reason}
+                  onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+                  className="text-sm resize-none" rows={2}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-amber-600" />
+                  <div>
+                    <div className="text-sm font-medium text-amber-800">通知全員</div>
+                    <div className="text-xs text-amber-600">向所有平台用戶發送調整通知</div>
+                  </div>
+                </div>
+                <Switch checked={form.notifyAll} onCheckedChange={v => setForm(f => ({ ...f, notifyAll: v }))} />
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)} size="sm">取消</Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={adjustMutation.isPending || !impactPreview}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                  size="sm"
+                >
+                  {adjustMutation.isPending ? "提交中..." : !impactPreview ? "請先預檢影響" : (
+                    <><Zap className="w-3.5 h-3.5 mr-1" />{form.notifyAll ? "確認調整並通知" : "確認調整"}</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {activeCommand === 'location' && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+                用於提醒已指派但未顯示位置的人員開啟「我的任務」位置共享。已綁定登入帳號的人員會收到通知中心提醒和 Web Push。
+              </div>
+              {missingLocations.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <LocateFixed className="mx-auto mb-2 h-9 w-9 opacity-40" />
+                  <p className="text-sm">目前沒有待提醒人員</p>
+                </div>
+              ) : (
+                <div className="rounded-lg border divide-y">
+                  {missingLocations.map((item: any) => (
+                    <div key={item.staffId} className="flex flex-wrap items-center justify-between gap-2 p-3">
+                      <div>
+                        <div className="text-sm font-medium">{item.staffName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {roleName(item.role, item.customRole)} · {item.groupCode} {item.groupName}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => onRemindLocation(item.staffId)}>
+                        <Send className="mr-1.5 h-3.5 w-3.5" />
+                        發送提醒
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {recentAdj.length > 0 && activeCommand !== 'adjust' && (
+            <div className="mt-2 rounded-lg border bg-slate-50 p-3">
+              <div className="mb-2 text-xs font-semibold text-slate-600">最近調整記錄</div>
+              <div className="space-y-1.5">
+                {(recentAdj as any[]).slice(0, 3).map((r: any, i: number) => (
+                  <div key={i} className="flex items-start gap-2 rounded bg-white p-2 text-xs">
+                    <BellRing className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{r.title}</div>
+                      <div className="text-muted-foreground">{r.createdAt}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -744,7 +1267,6 @@ function AccomDetailDialog({ open, onClose, accommodation }: { open: boolean; on
 
 // ===== 主仪表盘组件 =====
 export default function OperationsDashboard() {
-  const [refreshKey, setRefreshKey] = useState(0);
   const [staffDetailOpen, setStaffDetailOpen] = useState(false);
   const [venueDetailOpen, setVenueDetailOpen] = useState(false);
   const [diningDetailOpen, setDiningDetailOpen] = useState(false);
@@ -768,13 +1290,24 @@ export default function OperationsDashboard() {
   const { data: flights } = trpc.dashboard.flightInfo.useQuery(undefined, {
     refetchInterval: 60000,
   });
+  const { data: staffLocations, refetch: refetchStaffLocations } = trpc.dashboard.staffLocations.useQuery(undefined, {
+    refetchInterval: 60000,
+  });
+  const { data: commandScope, refetch: refetchCommandScope } = trpc.dashboard.commandScope.useQuery(undefined, {
+    refetchInterval: 60000,
+  });
+  const remindLocation = trpc.dashboard.remindLocationSharing.useMutation({
+    onSuccess: () => toast.success("已發送位置共享提醒"),
+    onError: (error) => toast.error("提醒失敗", { description: error.message }),
+  });
 
   const handleRefresh = () => {
     refetchOverview();
     refetchStaff();
     refetchVenue();
     refetchDining();
-    setRefreshKey(k => k + 1);
+    refetchStaffLocations();
+    refetchCommandScope();
   };
 
   const todayItins = overview?.todayItineraries || [];
@@ -941,6 +1474,11 @@ export default function OperationsDashboard() {
         </Card>
       </div>
 
+      <StaffLocationMap
+        data={staffLocations}
+        onRemind={(staffId) => remindLocation.mutate({ staffId })}
+      />
+
       {/* 主内容区：三列布局 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
@@ -976,9 +1514,6 @@ export default function OperationsDashboard() {
               )}
             </CardContent>
           </Card>
-
-          {/* 紧急调整快捷窗口（明日行程預告上方） */}
-          <UrgentAdjustPanel allItins={[...todayItins, ...tomorrowItins]} />
 
           {/* 明日预告 */}
           {tomorrowItins.length > 0 && (
@@ -1201,6 +1736,11 @@ export default function OperationsDashboard() {
         open={accomDetailOpen}
         onClose={() => setAccomDetailOpen(false)}
         accommodation={accommodation}
+      />
+      <EmergencyCommandButton
+        commandScope={commandScope}
+        staffLocations={staffLocations}
+        onRemindLocation={(staffId) => remindLocation.mutate({ staffId })}
       />
     </div>
   );

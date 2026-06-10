@@ -84,6 +84,251 @@ const editorProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+const staffRoleValues = ['coordinator', 'staff', 'guide', 'driver', 'security', 'other'] as const;
+const staffRoleSchema = z.enum(staffRoleValues);
+
+const urgentAdjustScopeSchema = z.object({
+  itineraryId: z.number().optional(),
+  scopeType: z.enum(['single', 'group', 'batch']).default('single'),
+  groupIds: z.array(z.number()).optional(),
+  batchCode: z.string().optional(),
+  matchText: z.string().optional(),
+  date: z.string().optional(),
+  locationName: z.string().optional(),
+  description: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type UrgentAdjustScopeInput = z.infer<typeof urgentAdjustScopeSchema>;
+
+async function findUrgentAdjustTargets(dbConn: any, input: UrgentAdjustScopeInput) {
+  if (input.scopeType === 'single') {
+    if (!input.itineraryId) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: '請選擇行程點' });
+    }
+    const [rows] = await dbConn.execute(sql`
+      SELECT i.id, i.groupId, i.locationId, i.locationName, i.description, i.startTime, i.endTime, i.notes,
+        DATE_FORMAT(i.date, '%Y-%m-%d') as date,
+        g.projectId, g.name as groupName, g.code as groupCode, g.batch_code as batchCode,
+        COALESCE(g.totalCount, g.studentCount + g.teacherCount, 0) as headcount
+      FROM itineraries i
+      JOIN \`groups\` g ON g.id = i.groupId
+      WHERE i.id = ${input.itineraryId}
+    `);
+    return (rows as unknown) as any[];
+  }
+
+  if (input.scopeType === 'group') {
+    const groupIds = input.groupIds || [];
+    if (groupIds.length === 0 || !input.matchText?.trim()) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: '請選擇團組並指定要匹配的原行程點' });
+    }
+    const like = `%${input.matchText.trim()}%`;
+    const dateClause = input.date ? sql`AND DATE_FORMAT(i.date, '%Y-%m-%d') = ${input.date}` : sql``;
+    const targetRows: any[] = [];
+    for (const groupId of groupIds) {
+      const [rows] = await dbConn.execute(sql`
+        SELECT i.id, i.groupId, i.locationId, i.locationName, i.description, i.startTime, i.endTime, i.notes,
+          DATE_FORMAT(i.date, '%Y-%m-%d') as date,
+          g.projectId, g.name as groupName, g.code as groupCode, g.batch_code as batchCode,
+          COALESCE(g.totalCount, g.studentCount + g.teacherCount, 0) as headcount
+        FROM itineraries i
+        JOIN \`groups\` g ON g.id = i.groupId
+        WHERE i.groupId = ${groupId}
+          ${dateClause}
+          AND (i.locationName LIKE ${like} OR i.description LIKE ${like})
+      `);
+      targetRows.push(...((rows as unknown) as any[]));
+    }
+    return targetRows;
+  }
+
+  if (!input.batchCode?.trim() || !input.matchText?.trim()) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: '請選擇批次並指定要匹配的原行程點' });
+  }
+  const like = `%${input.matchText.trim()}%`;
+  const dateClause = input.date ? sql`AND DATE_FORMAT(i.date, '%Y-%m-%d') = ${input.date}` : sql``;
+  const [rows] = await dbConn.execute(sql`
+    SELECT i.id, i.groupId, i.locationId, i.locationName, i.description, i.startTime, i.endTime, i.notes,
+      DATE_FORMAT(i.date, '%Y-%m-%d') as date,
+      g.projectId, g.name as groupName, g.code as groupCode, g.batch_code as batchCode,
+      COALESCE(g.totalCount, g.studentCount + g.teacherCount, 0) as headcount
+    FROM itineraries i
+    JOIN \`groups\` g ON g.id = i.groupId
+    WHERE g.batch_code = ${input.batchCode}
+      ${dateClause}
+      AND (i.locationName LIKE ${like} OR i.description LIKE ${like})
+  `);
+  return (rows as unknown) as any[];
+}
+
+function timeForConflict(time: string | null | undefined, fallback: string) {
+  return time && time.trim() ? time : fallback;
+}
+
+async function buildUrgentAdjustImpact(dbConn: any, input: UrgentAdjustScopeInput, targets: any[]) {
+  const targetIds = targets.map((row) => Number(row.id));
+  const targetIdSet = new Set(targetIds);
+  const targetGroups = Array.from(new Set(targets.map((row) => row.groupCode).filter(Boolean)));
+  const affectedDates = Array.from(new Set(targets.map((row) => row.date).filter(Boolean))).sort();
+  const impacts: Array<{
+    level: 'error' | 'warning' | 'info';
+    type: string;
+    title: string;
+    message: string;
+    relatedGroups?: string[];
+  }> = [];
+
+  for (const target of targets) {
+    const newStart = timeForConflict(input.startTime ?? target.startTime, '00:00');
+    const newEnd = timeForConflict(input.endTime ?? target.endTime, '23:59');
+    const newLocationName = (input.locationName ?? target.locationName ?? '').trim();
+
+    const [sameGroupRows] = await dbConn.execute(sql`
+      SELECT id, locationName, description, startTime, endTime
+      FROM itineraries
+      WHERE groupId = ${target.groupId}
+        AND DATE_FORMAT(date, '%Y-%m-%d') = ${target.date}
+        AND id <> ${target.id}
+        AND COALESCE(startTime, '00:00') < ${newEnd}
+        AND COALESCE(endTime, '23:59') > ${newStart}
+      ORDER BY COALESCE(startTime, '00:00')
+    `);
+    const sameGroup = ((sameGroupRows as unknown) as any[]).filter((row) => !targetIdSet.has(Number(row.id)));
+    if (sameGroup.length > 0) {
+      impacts.push({
+        level: 'error',
+        type: 'same_group_overlap',
+        title: `${target.groupCode} 同團時間重疊`,
+        message: `${target.date} ${newStart}-${newEnd} 會壓到 ${sameGroup.map((row) => `${row.startTime || '未定'}-${row.endTime || '未定'} ${row.locationName || row.description || '未命名行程'}`).join('、')}`,
+        relatedGroups: [target.groupCode],
+      });
+    }
+
+    if (newLocationName) {
+      const [locationRows] = await dbConn.execute(sql`
+        SELECT i.id, g.code AS groupCode, g.name AS groupName,
+          COALESCE(g.totalCount, g.studentCount + g.teacherCount, 0) AS headcount,
+          i.startTime, i.endTime, i.locationName, i.description,
+          COALESCE(l.maxCapacity, l.capacity, a.maxCapacity, a.capacity, 0) AS maxCapacity
+        FROM itineraries i
+        JOIN \`groups\` g ON g.id = i.groupId
+        LEFT JOIN locations l ON (i.locationId = l.id OR (i.locationId IS NULL AND l.name = i.locationName))
+        LEFT JOIN attractions a ON (a.name = i.locationName OR a.name = ${newLocationName})
+        WHERE g.projectId = ${target.projectId}
+          AND DATE_FORMAT(i.date, '%Y-%m-%d') = ${target.date}
+          AND i.id <> ${target.id}
+          AND COALESCE(i.startTime, '00:00') < ${newEnd}
+          AND COALESCE(i.endTime, '23:59') > ${newStart}
+          AND (i.locationName = ${newLocationName} OR i.description LIKE ${`%${newLocationName}%`})
+        ORDER BY COALESCE(i.startTime, '00:00'), g.code
+      `);
+      const locationConflicts = ((locationRows as unknown) as any[]).filter((row) => !targetIdSet.has(Number(row.id)));
+      if (locationConflicts.length > 0) {
+        const outsidePeople = locationConflicts.reduce((sum, row) => sum + (Number(row.headcount) || 0), 0);
+        const maxCapacity = Number(locationConflicts.find((row) => Number(row.maxCapacity) > 0)?.maxCapacity) || 0;
+        const totalPeople = outsidePeople + (Number(target.headcount) || 0);
+        impacts.push({
+          level: maxCapacity && totalPeople > maxCapacity ? 'error' : 'warning',
+          type: 'location_overlap',
+          title: `${newLocationName} 同時段已有其他團組`,
+          message: `${target.date} ${newStart}-${newEnd} 另有 ${locationConflicts.map((row) => `${row.groupCode} ${row.startTime || '未定'}-${row.endTime || '未定'}`).join('、')}${maxCapacity ? `；預估合計 ${totalPeople} / 容量 ${maxCapacity}` : ''}`,
+          relatedGroups: Array.from(new Set(locationConflicts.map((row) => row.groupCode).filter(Boolean))),
+        });
+      }
+    }
+
+    const [exchangeRows] = await dbConn.execute(sql`
+      SELECT se.id, g.code AS groupCode, g.name AS groupName, es.name AS schoolName, se.startTime, se.endTime
+      FROM schoolExchanges se
+      JOIN \`groups\` g ON g.id = se.groupId
+      LEFT JOIN exchangeSchools es ON es.id = se.schoolId
+      WHERE g.projectId = ${target.projectId}
+        AND se.exchangeDate = ${target.date}
+        AND COALESCE(se.startTime, '00:00') < ${newEnd}
+        AND COALESCE(se.endTime, '23:59') > ${newStart}
+        AND (se.groupId <> ${target.groupId} OR se.groupId = ${target.groupId})
+      ORDER BY se.startTime, g.code
+    `);
+    const exchangeConflicts = (exchangeRows as unknown) as any[];
+    if (exchangeConflicts.length > 0 && /學校|学校|交流|姊妹|姐妹/.test(`${newLocationName} ${input.description ?? target.description ?? ''}`)) {
+      impacts.push({
+        level: 'warning',
+        type: 'school_exchange_overlap',
+        title: '姊妹學校交流時段需核對',
+        message: `${target.date} ${newStart}-${newEnd} 牽涉交流安排：${exchangeConflicts.map((row) => `${row.groupCode} ${row.schoolName || '姊妹學校'} ${row.startTime || '未定'}-${row.endTime || '未定'}`).join('、')}`,
+        relatedGroups: Array.from(new Set(exchangeConflicts.map((row) => row.groupCode).filter(Boolean))),
+      });
+    }
+
+    const [staffRows] = await dbConn.execute(sql`
+      SELECT bs.id, bs.staffId, s.name AS staffName, g.code AS groupCode, bs.startTime, bs.endTime, bs.taskName
+      FROM batchStaff bs
+      JOIN staff s ON s.id = bs.staffId
+      JOIN \`groups\` g ON g.id = bs.groupId
+      WHERE DATE_FORMAT(bs.date, '%Y-%m-%d') = ${target.date}
+        AND bs.groupId <> ${target.groupId}
+        AND bs.staffId IN (
+          SELECT staffId FROM batchStaff
+          WHERE groupId = ${target.groupId}
+            AND DATE_FORMAT(date, '%Y-%m-%d') = ${target.date}
+        )
+        AND COALESCE(bs.startTime, '00:00') < ${newEnd}
+        AND COALESCE(bs.endTime, '23:59') > ${newStart}
+      ORDER BY s.name, bs.startTime
+    `);
+    const staffConflicts = (staffRows as unknown) as any[];
+    if (staffConflicts.length > 0) {
+      impacts.push({
+        level: 'error',
+        type: 'staff_overlap',
+        title: '工作人員跨團時間衝突',
+        message: `${target.date} ${newStart}-${newEnd}：${staffConflicts.map((row) => `${row.staffName} 已在 ${row.groupCode} ${row.startTime || '未定'}-${row.endTime || '未定'}`).join('、')}`,
+        relatedGroups: Array.from(new Set(staffConflicts.map((row) => row.groupCode).filter(Boolean))),
+      });
+    }
+  }
+
+  const seen = new Set<string>();
+  const deduped = impacts.filter((impact) => {
+    const key = `${impact.level}|${impact.type}|${impact.title}|${impact.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (deduped.length === 0) {
+    deduped.push({
+      level: 'info',
+      type: 'clear',
+      title: '未發現直接衝突',
+      message: '未檢出同團時間重疊、同地點同時段、姊妹學校交流或工作人員跨團衝突。',
+    });
+  }
+
+  return {
+    affectedGroups: targetGroups.length,
+    affectedItineraries: targets.length,
+    affectedDates,
+    targetGroups,
+    targets: targets.slice(0, 80).map((row) => ({
+      id: row.id,
+      groupId: row.groupId,
+      groupCode: row.groupCode,
+      groupName: row.groupName,
+      batchCode: row.batchCode,
+      date: row.date,
+      locationName: row.locationName,
+      description: row.description,
+      startTime: row.startTime,
+      endTime: row.endTime,
+    })),
+    impacts: deduped,
+  };
+}
+
 export const appRouter = router({
   system: systemRouter,
   
@@ -2494,6 +2739,20 @@ export const appRouter = router({
 
   // ===== 工作人員庫 =====
   staff: router({
+    userOptions: editorProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return [];
+      const { users } = await import('../drizzle/schema');
+      const { asc } = await import('drizzle-orm');
+      return await dbConn.select({
+        id: users.id,
+        username: users.username,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+      }).from(users).orderBy(asc(users.name), asc(users.username));
+    }),
+
     list: protectedProcedure.query(async () => {
       const dbConn = await db.getDb();
       if (!dbConn) return [];
@@ -2503,21 +2762,133 @@ export const appRouter = router({
         id: staff.id,
         name: staff.name,
         role: staff.role,
+        customRole: staff.customRole,
+        userId: staff.userId,
         phone: staff.phone,
         email: staff.email,
         wechat: staff.wechat,
         languages: staff.languages,
         licenseNumber: staff.licenseNumber,
         notes: staff.notes,
+        locationSharingEnabled: staff.locationSharingEnabled,
+        lastLatitude: staff.lastLatitude,
+        lastLongitude: staff.lastLongitude,
+        lastLocationAccuracy: staff.lastLocationAccuracy,
+        lastLocationAt: staff.lastLocationAt,
         isActive: staff.isActive,
       }).from(staff).where(eq(staff.isActive, true));
       return rows;
     }),
 
+    me: protectedProcedure.query(async ({ ctx }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return null;
+      const { staff } = await import('../drizzle/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const rows = await dbConn.select().from(staff)
+        .where(and(eq(staff.userId, ctx.user.id), eq(staff.isActive, true)))
+        .limit(1);
+      return rows[0] ?? null;
+    }),
+
+    myAssignments: protectedProcedure.query(async ({ ctx }) => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { profile: null, assignments: [] };
+      const { sql } = await import('drizzle-orm');
+      const [profileRows] = await dbConn.execute(sql`
+        SELECT *
+        FROM staff
+        WHERE userId = ${ctx.user.id} AND isActive = true
+        LIMIT 1
+      `);
+      const profile = ((profileRows as unknown) as any[])[0] ?? null;
+      if (!profile) return { profile: null, assignments: [] };
+      const [assignmentRows] = await dbConn.execute(sql`
+        SELECT
+          bs.id,
+          bs.groupId,
+          bs.staffId,
+          bs.role,
+          bs.customRole,
+          DATE_FORMAT(bs.date, '%Y-%m-%d') AS date,
+          bs.itineraryId,
+          COALESCE(i.locationName, bs.taskName) AS taskName,
+          i.locationName AS itineraryLocationName,
+          i.description AS itineraryDescription,
+          bs.startTime,
+          bs.endTime,
+          bs.notes,
+          g.name AS groupName,
+          g.code AS groupCode,
+          g.contact AS groupContact,
+          g.phone AS groupPhone,
+          COALESCE(g.studentCount, 0) + COALESCE(g.teacherCount, 0) AS headcount
+        FROM batchStaff bs
+        JOIN \`groups\` g ON bs.groupId = g.id
+        LEFT JOIN itineraries i ON bs.itineraryId = i.id
+        WHERE bs.staffId = ${profile.id}
+          AND (bs.date IS NULL OR bs.date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY))
+        ORDER BY bs.date ASC, COALESCE(bs.startTime, '00:00') ASC
+        LIMIT 100
+      `);
+      return { profile, assignments: assignmentRows as unknown as any[] };
+    }),
+
+    setLocationSharing: protectedProcedure
+      .input(z.object({ enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { staff } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        const rows = await dbConn.select({ id: staff.id }).from(staff)
+          .where(and(eq(staff.userId, ctx.user.id), eq(staff.isActive, true)))
+          .limit(1);
+        const profile = rows[0];
+        if (!profile) throw new TRPCError({ code: 'NOT_FOUND', message: '此登入帳號尚未綁定工作人員檔案' });
+        await dbConn.update(staff)
+          .set({ locationSharingEnabled: input.enabled })
+          .where(eq(staff.id, profile.id));
+        return { success: true };
+      }),
+
+    reportLocation: protectedProcedure
+      .input(z.object({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        accuracy: z.number().optional().nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { staff } = await import('../drizzle/schema');
+        const { eq, and } = await import('drizzle-orm');
+        const rows = await dbConn.select({
+          id: staff.id,
+          locationSharingEnabled: staff.locationSharingEnabled,
+        }).from(staff)
+          .where(and(eq(staff.userId, ctx.user.id), eq(staff.isActive, true)))
+          .limit(1);
+        const profile = rows[0];
+        if (!profile) throw new TRPCError({ code: 'NOT_FOUND', message: '此登入帳號尚未綁定工作人員檔案' });
+        if (!profile.locationSharingEnabled) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: '請先開啟位置共享' });
+        }
+        await dbConn.update(staff).set({
+          lastLatitude: String(input.latitude),
+          lastLongitude: String(input.longitude),
+          lastLocationAccuracy: input.accuracy ? Math.round(input.accuracy) : null,
+          lastLocationAt: new Date(),
+        }).where(eq(staff.id, profile.id));
+        return { success: true };
+      }),
+
     create: editorProcedure
       .input(z.object({
         name: z.string().min(1),
-        role: z.enum(['coordinator','staff','guide','driver']),
+        role: staffRoleSchema,
+        customRole: z.string().optional().nullable(),
+        userId: z.number().optional().nullable(),
         phone: z.string().optional(),
         email: z.string().optional(),
         wechat: z.string().optional(),
@@ -2537,7 +2908,9 @@ export const appRouter = router({
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).optional(),
-        role: z.enum(['coordinator','staff','guide','driver']).optional(),
+        role: staffRoleSchema.optional(),
+        customRole: z.string().optional().nullable(),
+        userId: z.number().optional().nullable(),
         phone: z.string().optional().nullable(),
         email: z.string().optional().nullable(),
         wechat: z.string().optional().nullable(),
@@ -2570,7 +2943,7 @@ export const appRouter = router({
     // 獲取工作人員統計數據
     stats: protectedProcedure.query(async () => {
       const dbConn = await db.getDb();
-      if (!dbConn) return { total: 0, coordinator: 0, staff: 0, guide: 0, driver: 0, assigned: 0 };
+      if (!dbConn) return { total: 0, coordinator: 0, staff: 0, guide: 0, driver: 0, security: 0, other: 0, assigned: 0, sharing: 0 };
       const { staff, batchStaff } = await import('../drizzle/schema');
       const { eq, count, countDistinct } = await import('drizzle-orm');
       // 按角色統計
@@ -2582,6 +2955,9 @@ export const appRouter = router({
       const assignedRows = await dbConn.select({
         count: countDistinct(batchStaff.staffId),
       }).from(batchStaff);
+      const sharingRows = await dbConn.select({
+        count: count(),
+      }).from(staff).where(eq(staff.locationSharingEnabled, true));
       const roleMap: Record<string, number> = {};
       let total = 0;
       for (const row of staffRows) {
@@ -2594,7 +2970,10 @@ export const appRouter = router({
         staff: roleMap['staff'] || 0,
         guide: roleMap['guide'] || 0,
         driver: roleMap['driver'] || 0,
+        security: roleMap['security'] || 0,
+        other: roleMap['other'] || 0,
         assigned: Number(assignedRows[0]?.count || 0),
+        sharing: Number(sharingRows[0]?.count || 0),
       };
     }),
 
@@ -2604,14 +2983,18 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const dbConn = await db.getDb();
         if (!dbConn) return [];
-        const { batchStaff, groups } = await import('../drizzle/schema');
+        const { batchStaff, groups, itineraries } = await import('../drizzle/schema');
         const { eq, sql } = await import('drizzle-orm');
         const assignments = await dbConn.select({
           id: batchStaff.id,
           groupId: batchStaff.groupId,
           staffId: batchStaff.staffId,
           role: batchStaff.role,
+          customRole: batchStaff.customRole,
           date: sql<string>`DATE_FORMAT(${batchStaff.date}, '%Y-%m-%d')`,
+          itineraryId: batchStaff.itineraryId,
+          itineraryLocationName: itineraries.locationName,
+          itineraryDescription: itineraries.description,
           taskName: batchStaff.taskName,
           startTime: batchStaff.startTime,
           endTime: batchStaff.endTime,
@@ -2622,6 +3005,7 @@ export const appRouter = router({
           groupEndDate: sql<string>`DATE_FORMAT(${groups.endDate}, '%Y-%m-%d')`,
         }).from(batchStaff)
           .leftJoin(groups, eq(batchStaff.groupId, groups.id))
+          .leftJoin(itineraries, eq(batchStaff.itineraryId, itineraries.id))
           .where(eq(batchStaff.staffId, input.staffId))
           .orderBy((await import('drizzle-orm')).asc(batchStaff.date), (await import('drizzle-orm')).asc(batchStaff.startTime));
         return assignments;
@@ -2636,15 +3020,18 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const dbConn = await db.getDb();
         if (!dbConn) return [];
-        const { batchStaff, staff } = await import('../drizzle/schema');
+        const { batchStaff, staff, itineraries } = await import('../drizzle/schema');
         const { eq, sql, asc } = await import('drizzle-orm');
         const result = await dbConn.select({
           id: batchStaff.id,
           groupId: batchStaff.groupId,
           staffId: batchStaff.staffId,
           role: batchStaff.role,
+          customRole: batchStaff.customRole,
           date: sql<string>`DATE_FORMAT(${batchStaff.date}, '%Y-%m-%d')`,
           itineraryId: batchStaff.itineraryId,
+          itineraryLocationName: itineraries.locationName,
+          itineraryDescription: itineraries.description,
           taskName: batchStaff.taskName,
           startTime: batchStaff.startTime,
           endTime: batchStaff.endTime,
@@ -2652,8 +3039,15 @@ export const appRouter = router({
           staffName: staff.name,
           staffPhone: staff.phone,
           staffRole: staff.role,
+          staffCustomRole: staff.customRole,
+          locationSharingEnabled: staff.locationSharingEnabled,
+          lastLatitude: staff.lastLatitude,
+          lastLongitude: staff.lastLongitude,
+          lastLocationAccuracy: staff.lastLocationAccuracy,
+          lastLocationAt: staff.lastLocationAt,
         }).from(batchStaff)
           .leftJoin(staff, eq(batchStaff.staffId, staff.id))
+          .leftJoin(itineraries, eq(batchStaff.itineraryId, itineraries.id))
           .where(eq(batchStaff.groupId, input.groupId))
           .orderBy(asc(batchStaff.date), asc(batchStaff.startTime));
         return result;
@@ -2676,12 +3070,19 @@ export const appRouter = router({
           groupId: batchStaff.groupId,
           staffId: batchStaff.staffId,
           role: batchStaff.role,
+          customRole: batchStaff.customRole,
           date: sql<string>`DATE_FORMAT(${batchStaff.date}, '%Y-%m-%d')`,
+          itineraryId: batchStaff.itineraryId,
           taskName: batchStaff.taskName,
           startTime: batchStaff.startTime,
           endTime: batchStaff.endTime,
           staffName: staff.name,
           staffRole: staff.role,
+          staffCustomRole: staff.customRole,
+          locationSharingEnabled: staff.locationSharingEnabled,
+          lastLatitude: staff.lastLatitude,
+          lastLongitude: staff.lastLongitude,
+          lastLocationAt: staff.lastLocationAt,
         }).from(batchStaff)
           .leftJoin(staff, eq(batchStaff.staffId, staff.id))
           .where(inArray(batchStaff.groupId, groupIds));
@@ -2693,7 +3094,8 @@ export const appRouter = router({
       .input(z.object({
         groupId: z.number(),
         staffId: z.number(),
-        role: z.enum(['coordinator','staff','guide','driver']),
+        role: staffRoleSchema,
+        customRole: z.string().optional().nullable(),
         date: z.string(), // 具體日期 YYYY-MM-DD
         itineraryId: z.number().optional(), // 關聯的行程點 ID（可選）
         taskName: z.string().optional(), // 行程點名稱
@@ -2709,6 +3111,7 @@ export const appRouter = router({
           groupId: input.groupId,
           staffId: input.staffId,
           role: input.role,
+          customRole: input.customRole ?? null,
           date: input.date as any,
           itineraryId: input.itineraryId ?? null,
           taskName: input.taskName ?? null,
@@ -2723,8 +3126,10 @@ export const appRouter = router({
     update: editorProcedure
       .input(z.object({
         id: z.number(),
-        role: z.enum(['coordinator','staff','guide','driver']).optional(),
+        role: staffRoleSchema.optional(),
+        customRole: z.string().optional().nullable(),
         date: z.string().optional(),
+        itineraryId: z.number().optional().nullable(),
         taskName: z.string().optional(),
         startTime: z.string().optional(),
         endTime: z.string().optional(),
@@ -2917,6 +3322,69 @@ export const appRouter = router({
 
   // ===== 实时运营仪表盘 =====
   dashboard: router({
+    commandScope: protectedProcedure
+      .input(z.object({ projectId: z.number().optional() }).optional())
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return { project: null, groups: [], batches: [], itineraries: [] };
+        const { sql } = await import('drizzle-orm');
+        let projectId = input?.projectId;
+        let project: any = null;
+        if (projectId) {
+          const [projectRows] = await dbConn.execute(sql`
+            SELECT id, name, code, DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate, DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate
+            FROM projects
+            WHERE id = ${projectId}
+            LIMIT 1
+          `);
+          project = ((projectRows as unknown) as any[])[0] ?? null;
+        } else {
+          const [projectRows] = await dbConn.execute(sql`
+            SELECT id, name, code, DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate, DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate
+            FROM projects
+            ORDER BY
+              CASE status WHEN 'ongoing' THEN 0 WHEN 'preparing' THEN 1 ELSE 2 END,
+              startDate DESC,
+              id DESC
+            LIMIT 1
+          `);
+          project = ((projectRows as unknown) as any[])[0] ?? null;
+          projectId = project?.id;
+        }
+        if (!projectId) return { project: null, groups: [], batches: [], itineraries: [] };
+
+        const [groupRows] = await dbConn.execute(sql`
+          SELECT id, name, code, batch_code AS batchCode,
+            DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
+            DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate,
+            studentCount, teacherCount, totalCount
+          FROM \`groups\`
+          WHERE projectId = ${projectId}
+          ORDER BY batch_code ASC, code ASC
+        `);
+        const [batchRows] = await dbConn.execute(sql`
+          SELECT DISTINCT batch_code AS code
+          FROM \`groups\`
+          WHERE projectId = ${projectId} AND batch_code IS NOT NULL AND batch_code <> ''
+          ORDER BY batch_code ASC
+        `);
+        const [itineraryRows] = await dbConn.execute(sql`
+          SELECT i.id AS itinId, i.groupId, g.code AS groupCode, g.name AS groupName, g.batch_code AS batchCode,
+            DATE_FORMAT(i.date, '%Y-%m-%d') AS date,
+            i.dayNumber, i.locationName, i.description, i.startTime, i.endTime, i.notes
+          FROM itineraries i
+          JOIN \`groups\` g ON g.id = i.groupId
+          WHERE g.projectId = ${projectId}
+          ORDER BY g.batch_code ASC, g.code ASC, i.date ASC, COALESCE(i.startTime, '00:00') ASC
+        `);
+        return {
+          project,
+          groups: groupRows as unknown as any[],
+          batches: batchRows as unknown as any[],
+          itineraries: itineraryRows as unknown as any[],
+        };
+      }),
+
     // 获取当前正在进行的项目和团组行程进度
     overview: protectedProcedure.query(async () => {
       const dbConn = await db.getDb();
@@ -3048,7 +3516,14 @@ export const appRouter = router({
       }
 
       // 获取所有工作人员
-      const [allStaff] = await dbConn.execute(sql`SELECT id, name, role, phone FROM staff ORDER BY role, name`);
+      const [allStaff] = await dbConn.execute(sql`
+        SELECT
+          id, name, role, customRole, userId, phone,
+          locationSharingEnabled, lastLatitude, lastLongitude, lastLocationAccuracy, lastLocationAt
+        FROM staff
+        WHERE isActive = true
+        ORDER BY role, name
+      `);
 
       // 获取今天的工作人员指派
       const [todayAssignments] = await dbConn.execute(sql`
@@ -3056,14 +3531,19 @@ export const appRouter = router({
           bs.staffId,
           bs.groupId,
           bs.role as assignedRole,
+          bs.customRole as assignedCustomRole,
+          bs.itineraryId,
           bs.taskName,
           bs.startTime,
           bs.endTime,
           g.name as groupName,
           g.code as groupCode,
+          i.locationName as itineraryLocationName,
+          i.description as itineraryDescription,
           DATE_FORMAT(bs.date, '%Y-%m-%d') as date
         FROM batchStaff bs
         JOIN \`groups\` g ON bs.groupId = g.id
+        LEFT JOIN itineraries i ON bs.itineraryId = i.id
         WHERE DATE_FORMAT(bs.date, '%Y-%m-%d') = ${todayStr}
         ORDER BY bs.startTime ASC
       `);
@@ -3078,6 +3558,7 @@ export const appRouter = router({
         const assignments = assignmentMap.get(s.id) || [];
         // 检查当前是否在岗
         const currentAssignment = assignments.find((a: any) => {
+          if (!a.startTime && !a.endTime) return true;
           if (!a.startTime || !a.endTime) return false;
           const [sh, sm] = a.startTime.split(':').map(Number);
           const [eh, em] = a.endTime.split(':').map(Number);
@@ -3092,6 +3573,7 @@ export const appRouter = router({
         });
         return {
           ...s,
+          roleLabel: s.role === 'other' ? (s.customRole || '自定義') : undefined,
           status: currentAssignment ? 'busy' : (assignments.length > 0 ? 'scheduled' : 'free'),
           currentAssignment: currentAssignment || null,
           nextAssignment: nextAssignment || null,
@@ -3099,6 +3581,136 @@ export const appRouter = router({
         };
       });
     }),
+
+    staffLocations: protectedProcedure.query(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) return { located: [], missing: [] };
+      const { sql } = await import('drizzle-orm');
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const nowMins = currentHour * 60 + currentMinute;
+      const realTodayStr = now.toISOString().slice(0, 10);
+      const [chk] = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM batchStaff WHERE DATE_FORMAT(date, '%Y-%m-%d') = ${realTodayStr}`);
+      let todayStr = realTodayStr;
+      if ((((chk as unknown) as any[])[0]?.cnt ?? 0) === 0) {
+        const [nf] = await dbConn.execute(sql`SELECT DATE_FORMAT(MIN(date), '%Y-%m-%d') as d FROM batchStaff WHERE date >= NOW()`);
+        const fd = ((nf as unknown) as any[])[0]?.d;
+        if (fd) todayStr = fd;
+        else {
+          const [np] = await dbConn.execute(sql`SELECT DATE_FORMAT(MAX(date), '%Y-%m-%d') as d FROM batchStaff WHERE date < NOW()`);
+          const pd = ((np as unknown) as any[])[0]?.d;
+          if (pd) todayStr = pd;
+        }
+      }
+
+      const [rows] = await dbConn.execute(sql`
+        SELECT
+          s.id AS staffId,
+          s.name AS staffName,
+          s.role,
+          s.customRole,
+          s.userId,
+          s.phone,
+          s.locationSharingEnabled,
+          s.lastLatitude,
+          s.lastLongitude,
+          s.lastLocationAccuracy,
+          s.lastLocationAt,
+          bs.id AS assignmentId,
+          bs.groupId,
+          bs.role AS assignedRole,
+          bs.customRole AS assignedCustomRole,
+          DATE_FORMAT(bs.date, '%Y-%m-%d') AS date,
+          bs.itineraryId,
+          COALESCE(i.locationName, bs.taskName) AS taskName,
+          i.description AS itineraryDescription,
+          bs.startTime,
+          bs.endTime,
+          g.name AS groupName,
+          g.code AS groupCode,
+          COALESCE(g.studentCount, 0) + COALESCE(g.teacherCount, 0) AS headcount
+        FROM batchStaff bs
+        JOIN staff s ON bs.staffId = s.id
+        JOIN \`groups\` g ON bs.groupId = g.id
+        LEFT JOIN itineraries i ON bs.itineraryId = i.id
+        WHERE s.isActive = true
+          AND DATE_FORMAT(bs.date, '%Y-%m-%d') = ${todayStr}
+        ORDER BY g.code ASC, s.role ASC, COALESCE(bs.startTime, '00:00') ASC
+      `);
+
+      const bestByStaff = new Map<number, any>();
+      for (const row of (rows as unknown) as any[]) {
+        const isCurrent = !row.startTime && !row.endTime
+          ? true
+          : row.startTime && row.endTime
+            ? (() => {
+                const [sh, sm] = row.startTime.split(':').map(Number);
+                const [eh, em] = row.endTime.split(':').map(Number);
+                return nowMins >= sh * 60 + sm && nowMins < eh * 60 + em;
+              })()
+            : false;
+        const isUpcoming = row.startTime
+          ? (() => {
+              const [sh, sm] = row.startTime.split(':').map(Number);
+              return sh * 60 + sm > nowMins;
+            })()
+          : false;
+        const rank = isCurrent ? 3 : isUpcoming ? 2 : 1;
+        const existing = bestByStaff.get(row.staffId);
+        if (!existing || rank > existing.rank) {
+          bestByStaff.set(row.staffId, { ...row, rank, assignmentStatus: isCurrent ? 'current' : isUpcoming ? 'upcoming' : 'assigned' });
+        }
+      }
+
+      const located: any[] = [];
+      const missing: any[] = [];
+      for (const item of Array.from(bestByStaff.values())) {
+        const hasLocation = item.locationSharingEnabled && item.lastLatitude && item.lastLongitude;
+        const payload = {
+          ...item,
+          latitude: item.lastLatitude ? Number(item.lastLatitude) : null,
+          longitude: item.lastLongitude ? Number(item.lastLongitude) : null,
+        };
+        if (hasLocation) located.push(payload);
+        else missing.push(payload);
+      }
+      return { today: todayStr, located, missing };
+    }),
+
+    remindLocationSharing: editorProcedure
+      .input(z.object({ staffId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { sql } = await import('drizzle-orm');
+        const [rows] = await dbConn.execute(sql`
+          SELECT s.id, s.name, s.userId, g.id AS groupId, g.name AS groupName, g.code AS groupCode
+          FROM staff s
+          LEFT JOIN batchStaff bs ON bs.staffId = s.id
+          LEFT JOIN \`groups\` g ON g.id = bs.groupId
+          WHERE s.id = ${input.staffId} AND s.isActive = true
+          ORDER BY bs.date DESC
+          LIMIT 1
+        `);
+        const target = ((rows as unknown) as any[])[0];
+        if (!target) throw new TRPCError({ code: 'NOT_FOUND', message: '工作人員不存在' });
+        if (!target.userId) throw new TRPCError({ code: 'BAD_REQUEST', message: '此工作人員尚未綁定登入帳號，無法發送系統提醒' });
+        const { notifications } = await import('../drizzle/schema');
+        await dbConn.insert(notifications).values({
+          userId: target.userId,
+          type: 'reminder',
+          title: '請開啟位置共享',
+          content: `${ctx.user.name || ctx.user.username || '指揮中心'}提醒你開啟位置共享，以便團組「${target.groupCode || ''} ${target.groupName || ''}」進行實時位置協作。`,
+          relatedGroupId: target.groupId ?? null,
+        });
+        await sendWebPushToAll({
+          title: '請開啟位置共享',
+          body: `請進入「我的任務」開啟位置共享，方便指揮中心追蹤團組動向。`,
+          url: '/my-tasks',
+        }, [target.userId]);
+        return { success: true };
+      }),
 
     // 获取景点人流预警
     venueAlert: protectedProcedure.query(async () => {
@@ -3356,9 +3968,98 @@ export const appRouter = router({
       return { hk: hkCount, sz: szCount, total: hkCount + szCount, groups: groupDetails };
     }),
 
-    // 获取航班信息
+    previewUrgentAdjust: protectedProcedure
+      .input(urgentAdjustScopeSchema)
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error('DB not available');
+        const hasUpdate = input.locationName !== undefined || input.description !== undefined ||
+          input.startTime !== undefined || input.endTime !== undefined || input.notes !== undefined;
+        if (!hasUpdate) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '請至少填寫一項要調整的內容' });
+        }
+        const targetRows = await findUrgentAdjustTargets(dbConn, input);
+        if (targetRows.length === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '沒有找到符合條件的行程點' });
+        }
+        return await buildUrgentAdjustImpact(dbConn, input, targetRows);
+      }),
+
     // 紧急调整行程点
     urgentAdjust: protectedProcedure
+      .input(urgentAdjustScopeSchema.extend({
+        reason: z.string(), // 调整原因（必填）
+        notifyAll: z.boolean().default(false), // 是否通知全员
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error('DB not available');
+        const hasUpdate = input.locationName !== undefined || input.description !== undefined ||
+          input.startTime !== undefined || input.endTime !== undefined || input.notes !== undefined;
+        if (!hasUpdate) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '請至少填寫一項要調整的內容' });
+        }
+
+        const targetRows = await findUrgentAdjustTargets(dbConn, input);
+        if (targetRows.length === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: '沒有找到符合條件的行程點' });
+        }
+
+        const ids = targetRows.map((row) => Number(row.id));
+        const syncedTaskName = input.locationName ?? input.description ?? null;
+        for (const id of ids) {
+          await dbConn.execute(sql`
+            UPDATE itineraries SET
+              locationName = COALESCE(${input.locationName ?? null}, locationName),
+              description = COALESCE(${input.description ?? null}, description),
+              startTime = COALESCE(${input.startTime ?? null}, startTime),
+              endTime = COALESCE(${input.endTime ?? null}, endTime),
+              notes = COALESCE(${input.notes ?? null}, notes)
+            WHERE id = ${id}
+          `);
+          await dbConn.execute(sql`
+            UPDATE batchStaff SET
+              taskName = COALESCE(${syncedTaskName}, taskName),
+              startTime = COALESCE(${input.startTime ?? null}, startTime),
+              endTime = COALESCE(${input.endTime ?? null}, endTime),
+              notes = COALESCE(${input.notes ?? null}, notes)
+            WHERE itineraryId = ${id}
+          `);
+        }
+
+        const first = targetRows[0];
+        const groupCodes = Array.from(new Set(targetRows.map((row) => row.groupCode).filter(Boolean)));
+        if (input.notifyAll) {
+          const [allUsers] = await dbConn.execute(sql`SELECT id FROM users`);
+          const userList = (allUsers as unknown) as any[];
+          const title = `【緊急調整】${groupCodes.join('、')} 行程批量變更`;
+          const content = `已緊急調整 ${groupCodes.length} 個團組、${targetRows.length} 個行程點。\n` +
+            `原行程匹配：${input.scopeType === 'single' ? (first.locationName || first.description) : input.matchText}\n` +
+            `調整原因：${input.reason}\n` +
+            (input.locationName ? `新地點：${input.locationName}\n` : '') +
+            (input.startTime ? `新時間：${input.startTime}${input.endTime ? `–${input.endTime}` : ''}\n` : '') +
+            (input.description ? `新內容：${input.description}\n` : '') +
+            (input.notes ? `備註：${input.notes}` : '');
+          for (const u of userList) {
+            await dbConn.execute(sql`
+              INSERT INTO notifications (userId, type, title, content, isRead, createdAt)
+              VALUES (${u.id}, 'change', ${title}, ${content}, false, NOW())
+            `);
+          }
+          await sendWebPushToAll({ title, body: content, url: '/' });
+          const { notifyOwner } = await import('./_core/notification');
+          await notifyOwner({ title, content });
+        }
+        return {
+          success: true,
+          groupName: input.scopeType === 'single' ? first.groupName : groupCodes.join('、'),
+          date: input.date || first.date,
+          affectedGroups: groupCodes.length,
+          affectedItineraries: targetRows.length,
+        };
+      }),
+
+    legacyUrgentAdjust: protectedProcedure
       .input(z.object({
         itineraryId: z.number(),
         locationName: z.string().optional(),
@@ -3366,14 +4067,13 @@ export const appRouter = router({
         startTime: z.string().optional(),
         endTime: z.string().optional(),
         notes: z.string().optional(),
-        reason: z.string(), // 调整原因（必填）
-        notifyAll: z.boolean().default(false), // 是否通知全员
+        reason: z.string(),
+        notifyAll: z.boolean().default(false),
       }))
       .mutation(async ({ input, ctx }) => {
         const dbConn = await db.getDb();
         if (!dbConn) throw new Error('DB not available');
         const { sql } = await import('drizzle-orm');
-        // 1. 获取原行程点信息
         const [origRows] = await dbConn.execute(sql`
           SELECT i.id, i.locationName, i.description, i.startTime, i.endTime, i.notes,
             DATE_FORMAT(i.date, '%Y-%m-%d') as date,
@@ -3384,7 +4084,6 @@ export const appRouter = router({
         `);
         const orig = ((origRows as unknown) as any[])[0];
         if (!orig) throw new Error('行程點不存在');
-        // 2. 更新行程點（使用 Drizzle sql 模板安全参数化）
         const hasUpdate = input.locationName !== undefined || input.description !== undefined ||
           input.startTime !== undefined || input.endTime !== undefined || input.notes !== undefined;
         if (hasUpdate) {
@@ -3414,11 +4113,36 @@ export const appRouter = router({
               VALUES (${u.id}, 'change', ${title}, ${content}, false, NOW())
             `);
           }
+          await sendWebPushToAll({ title, body: content, url: '/' });
           // 同时通知 owner
           const { notifyOwner } = await import('./_core/notification');
           await notifyOwner({ title, content });
         }
         return { success: true, groupName: orig.groupName, date: orig.date };
+      }),
+
+    emergencyBroadcast: editorProcedure
+      .input(z.object({
+        title: z.string().min(1),
+        content: z.string().min(1),
+        relatedGroupId: z.number().optional().nullable(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { sql } = await import('drizzle-orm');
+        const [allUsers] = await dbConn.execute(sql`SELECT id FROM users`);
+        const userList = (allUsers as unknown) as any[];
+        const title = `【緊急通知】${input.title}`;
+        const content = `${input.content}\n\n發布人：${ctx.user.name || ctx.user.username || '指揮中心'}`;
+        for (const u of userList) {
+          await dbConn.execute(sql`
+            INSERT INTO notifications (userId, type, title, content, relatedGroupId, isRead, createdAt)
+            VALUES (${u.id}, 'reminder', ${title}, ${content}, ${input.relatedGroupId ?? null}, false, NOW())
+          `);
+        }
+        const sent = await sendWebPushToAll({ title, body: input.content, url: input.relatedGroupId ? `/groups/${input.relatedGroupId}` : '/' });
+        return { success: true, recipients: userList.length, pushed: sent };
       }),
 
     // 获取最近调整记录

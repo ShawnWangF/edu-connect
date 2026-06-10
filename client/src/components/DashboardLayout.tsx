@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Activity, CalendarDays, LogOut, PanelLeft, Users, MapPin, BarChart3, Settings, FileText, Briefcase, Bell, Layers } from "lucide-react";
+import { Activity, CalendarDays, LogOut, PanelLeft, Users, MapPin, BarChart3, Settings, FileText, Bell, Layers, Navigation } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -30,6 +30,7 @@ import { PushNotificationBanner } from "./PushNotificationBanner";
 
 const menuItems = [
   { icon: Activity, label: "實時指揮中心", path: "/" },
+  { icon: Navigation, label: "我的任務", path: "/my-tasks" },
   { icon: CalendarDays, label: "排程總覽", path: "/schedule" },
   { icon: Layers, label: "批次管理", path: "/batches" },
   { icon: Users, label: "團組管理", path: "/groups" },

@@ -31,6 +31,19 @@ const typeMap = {
   vip: "VIP",
 };
 
+const staffRoleLabels: Record<string, string> = {
+  coordinator: "負責人",
+  staff: "工作人員",
+  guide: "導遊",
+  driver: "司機",
+  security: "安全員",
+  other: "自定義",
+};
+
+function staffRoleLabel(role: string, customRole?: string | null) {
+  return role === "other" ? customRole || "自定義" : staffRoleLabels[role] || role;
+}
+
 export default function GroupDetail() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/groups/:id");
@@ -45,6 +58,7 @@ export default function GroupDetail() {
   const { data: files } = trpc.files.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: attractions } = trpc.locations.list.useQuery();
   const { data: schoolExchanges = [] } = trpc.schoolExchanges.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
+  const { data: staffAssignments = [] } = trpc.batchStaff.listByGroup.useQuery({ groupId }, { enabled: isValidGroup });
   const { data: domesticSchoolsList } = trpc.domesticSchools.list.useQuery();
   const schools = domesticSchoolsList; // 前來交流學校資源庫
   const { data: exchangeSchools } = trpc.exchangeSchools.list.useQuery();
@@ -322,7 +336,7 @@ export default function GroupDetail() {
         </TabsList>
 
         <TabsContent value="itinerary">
-          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} attractions={attractions} dailyCards={dailyCards} />
+          <ItineraryTab groupId={groupId} itineraries={itineraries} utils={utils} group={group} attractions={attractions} dailyCards={dailyCards} staffAssignments={staffAssignments} />
         </TabsContent>
 
         <TabsContent value="daily">
@@ -346,7 +360,7 @@ export default function GroupDetail() {
 }
 
 // 行程詳情標籤頁
-function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCards }: any) {
+function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCards, staffAssignments }: any) {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
@@ -915,6 +929,29 @@ function ItineraryTab({ groupId, itineraries, utils, group, attractions, dailyCa
                                 {item.data.notes && (
                                   <p className="text-sm text-muted-foreground mt-1">備註: {item.data.notes}</p>
                                 )}
+                                {(() => {
+                                  const assignedStaff = (staffAssignments || []).filter((staff: any) => (
+                                    staff.itineraryId === item.data.id ||
+                                    (!staff.itineraryId && staff.date === item.data.date)
+                                  ));
+                                  if (assignedStaff.length === 0) return null;
+                                  return (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {assignedStaff.map((staff: any) => (
+                                        <Badge key={staff.id} variant="outline" className="text-xs">
+                                          <UserCheck className="mr-1 h-3 w-3" />
+                                          {staff.staffName}
+                                          <span className="ml-1 text-muted-foreground">
+                                            {staffRoleLabel(staff.role, staff.customRole || staff.staffCustomRole)}
+                                          </span>
+                                          {staff.locationSharingEnabled && staff.lastLatitude && staff.lastLongitude && (
+                                            <span className="ml-1 text-blue-600">定位</span>
+                                          )}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="flex gap-2">
                                 <Button

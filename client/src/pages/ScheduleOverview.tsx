@@ -1486,11 +1486,14 @@ export default function ScheduleOverview() {
                           {(() => {
                             const groupStaff = staffAssignments.filter(s => s.groupId === g.id);
                             if (groupStaff.length === 0) return <span className="text-gray-400">-</span>;
-                            const roleLabels: Record<string, string> = { coordinator: '總統籌', staff: '工作人員', guide: '導遊', driver: '司機' };
+                            const roleLabels: Record<string, string> = { coordinator: '負責人', staff: '工作人員', guide: '導遊', driver: '司機', security: '安全員', other: '自定義' };
                             return groupStaff.map((s, i) => (
                               <div key={i} className="leading-tight">
                                 <span className="font-medium">{s.staffName || '-'}</span>
-                                <span className="text-gray-400 ml-0.5">({roleLabels[s.role] || s.role})</span>
+                                <span className="text-gray-400 ml-0.5">({s.role === 'other' ? (s.customRole || '自定義') : (roleLabels[s.role] || s.role)})</span>
+                                {s.locationSharingEnabled && s.lastLatitude && s.lastLongitude && (
+                                  <span className="ml-1 text-blue-500">定位</span>
+                                )}
                               </div>
                             ));
                           })()}

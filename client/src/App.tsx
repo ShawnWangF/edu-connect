@@ -27,6 +27,7 @@ import ScheduleOverview from "./pages/ScheduleOverview";
 import Batches from "./pages/Batches";
 import MemberManagement from "./pages/MemberManagement";
 import OperationsDashboard from "./pages/OperationsDashboard";
+import MyTasks from "./pages/MyTasks";
 
 function Router() {
   return (
@@ -141,6 +142,11 @@ function Router() {
       <Route path="/members">
         <DashboardLayout>
           <MemberManagement />
+        </DashboardLayout>
+      </Route>
+      <Route path="/my-tasks">
+        <DashboardLayout>
+          <MyTasks />
         </DashboardLayout>
       </Route>
       <Route path="/404" component={NotFound} />

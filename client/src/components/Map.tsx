@@ -92,8 +92,12 @@ const GOOGLE_MAPS_BASE_URL =
 
 function loadMapScript() {
   return new Promise(resolve => {
+    if (window.google?.maps) {
+      resolve(null);
+      return;
+    }
     if (!API_KEY) {
-      console.error("Google Maps API key is not configured");
+      console.warn("Google Maps API key is not configured");
       resolve(null);
       return;
     }
@@ -135,6 +139,9 @@ export function MapView({
       console.error("Map container not found");
       return;
     }
+    if (!window.google?.maps) {
+      return;
+    }
     map.current = new window.google.maps.Map(mapContainer.current, {
       zoom: initialZoom,
       center: initialCenter,
@@ -154,6 +161,12 @@ export function MapView({
   }, [init]);
 
   return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
+    <div ref={mapContainer} className={cn("w-full h-[500px] bg-slate-100", className)}>
+      {!API_KEY && (
+        <div className="flex h-full items-center justify-center text-sm text-slate-500">
+          Google Maps API Key 尚未配置
+        </div>
+      )}
+    </div>
   );
 }
