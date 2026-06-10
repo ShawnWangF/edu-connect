@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/mysql2";
-import { users, locations } from "../drizzle/schema.js";
+import mysql from "mysql2/promise";
 import { nanoid } from "nanoid";
 
 // 使用bcrypt的簡化版本進行密碼哈希
@@ -11,7 +10,11 @@ async function hashPassword(password) {
 }
 
 async function seed() {
-  const db = drizzle(process.env.DATABASE_URL);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required to seed data");
+  }
+
+  const conn = await mysql.createConnection(process.env.DATABASE_URL);
   
   console.log("開始創建初始數據...");
   
@@ -19,16 +22,20 @@ async function seed() {
   const hashedPassword = await hashPassword("000000");
   
   try {
-    await db.insert(users).values({
-      openId: `local-${nanoid()}`,
-      username: "wang",
-      password: hashedPassword,
-      name: "Wang",
-      email: "wang@educonnect.com",
-      loginMethod: "local",
-      role: "admin",
-      isOnline: false,
-    });
+    await conn.execute(
+      `INSERT INTO users (openId, username, password, name, email, loginMethod, role, isOnline)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        `local-${nanoid()}`,
+        "wang",
+        hashedPassword,
+        "Wang",
+        "wang@educonnect.com",
+        "local",
+        "admin",
+        false,
+      ]
+    );
     console.log("✓ 初始管理員賬號已創建: wang/000000");
   } catch (error) {
     console.log("管理員賬號可能已存在，跳過創建");
@@ -114,13 +121,31 @@ async function seed() {
   
   try {
     for (const location of initialLocations) {
-      await db.insert(locations).values(location);
+      await conn.execute(
+        `INSERT INTO locations (name, address, capacity, applicableType, restrictedDays, contact, phone, isActive)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM locations WHERE name = ? LIMIT 1
+         )`,
+        [
+          location.name,
+          location.address,
+          location.capacity,
+          location.applicableType,
+          location.restrictedDays ?? null,
+          location.contact,
+          location.phone,
+          location.isActive,
+          location.name,
+        ]
+      );
     }
     console.log("✓ 初始景點數據已創建");
   } catch (error) {
     console.log("景點數據可能已存在，跳過創建");
   }
   
+  await conn.end();
   console.log("初始數據創建完成！");
   process.exit(0);
 }

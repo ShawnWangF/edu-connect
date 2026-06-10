@@ -1,0 +1,12 @@
+node_modules
+dist
+uploads
+backups
+.env
+.env.*
+!.env.example
+!.env.production.example
+.git
+.DS_Store
+*.log
+coverage

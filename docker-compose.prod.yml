@@ -1,0 +1,81 @@
+name: hkeiu-prod
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_ID: ${APP_ID:-edu-connect}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+      JWT_SECRET: ${JWT_SECRET:-change-this-before-production}
+      DATABASE_URL: ${DATABASE_URL:-mysql://edu_connect:edu_connect_password@mysql:3306/edu_connect}
+      FILE_STORAGE_DIR: /app/uploads
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
+      NOTIFICATION_API_URL: ${NOTIFICATION_API_URL:-}
+      NOTIFICATION_API_KEY: ${NOTIFICATION_API_KEY:-}
+      DATA_API_URL: ${DATA_API_URL:-}
+      DATA_API_KEY: ${DATA_API_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - app-uploads:/app/uploads
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    depends_on:
+      - app
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-edu_connect}
+      MYSQL_USER: ${MYSQL_USER:-edu_connect}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-edu_connect_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      TZ: Asia/Hong_Kong
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  app-uploads:
+  caddy-data:
+  caddy-config:
+  mysql-data:

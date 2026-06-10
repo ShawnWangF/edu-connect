@@ -16,4 +16,18 @@ CREATE TABLE `projects` (
 );
 --> statement-breakpoint
 ALTER TABLE `groups` ADD `projectId` int;--> statement-breakpoint
-ALTER TABLE `itineraries` DROP COLUMN `contactPerson`;
+SET @itineraries_contact_person_exists = (
+	SELECT COUNT(*)
+	FROM INFORMATION_SCHEMA.COLUMNS
+	WHERE TABLE_SCHEMA = DATABASE()
+		AND TABLE_NAME = 'itineraries'
+		AND COLUMN_NAME = 'contactPerson'
+);--> statement-breakpoint
+SET @drop_itineraries_contact_person = IF(
+	@itineraries_contact_person_exists > 0,
+	'ALTER TABLE `itineraries` DROP COLUMN `contactPerson`',
+	'SELECT 1'
+);--> statement-breakpoint
+PREPARE drop_itineraries_contact_person_stmt FROM @drop_itineraries_contact_person;--> statement-breakpoint
+EXECUTE drop_itineraries_contact_person_stmt;--> statement-breakpoint
+DEALLOCATE PREPARE drop_itineraries_contact_person_stmt;

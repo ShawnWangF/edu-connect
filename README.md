@@ -57,6 +57,37 @@ pnpm build
 pnpm start
 ```
 
+## 中央 Web/PWA 內部部署
+
+推薦把系統部署到一台中央服務器，團隊成員用瀏覽器訪問同一個網址；在支援 PWA 的瀏覽器中，可以把它安裝到桌面或 Dock，體驗接近桌面 App，但數據仍集中在同一個 MySQL。
+
+1. 在服務器安裝 Docker 和 Docker Compose。
+2. 複製生產環境示例並填入域名、密碼和密鑰：
+
+```bash
+cp .env.production.example .env.production
+```
+
+3. 啟動中央服務：
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+4. 首次啟動後創建初始管理員和基礎數據：
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec app pnpm db:seed
+```
+
+5. 備份數據庫：
+
+```bash
+./scripts/backup-db.sh
+```
+
+`deploy/Caddyfile` 會把外部請求反向代理到 App。設置真實域名並把 DNS 指向服務器後，Caddy 會自動申請 HTTPS；HTTPS 是 PWA 在非 localhost 環境中正常安裝和推送通知的基礎。
+
 ## 可選功能配置
 
 - AI 聊天/圖片/語音：配置 `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`。

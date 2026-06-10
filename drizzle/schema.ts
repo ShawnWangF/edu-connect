@@ -339,6 +339,10 @@ export const restaurants = mysqlTable("restaurants", {
   cuisine: varchar("cuisine", { length: 100 }), // 菜系
   priceRange: varchar("priceRange", { length: 50 }), // 價格區間
   businessHours: varchar("businessHours", { length: 200 }), // 營業時間
+  bookingDate: date("bookingDate"), // 預訂日期（運營看板提醒）
+  bookingTime: varchar("bookingTime", { length: 10 }), // 預訂時間 HH:mm
+  bookingPax: int("bookingPax"), // 預訂人數
+  bookingGroupId: int("bookingGroupId"), // 關聯團組
   specialties: text("specialties"), // 特色菜品
   notes: text("notes"),
   isActive: boolean("isActive").default(true).notNull(),
