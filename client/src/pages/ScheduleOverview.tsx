@@ -42,6 +42,26 @@ const BLOCK_CONFIG: Record<BlockType, { label: string; shortLabel: string; bg: s
   free:         { label: '空閒', shortLabel: '', bg: 'transparent', text: '#bbb', border: '#e5e7eb' },
 };
 
+const RESERVATION_LOCATION_KEYWORDS = [
+  '萬思未來',
+  '万思未来',
+  '南方科技',
+  '機器人展示館',
+  '机器人展示馆',
+  '華大基因時空中心',
+  '华大基因时空中心',
+  '比亞迪雲巴',
+  '比亚迪云巴',
+  '香港海洋公園',
+  '香港海洋公园',
+  '嘉道理農場',
+  '嘉道理农场',
+];
+
+function isReservationLocationName(name: string): boolean {
+  return RESERVATION_LOCATION_KEYWORDS.some(keyword => name.includes(keyword));
+}
+
 // 住宿城市計算
 function getHotelCity(blockType: BlockType): 'sz' | 'hk' | null {
   if (['sz_arrive', 'sz_stay', 'border_hk_sz'].includes(blockType)) return 'sz';
@@ -50,14 +70,93 @@ function getHotelCity(blockType: BlockType): 'sz' | 'hk' | null {
 }
 
 // 是否是抵達類型（需要顯示航班）
-// 只有 hk_arrive（抵達香港）才有航班；sz_arrive（抵達深圳）是陸路入境，無航班
+// 真實團組包含香港進和深圳進兩種航班抵達口岸。
 function isArrivalType(bt: BlockType) {
-  return bt === 'hk_arrive';
+  return bt === 'hk_arrive' || bt === 'sz_arrive';
 }
 
 // 是否是離開類型
 function isDepartureType(bt: BlockType) {
   return ['departure', 'border_sz_hk', 'border_hk_sz'].includes(bt);
+}
+
+type SchoolListItem = {
+  name: string;
+  studentCount: number;
+  teacherCount?: number;
+  timeSlot?: string;
+  exchangeDate?: string;
+  lunch?: string;
+  notes?: string;
+};
+
+function normalizeSchoolList(value: any, fallbackName = ''): SchoolListItem[] {
+  if (typeof value === 'string' && value) {
+    if (value.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(value);
+        return (parsed as any[]).map((item: any) => ({
+          name: item.name,
+          studentCount: item.studentCount ?? item.students ?? 0,
+          teacherCount: item.teacherCount ?? item.teachers ?? 0,
+          timeSlot: item.timeSlot,
+          exchangeDate: item.exchangeDate,
+          lunch: item.lunch,
+          notes: item.notes,
+        }));
+      } catch {
+        return [{ name: value, studentCount: 0 }];
+      }
+    }
+    return value.split('·').map((school: string) => {
+      const trimmed = school.trim();
+      const match = trimmed.match(/^(.+?)（([0-9]+)(?:\+([0-9]+))?人）$/);
+      if (match) {
+        return {
+          name: match[1],
+          studentCount: parseInt(match[2], 10),
+          teacherCount: match[3] ? parseInt(match[3], 10) : 0,
+        };
+      }
+      return { name: trimmed, studentCount: 0 };
+    }).filter(s => s.name);
+  }
+  if (Array.isArray(value)) {
+    return (value as any[]).map((item: any) => ({
+      name: item.name,
+      studentCount: item.studentCount ?? item.students ?? 0,
+      teacherCount: item.teacherCount ?? item.teachers ?? 0,
+      timeSlot: item.timeSlot,
+      exchangeDate: item.exchangeDate,
+      lunch: item.lunch,
+      notes: item.notes,
+    }));
+  }
+  return fallbackName ? [{ name: fallbackName, studentCount: 0 }] : [];
+}
+
+function roomsForPeople(count: number): number {
+  return count > 0 ? Math.ceil(count / 2) : 0;
+}
+
+function timePeriod(startTime?: string | null): '上午' | '下午' | '未定' {
+  if (!startTime) return '未定';
+  const hour = Number(String(startTime).split(':')[0]);
+  if (!Number.isFinite(hour)) return '未定';
+  return hour < 12 ? '上午' : '下午';
+}
+
+function vehicleLabelForGroup(group: any): string {
+  const source = String(group?.code || group?.name || '');
+  const codes = source.match(/[PS]\d+/gi) || [];
+  const labels = codes.map(code => {
+    const match = code.match(/^([PS])(\d+)$/i);
+    if (!match) return code;
+    return match[1].toUpperCase() === 'S'
+      ? `中學車號${match[2]}`
+      : `小學車號${match[2]}`;
+  });
+  return Array.from(new Set(labels)).join(' / ') || '-';
 }
 
 // 生成日期範圍
@@ -139,6 +238,8 @@ export default function ScheduleOverview() {
   const { data: blocks = [], refetch: refetchBlocks } = trpc.scheduleBlocks.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
   const { data: staffAssignments = [] } = trpc.batchStaff.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
   const { data: batchList = [] } = trpc.batches.listByProject.useQuery({ projectId: pid! }, { enabled: !!pid });
+  const { data: allItineraries = [] } = trpc.itineraries.listAll.useQuery(undefined, { enabled: !!pid });
+  const { data: locations = [] } = trpc.locations.list.useQuery(undefined, { enabled: !!pid });
 
   // 批次航班信息 Map：batch_code -> { arrivalFlight, departureFlight, arrivalTime, departureTime }
   const batchFlightMap = useMemo(() => {
@@ -269,16 +370,12 @@ export default function ScheduleOverview() {
   }
 
   // 判斷某天是否有航班
-  // 規則：只有抵港日（落地香港）和離境日才有航班
-  // 抵達深圳是陸路入境，無航班
+  // 真實排程中香港進、深圳進都可能是航班抵達。
   function hasFlightOnDate(g: any, date: string): { arrival: boolean; departure: boolean } {
     const startDate = toDateStr(g.startDate);
     const endDate = toDateStr(g.endDate);
-    const startCity = (g.start_city || g.startCity || '').toLowerCase();
-    const isHkFirst = startCity === 'hk' || startCity === '香港';
-    // 抵達航班：只有香港先（落地香港）才有抵達航班；深圳先是陸路入境，無抵達航班
     return {
-      arrival: date === startDate && isHkFirst,
+      arrival: date === startDate,
       departure: date === endDate,   // 離境日必有離開航班（從香港飛回）
     };
   }
@@ -287,6 +384,7 @@ export default function ScheduleOverview() {
   const dailyStats = useMemo(() => {
     return dateRange.map(date => {
       let szCount = 0, hkCount = 0;
+      let szRooms = 0, hkRooms = 0;
       const arrivalFlights: string[] = [];
       const departureFlights: string[] = [];
       let arrivalGroupCount = 0, departureGroupCount = 0;
@@ -294,13 +392,14 @@ export default function ScheduleOverview() {
       groups.forEach(g => {
         const block = blockMap.get(`${g.id}_${date}`);
         const count = (g.studentCount || 0) + (g.teacherCount || 0);
+        const rooms = roomsForPeople(count);
 
         if (block) {
           // 有色塊：使用色塊數據
           const bt: BlockType = block.blockType || 'free';
           const city = getHotelCity(bt);
-          if (city === 'sz') szCount += count;
-          if (city === 'hk') hkCount += count;
+          if (city === 'sz') { szCount += count; szRooms += rooms; }
+          if (city === 'hk') { hkCount += count; hkRooms += rooms; }
           if (isArrivalType(bt)) {
             arrivalGroupCount++;
             const batchFlight = g.batch_code ? batchFlightMap.get(g.batch_code) : undefined;
@@ -319,8 +418,8 @@ export default function ScheduleOverview() {
         } else {
           // 無色塊：根據團組信息推算住宿城市
           const city = inferCityFromGroup(g, date);
-          if (city === 'sz') szCount += count;
-          if (city === 'hk') hkCount += count;
+          if (city === 'sz') { szCount += count; szRooms += rooms; }
+          if (city === 'hk') { hkCount += count; hkRooms += rooms; }
           // 航班只存在於落地日（startDate）和離開日（endDate），過關日無航班
           const flightDates = hasFlightOnDate(g, date);
           if (flightDates.arrival) {
@@ -339,9 +438,66 @@ export default function ScheduleOverview() {
           }
         }
       });
-      return { date, szCount, hkCount, arrivalFlights, departureFlights, arrivalGroupCount, departureGroupCount };
+      return { date, szCount, hkCount, szRooms, hkRooms, arrivalFlights, departureFlights, arrivalGroupCount, departureGroupCount };
     });
   }, [dateRange, groups, blockMap, batchFlightMap]);
+
+  const groupMap = useMemo(() => {
+    return new Map(groups.map((g: any) => [g.id, g]));
+  }, [groups]);
+
+  const locationMap = useMemo(() => {
+    return new Map((locations as any[]).map((l: any) => [l.id, l]));
+  }, [locations]);
+
+  const attractionStats = useMemo(() => {
+    const byLocation = new Map<number, {
+      id: number;
+      name: string;
+      rows: Map<string, Map<string, { total: number; codes: Set<string> }>>;
+    }>();
+    const seen = new Set<string>();
+
+    (allItineraries as any[]).forEach((item: any) => {
+      const group = groupMap.get(item.groupId) as any;
+      if (!group || !item.locationId) return;
+      const date = toDateStr(item.date);
+      if (!dateRange.includes(date)) return;
+      const period = timePeriod(item.startTime);
+      const seenKey = `${item.groupId}_${item.locationId}_${date}_${period}`;
+      if (seen.has(seenKey)) return;
+      seen.add(seenKey);
+
+      const location = locationMap.get(item.locationId) as any;
+      const name = location?.name || item.locationName || `景點 #${item.locationId}`;
+      if (!isReservationLocationName(name)) return;
+      if (!byLocation.has(item.locationId)) {
+        byLocation.set(item.locationId, { id: item.locationId, name, rows: new Map() });
+      }
+      const loc = byLocation.get(item.locationId)!;
+      if (!loc.rows.has(period)) loc.rows.set(period, new Map());
+      const dateMap = loc.rows.get(period)!;
+      if (!dateMap.has(date)) dateMap.set(date, { total: 0, codes: new Set() });
+      const cell = dateMap.get(date)!;
+      cell.total += group.totalCount || (group.studentCount || 0) + (group.teacherCount || 0);
+      cell.codes.add(group.code || group.name);
+    });
+
+    return Array.from(byLocation.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+  }, [allItineraries, dateRange, groupMap, locationMap]);
+
+  const exchangeSupplementRows = useMemo(() => {
+    return groups.flatMap((g: any) => {
+      const schools = normalizeSchoolList(g.school_list, g.name);
+      const flightInfo = g.flight_info || {};
+      return schools.map(s => ({
+        group: g,
+        school: s,
+        arrivalFlight: flightInfo.arrivalFlight || '',
+        departureFlight: flightInfo.departureFlight || '',
+      }));
+    });
+  }, [groups]);
 
   function handleCellClick(groupId: number, date: string) {
     const existing = blockMap.get(`${groupId}_${date}`);
@@ -1045,10 +1201,44 @@ export default function ScheduleOverview() {
                     <td className="border border-gray-200 bg-[#FFFBF0]"></td>
                   </tr>
 
+                  {/* 香港每日房間數統計 */}
+                  <tr>
+                    <td colSpan={dateRange.length + 8} className="border border-gray-300 bg-[#1F4E79] text-white text-[9px] font-semibold px-2 py-0.5">
+                      ▼ 香港每日房間數統計
+                    </td>
+                  </tr>
+                  <tr className="bg-[#F0F8FF]">
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-900 bg-[#9DC3E6]">number of room</td>
+                    {dailyStats.map(({ date, hkRooms }) => (
+                      <td key={date} className="border border-gray-200 text-center py-0.5" style={{ backgroundColor: hkRooms > 0 ? '#9DC3E6' : '#F0F8FF' }}>
+                        {hkRooms > 0 && <span className="text-[10px] font-bold text-blue-900">{hkRooms}</span>}
+                        {hkRooms === 0 && <span className="text-[9px] text-gray-300">-</span>}
+                      </td>
+                    ))}
+                    <td className="border border-gray-200 bg-[#F0F8FF]"></td>
+                  </tr>
+
+                  {/* 深圳每日房間數統計 */}
+                  <tr>
+                    <td colSpan={dateRange.length + 8} className="border border-gray-300 bg-[#1F4E79] text-white text-[9px] font-semibold px-2 py-0.5">
+                      ▼ 深圳每日房間數統計
+                    </td>
+                  </tr>
+                  <tr className="bg-[#EBF5FB]">
+                    <td colSpan={8} className="border border-gray-200 px-2 py-0.5 text-[9px] font-semibold text-blue-800 bg-[#BDD7EE]">number of room</td>
+                    {dailyStats.map(({ date, szRooms }) => (
+                      <td key={date} className="border border-gray-200 text-center py-0.5" style={{ backgroundColor: szRooms > 0 ? '#BDD7EE' : '#EBF5FB' }}>
+                        {szRooms > 0 && <span className="text-[10px] font-bold text-blue-900">{szRooms}</span>}
+                        {szRooms === 0 && <span className="text-[9px] text-gray-300">-</span>}
+                      </td>
+                    ))}
+                    <td className="border border-gray-200 bg-[#EBF5FB]"></td>
+                  </tr>
+
                   {/* 每日住宿統計 */}
                   <tr>
                     <td colSpan={dateRange.length + 8} className="border border-gray-300 bg-[#1F4E79] text-white text-[9px] font-semibold px-2 py-0.5">
-                      ▼ 每日住宿需求（深港）統計（學生人數）
+                      ▼ 每日住宿需求（深港）統計（總人數）
                     </td>
                   </tr>
                   <tr className="bg-[#EBF5FB]">
@@ -1084,6 +1274,57 @@ export default function ScheduleOverview() {
                     })}
                     <td className="border border-gray-200 bg-[#F5F5F5]"></td>
                   </tr>
+
+                  {/* 景點預約人數統計 */}
+                  {attractionStats.length > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={dateRange.length + 8} className="border border-gray-300 bg-[#1F4E79] text-white text-[9px] font-semibold px-2 py-0.5">
+                          ▼ 景點預約人數統計
+                        </td>
+                      </tr>
+                      {attractionStats.map((location) => {
+                        const periods = Array.from(location.rows.keys()).sort((a, b) => {
+                          const order: Record<string, number> = { '上午': 0, '下午': 1, '未定': 2 };
+                          return order[a] - order[b];
+                        });
+                        return periods.map((period, index) => {
+                          const dateMap = location.rows.get(period)!;
+                          const rowBg = index % 2 === 0 ? '#F8FBFF' : '#FFFFFF';
+                          return (
+                            <tr key={`${location.id}_${period}`} className="bg-white">
+                              {index === 0 && (
+                                <td
+                                  rowSpan={periods.length}
+                                  colSpan={7}
+                                  className="border border-gray-200 px-2 py-1 text-[9px] font-semibold text-blue-900 align-middle bg-[#E8F4FD]"
+                                >
+                                  {location.name}
+                                </td>
+                              )}
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] font-medium text-gray-700 bg-[#DDEBFF]">
+                                {period}
+                              </td>
+                              {dailyStats.map(({ date }) => {
+                                const stat = dateMap.get(date);
+                                return (
+                                  <td key={date} className="border border-gray-200 text-center py-1 px-0.5" style={{ backgroundColor: stat ? '#E2F0D9' : rowBg }}>
+                                    {stat ? (
+                                      <div className="text-[8px] leading-tight text-green-900">
+                                        <div className="font-bold">{stat.total}</div>
+                                        <div className="truncate" title={Array.from(stat.codes).join('、')}>({Array.from(stat.codes).join(',')})</div>
+                                      </div>
+                                    ) : <span className="text-[9px] text-gray-300">-</span>}
+                                  </td>
+                                );
+                              })}
+                              <td className="border border-gray-200" style={{ backgroundColor: rowBg }}></td>
+                            </tr>
+                          );
+                        });
+                      })}
+                    </>
+                  )}
                 </>
               )}
             </tbody>
@@ -1113,36 +1354,7 @@ export default function ScheduleOverview() {
                     const types: string[] = Array.isArray(g.type) ? g.type : [];
                     const isSecondary = types.some(t => t.includes('中學') || t.includes('中学'));
                     const rowBg = isSecondary ? '#FFF4EC' : '#FFFFFF';
-                    
-                    // 处理 school_list 字符串或数组格式
-                    let schoolList: Array<{ name: string; studentCount: number; teacherCount?: number }> = [];
-                    if (typeof g.school_list === 'string' && g.school_list) {
-                      // 尝试解析 JSON 格式
-                      if ((g.school_list as string).startsWith('[')) {
-                        try {
-                          const parsed = JSON.parse(g.school_list);
-                          // 处理两种字段名格式：studentCount/teacherCount 或 students/teachers
-                          schoolList = parsed.map((item: any) => ({
-                            name: item.name,
-                            studentCount: item.studentCount ?? item.students ?? 0,
-                            teacherCount: item.teacherCount ?? item.teachers ?? 0
-                          }));
-                        } catch {
-                          // JSON 解析失败，作为普通字符串处理
-                          schoolList = [{ name: g.school_list, studentCount: 0 }];
-                        }
-                      } else {
-                        // 普通字符串格式："学校名（人数） · 学校名2（人数）"
-                        schoolList = [{ name: g.school_list, studentCount: 0 }];
-                      }
-                    } else if (Array.isArray(g.school_list)) {
-                      // 处理数组格式，也需要处理两种字段名
-                      schoolList = (g.school_list as any[]).map((item: any) => ({
-                        name: item.name,
-                        studentCount: item.studentCount ?? item.students ?? 0,
-                        teacherCount: item.teacherCount ?? item.teachers ?? 0
-                      }));
-                    }
+                    const schoolList = normalizeSchoolList(g.school_list, g.name);
                     const gGroupFlightInfo = g.flight_info || {};
                     const gBatchFlightInfo = g.batch_code ? (batchFlightMap.get(g.batch_code) || {}) : {};
                     const gFlightInfo = {
@@ -1163,7 +1375,7 @@ export default function ScheduleOverview() {
                           ))}
                         </td>
                         <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-500">
-                          {g.code || '-'}
+                          {vehicleLabelForGroup(g)}
                         </td>
                         <td className="border border-gray-200 px-2 py-1 text-center text-[10px] font-semibold text-gray-800">
                           {g.studentCount || 0}
@@ -1172,12 +1384,10 @@ export default function ScheduleOverview() {
                           {g.teacherCount || 0}
                         </td>
                         <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
-                          {typeof g.school_list === 'string' && g.school_list ? (
-                            <span>{g.school_list}</span>
-                          ) : schoolList.length > 0 ? (
+                          {schoolList.length > 0 ? (
                             schoolList.map((s, i) => (
                               <span key={i} className="mr-1">
-                                {s.name}（{s.studentCount}人）{i < schoolList.length - 1 ? '·' : ''}
+                                {s.name}（{s.studentCount}{s.teacherCount ? `+${s.teacherCount}` : ''}人）{i < schoolList.length - 1 ? '·' : ''}
                               </span>
                             ))
                           ) : (
@@ -1203,6 +1413,78 @@ export default function ScheduleOverview() {
                   })}
                 </tbody>
               </table>
+
+              {exchangeSupplementRows.length > 0 && (
+                <div className="mt-4">
+                  <div className="bg-[#1F4E79] text-white text-xs font-semibold px-3 py-1.5 rounded-t">
+                    交流日補充明細
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[1120px] border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-[#2E75B6] text-white">
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">團組</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">前來交流學校</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">去程航班</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">返程航班</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">出發日</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">交流日</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">交流時間</th>
+                          <th className="border border-gray-300 px-2 py-1 text-center text-[10px]">學生</th>
+                          <th className="border border-gray-300 px-2 py-1 text-center text-[10px]">帶隊</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">午餐安排</th>
+                          <th className="border border-gray-300 px-2 py-1 text-left text-[10px]">接待/其他</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exchangeSupplementRows.map(({ group, school, arrivalFlight, departureFlight }, index) => {
+                          const types: string[] = Array.isArray(group.type) ? group.type : [];
+                          const isSecondary = types.some(t => t.includes('中學') || t.includes('中学'));
+                          const rowBg = isSecondary ? '#FFF4EC' : index % 2 === 0 ? '#FFFFFF' : '#F8FBFF';
+                          return (
+                            <tr key={`${group.id}_${school.name}_${index}`} style={{ backgroundColor: rowBg }}>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] font-semibold text-gray-800">
+                                <div>{group.code || group.name}</div>
+                                <div className="text-[8px] font-normal text-gray-400">{vehicleLabelForGroup(group)}</div>
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
+                                {school.name || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-green-800">
+                                {arrivalFlight || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-amber-800">
+                                {departureFlight || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
+                                {toDateStr(group.startDate) || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] font-medium text-blue-800">
+                                {school.exchangeDate ? toDateStr(school.exchangeDate) : '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
+                                {school.timeSlot || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-center text-[10px] font-semibold text-gray-800">
+                                {school.studentCount || 0}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-center text-[10px] text-gray-700">
+                                {school.teacherCount || 0}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-700">
+                                {school.lunch || '-'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-1 text-[9px] text-gray-600">
+                                {school.notes || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

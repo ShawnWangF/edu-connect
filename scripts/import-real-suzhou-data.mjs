@@ -281,6 +281,7 @@ function parseInputFiles() {
 }
 
 const LOCATION_DEFS = [
+  { name: "萬思未來", aliases: ["万思未来", "萬思未來"], address: "深圳", applicableType: "elementary" },
   { name: "香港大學", aliases: ["香港大学", "香港大學"], address: "香港薄扶林香港大學", applicableType: "all" },
   { name: "香港太空館", aliases: ["香港太空馆", "香港太空館"], address: "尖沙咀梳士巴利道10號", applicableType: "all" },
   { name: "尖沙咀星光大道", aliases: ["尖沙咀星光大道", "星光大道", "尖沙咀"], address: "尖沙咀星光大道", applicableType: "all" },
