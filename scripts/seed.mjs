@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { drizzle } from "drizzle-orm/mysql2";
 import { users, locations } from "../drizzle/schema.js";
 import { nanoid } from "nanoid";

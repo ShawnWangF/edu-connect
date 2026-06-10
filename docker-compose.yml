@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: edu-connect-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: edu_connect
+      MYSQL_USER: edu_connect
+      MYSQL_PASSWORD: edu_connect_password
+      MYSQL_ROOT_PASSWORD: root_password
+      TZ: Asia/Hong_Kong
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mysql-data:
