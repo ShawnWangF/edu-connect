@@ -199,25 +199,23 @@ function StaffStatusCard({ staff }: { staff: any }) {
 
 function StaffLocationMap({
   data,
-  itineraryMap,
   onRemind,
-  onSyncPlaces,
-  syncPending,
+  itineraryPreview,
+  currentStaff,
+  onShareMyLocation,
+  sharePending,
 }: {
   data: any;
-  itineraryMap: any;
   onRemind: (staffId: number) => void;
-  onSyncPlaces: () => void;
-  syncPending: boolean;
+  itineraryPreview: any[];
+  currentStaff: any;
+  onShareMyLocation: () => void;
+  sharePending: boolean;
 }) {
   const located = data?.located || [];
   const missing = data?.missing || [];
-  const itineraryPoints = (itineraryMap?.points || []).map((point: any) => ({ ...point, color: "#ff1744" }));
-  const missingPlaces = itineraryMap?.missing || [];
   const center = located[0]?.latitude && located[0]?.longitude
     ? { lat: located[0].latitude, lng: located[0].longitude }
-    : itineraryPoints[0]?.lat && itineraryPoints[0]?.lng
-      ? { lat: itineraryPoints[0].lat, lng: itineraryPoints[0].lng }
     : { lat: 22.3193, lng: 114.1694 };
   const staffPoints = located
     .filter((item: any) => item.latitude && item.longitude)
@@ -230,7 +228,7 @@ function StaffLocationMap({
       subtitle: `${roleName(item.role, item.customRole)} · ${item.groupCode || ""} ${item.groupName || ""}`.trim(),
       meta: `${item.taskName || "團組指派"} · 最近 ${item.lastLocationAt ? new Date(item.lastLocationAt).toLocaleString("zh-HK") : "未記錄"}`,
     }));
-  const mapPoints = [...itineraryPoints, ...staffPoints];
+  const mapPoints = staffPoints;
 
   return (
     <Card className="bg-white border-0 shadow-sm">
@@ -243,7 +241,6 @@ function StaffLocationMap({
           <div className="flex gap-3 text-xs text-muted-foreground">
             <span>{located.length} 人已上報位置</span>
             <span>{missing.length} 人待開啟/待上報</span>
-            <span>{itineraryPoints.length} 個行程點</span>
           </div>
         </div>
       </CardHeader>
@@ -257,15 +254,47 @@ function StaffLocationMap({
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-[#ff1744] shadow-[0_0_10px_rgba(255,23,68,.75)]" />
-            行程點 / 工作人員位置
+            已上報位置的工作人員
           </span>
-          <Button variant="outline" size="sm" className="ml-auto h-7" onClick={onSyncPlaces} disabled={syncPending}>
-            {syncPending ? "同步中..." : "同步地點坐標"}
-          </Button>
         </div>
-        {located.length === 0 && itineraryPoints.length === 0 && (
+        {located.length === 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            目前沒有可顯示坐標。可先同步地點坐標，或提醒已指派工作人員開啟位置共享。
+            目前沒有可顯示的人員位置。已綁定工作人員可在此上報当前位置，或進入「我的任務」開啟位置共享。
+          </div>
+        )}
+        {currentStaff && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+            <div>
+              <div className="text-sm font-medium text-red-900">
+                我的身份：{currentStaff.name} · {roleName(currentStaff.role, currentStaff.customRole)}
+              </div>
+              <div className="text-xs text-red-700">
+                {currentStaff.locationSharingEnabled ? "位置共享已開啟" : "位置共享未開啟"}，點擊後會彈出瀏覽器定位授權。
+              </div>
+            </div>
+            <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={onShareMyLocation} disabled={sharePending}>
+              <LocateFixed className="mr-1.5 h-3.5 w-3.5" />
+              {sharePending ? "上報中..." : "上報我的当前位置"}
+            </Button>
+          </div>
+        )}
+        {itineraryPreview.length > 0 && (
+          <div className="rounded-lg border">
+            <div className="border-b bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+              行程點文字預告
+            </div>
+            <div className="divide-y">
+              {itineraryPreview.slice(0, 10).map((item: any) => (
+                <div key={`${item.itinId}-${item.groupCode}`} className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
+                  <Badge variant="outline" className="bg-white">{item.groupCode}</Badge>
+                  <span className="text-muted-foreground">{item.date}</span>
+                  {item.startTime && <span className="font-mono text-slate-600">{formatTime(item.startTime)}</span>}
+                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
+                    {item.locationName || item.description || "未命名行程點"}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -301,20 +330,6 @@ function StaffLocationMap({
                     提醒開啟
                   </Button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {missingPlaces.length > 0 && (
-          <div className="rounded-lg border">
-            <div className="border-b bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-              尚未定位的常見行程點
-            </div>
-            <div className="flex flex-wrap gap-2 p-3">
-              {missingPlaces.slice(0, 12).map((item: any) => (
-                <Badge key={item.name} variant="outline" className="bg-white">
-                  {item.name} · {item.count}
-                </Badge>
               ))}
             </div>
           </div>
@@ -1304,19 +1319,24 @@ export default function OperationsDashboard() {
   const { data: commandScope, refetch: refetchCommandScope } = trpc.dashboard.commandScope.useQuery(undefined, {
     refetchInterval: 60000,
   });
-  const { data: itineraryMap, refetch: refetchItineraryMap } = trpc.dashboard.itineraryMapPoints.useQuery(undefined, {
+  const { data: currentStaff, refetch: refetchCurrentStaff } = trpc.staff.me.useQuery(undefined, {
+    refetchInterval: 60000,
+  });
+  const { data: myTasks, refetch: refetchMyTasks } = trpc.staff.myAssignments.useQuery(undefined, {
     refetchInterval: 60000,
   });
   const remindLocation = trpc.dashboard.remindLocationSharing.useMutation({
     onSuccess: () => toast.success("已發送位置共享提醒"),
     onError: (error) => toast.error("提醒失敗", { description: error.message }),
   });
-  const syncPlaces = trpc.dashboard.syncPlaceCoordinates.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.inserted > 0 ? `已同步 ${data.inserted} 個地點坐標` : "地點坐標已是最新");
-      refetchItineraryMap();
+  const setSharing = trpc.staff.setLocationSharing.useMutation();
+  const reportMyLocation = trpc.staff.reportLocation.useMutation({
+    onSuccess: () => {
+      toast.success("位置已上報");
+      refetchStaffLocations();
+      refetchCurrentStaff();
     },
-    onError: (error) => toast.error("同步失敗", { description: error.message }),
+    onError: (error) => toast.error("位置上報失敗", { description: error.message }),
   });
 
   const handleRefresh = () => {
@@ -1326,7 +1346,8 @@ export default function OperationsDashboard() {
     refetchDining();
     refetchStaffLocations();
     refetchCommandScope();
-    refetchItineraryMap();
+    refetchCurrentStaff();
+    refetchMyTasks();
   };
 
   const todayItins = overview?.todayItineraries || [];
@@ -1342,6 +1363,55 @@ export default function OperationsDashboard() {
   const warningVenues = venueAlerts.filter((v: any) => v.alertLevel === 'warning');
 
   const urgentDining = diningAlerts.filter((d: any) => d.urgency === 'now' || d.urgency === 'soon');
+  const myAssignmentPreview = (myTasks?.assignments || []).map((item: any) => ({
+    itinId: item.itineraryId || item.id,
+    groupCode: item.groupCode,
+    date: item.date,
+    startTime: item.startTime,
+    locationName: item.taskName || item.itineraryLocationName,
+    description: item.itineraryDescription,
+  }));
+  const itineraryPreview = myAssignmentPreview.length > 0
+    ? myAssignmentPreview.slice(0, 10)
+    : (commandScope?.itineraries || [])
+        .filter((item: any) => item.locationName || item.description)
+        .slice(0, 10);
+  const sharePending = setSharing.isPending || reportMyLocation.isPending;
+  const handleShareMyLocation = async () => {
+    if (!currentStaff) {
+      toast.error("此帳號尚未綁定工作人員身份");
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast.error("目前瀏覽器不支援定位");
+      return;
+    }
+    try {
+      if (!currentStaff.locationSharingEnabled) {
+        await setSharing.mutateAsync({ enabled: true });
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          reportMyLocation.mutate({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+        },
+        (err) => {
+          const description = err.code === 1
+            ? "請在瀏覽器或手機系統中允許本網站使用定位。"
+            : err.code === 2
+              ? "目前設備暫時無法提供定位，建議使用 Chrome 或手機瀏覽器重新上報。"
+              : "定位逾時，請確認網絡與系統定位服務已開啟後再試。";
+          toast.error("無法取得位置", { description });
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 15000 },
+      );
+    } catch (error: any) {
+      toast.error("位置共享開啟失敗", { description: error?.message || "請稍後再試" });
+    }
+  };
 
   return (
     <div className="p-5 space-y-5 bg-slate-50 min-h-screen">
@@ -1495,10 +1565,11 @@ export default function OperationsDashboard() {
 
       <StaffLocationMap
         data={staffLocations}
-        itineraryMap={itineraryMap}
         onRemind={(staffId) => remindLocation.mutate({ staffId })}
-        onSyncPlaces={() => syncPlaces.mutate()}
-        syncPending={syncPlaces.isPending}
+        itineraryPreview={itineraryPreview}
+        currentStaff={currentStaff}
+        onShareMyLocation={handleShareMyLocation}
+        sharePending={sharePending}
       />
 
       {/* 主内容区：三列布局 */}
