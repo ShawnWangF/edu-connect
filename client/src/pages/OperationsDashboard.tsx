@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { MapView } from "@/components/Map";
@@ -197,56 +197,40 @@ function StaffStatusCard({ staff }: { staff: any }) {
   );
 }
 
-function StaffLocationMap({ data, onRemind }: { data: any; onRemind: (staffId: number) => void }) {
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+function StaffLocationMap({
+  data,
+  itineraryMap,
+  onRemind,
+  onSyncPlaces,
+  syncPending,
+}: {
+  data: any;
+  itineraryMap: any;
+  onRemind: (staffId: number) => void;
+  onSyncPlaces: () => void;
+  syncPending: boolean;
+}) {
   const located = data?.located || [];
   const missing = data?.missing || [];
+  const itineraryPoints = (itineraryMap?.points || []).map((point: any) => ({ ...point, color: "#ff1744" }));
+  const missingPlaces = itineraryMap?.missing || [];
   const center = located[0]?.latitude && located[0]?.longitude
     ? { lat: located[0].latitude, lng: located[0].longitude }
+    : itineraryPoints[0]?.lat && itineraryPoints[0]?.lng
+      ? { lat: itineraryPoints[0].lat, lng: itineraryPoints[0].lng }
     : { lat: 22.3193, lng: 114.1694 };
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !window.google?.maps?.marker) return;
-    markersRef.current.forEach(marker => marker.map = null);
-    markersRef.current = [];
-    const bounds = new window.google.maps.LatLngBounds();
-    located.forEach((item: any) => {
-      if (!item.latitude || !item.longitude) return;
-      const position = { lat: item.latitude, lng: item.longitude };
-      const pin = document.createElement("div");
-      pin.className = "rounded-full bg-blue-600 text-white text-xs font-bold px-2 py-1 shadow-lg border-2 border-white";
-      pin.textContent = item.groupCode || item.staffName?.slice(0, 1) || "人";
-      const marker = new window.google.maps.marker.AdvancedMarkerElement({
-        map,
-        position,
-        title: `${item.staffName} · ${item.groupCode || ""}`,
-        content: pin,
-      });
-      marker.addListener("click", () => {
-        const info = new window.google.maps.InfoWindow({
-          content: `
-            <div style="font-size:12px;line-height:1.5;min-width:180px">
-              <strong>${item.staffName}</strong> · ${roleName(item.role, item.customRole)}<br/>
-              ${item.groupCode || ""} ${item.groupName || ""}<br/>
-              ${item.taskName || "團組指派"}<br/>
-              最近上報：${item.lastLocationAt ? new Date(item.lastLocationAt).toLocaleString("zh-HK") : "未記錄"}
-            </div>
-          `,
-        });
-        info.open({ map, anchor: marker });
-      });
-      markersRef.current.push(marker);
-      bounds.extend(position);
-    });
-    if (located.length > 1) {
-      map.fitBounds(bounds, 48);
-    } else if (located.length === 1) {
-      map.setCenter(center);
-      map.setZoom(14);
-    }
-  }, [located, center]);
+  const staffPoints = located
+    .filter((item: any) => item.latitude && item.longitude)
+    .map((item: any) => ({
+      id: `staff-${item.staffId}`,
+      lat: item.latitude,
+      lng: item.longitude,
+      color: "#ff1744",
+      label: item.staffName,
+      subtitle: `${roleName(item.role, item.customRole)} · ${item.groupCode || ""} ${item.groupName || ""}`.trim(),
+      meta: `${item.taskName || "團組指派"} · 最近 ${item.lastLocationAt ? new Date(item.lastLocationAt).toLocaleString("zh-HK") : "未記錄"}`,
+    }));
+  const mapPoints = [...itineraryPoints, ...staffPoints];
 
   return (
     <Card className="bg-white border-0 shadow-sm">
@@ -259,6 +243,7 @@ function StaffLocationMap({ data, onRemind }: { data: any; onRemind: (staffId: n
           <div className="flex gap-3 text-xs text-muted-foreground">
             <span>{located.length} 人已上報位置</span>
             <span>{missing.length} 人待開啟/待上報</span>
+            <span>{itineraryPoints.length} 個行程點</span>
           </div>
         </div>
       </CardHeader>
@@ -267,11 +252,20 @@ function StaffLocationMap({ data, onRemind }: { data: any; onRemind: (staffId: n
           className="h-[420px] rounded-lg border overflow-hidden"
           initialCenter={center}
           initialZoom={12}
-          onMapReady={(map) => { mapRef.current = map; }}
+          points={mapPoints}
         />
-        {located.length === 0 && (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-[#ff1744] shadow-[0_0_10px_rgba(255,23,68,.75)]" />
+            行程點 / 工作人員位置
+          </span>
+          <Button variant="outline" size="sm" className="ml-auto h-7" onClick={onSyncPlaces} disabled={syncPending}>
+            {syncPending ? "同步中..." : "同步地點坐標"}
+          </Button>
+        </div>
+        {located.length === 0 && itineraryPoints.length === 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            目前沒有可顯示的位置。可從下方提醒已指派工作人員開啟位置共享。
+            目前沒有可顯示坐標。可先同步地點坐標，或提醒已指派工作人員開啟位置共享。
           </div>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -307,6 +301,20 @@ function StaffLocationMap({ data, onRemind }: { data: any; onRemind: (staffId: n
                     提醒開啟
                   </Button>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {missingPlaces.length > 0 && (
+          <div className="rounded-lg border">
+            <div className="border-b bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+              尚未定位的常見行程點
+            </div>
+            <div className="flex flex-wrap gap-2 p-3">
+              {missingPlaces.slice(0, 12).map((item: any) => (
+                <Badge key={item.name} variant="outline" className="bg-white">
+                  {item.name} · {item.count}
+                </Badge>
               ))}
             </div>
           </div>
@@ -1296,9 +1304,19 @@ export default function OperationsDashboard() {
   const { data: commandScope, refetch: refetchCommandScope } = trpc.dashboard.commandScope.useQuery(undefined, {
     refetchInterval: 60000,
   });
+  const { data: itineraryMap, refetch: refetchItineraryMap } = trpc.dashboard.itineraryMapPoints.useQuery(undefined, {
+    refetchInterval: 60000,
+  });
   const remindLocation = trpc.dashboard.remindLocationSharing.useMutation({
     onSuccess: () => toast.success("已發送位置共享提醒"),
     onError: (error) => toast.error("提醒失敗", { description: error.message }),
+  });
+  const syncPlaces = trpc.dashboard.syncPlaceCoordinates.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.inserted > 0 ? `已同步 ${data.inserted} 個地點坐標` : "地點坐標已是最新");
+      refetchItineraryMap();
+    },
+    onError: (error) => toast.error("同步失敗", { description: error.message }),
   });
 
   const handleRefresh = () => {
@@ -1308,6 +1326,7 @@ export default function OperationsDashboard() {
     refetchDining();
     refetchStaffLocations();
     refetchCommandScope();
+    refetchItineraryMap();
   };
 
   const todayItins = overview?.todayItineraries || [];
@@ -1476,7 +1495,10 @@ export default function OperationsDashboard() {
 
       <StaffLocationMap
         data={staffLocations}
+        itineraryMap={itineraryMap}
         onRemind={(staffId) => remindLocation.mutate({ staffId })}
+        onSyncPlaces={() => syncPlaces.mutate()}
+        syncPending={syncPlaces.isPending}
       />
 
       {/* 主内容区：三列布局 */}

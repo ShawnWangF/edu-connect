@@ -155,6 +155,13 @@
       "when": 1781096400000,
       "tag": "0021_staff_live_location",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1781182800000,
+      "tag": "0022_place_coordinates",
+      "breakpoints": true
     }
   ]
 }

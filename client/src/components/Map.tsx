@@ -1,170 +1,122 @@
-/**
- * GOOGLE MAPS FRONTEND INTEGRATION - ESSENTIAL GUIDE
- *
- * USAGE FROM PARENT COMPONENT:
- * ======
- *
- * const mapRef = useRef<google.maps.Map | null>(null);
- *
- * <MapView
- *   initialCenter={{ lat: 40.7128, lng: -74.0060 }}
- *   initialZoom={15}
- *   onMapReady={(map) => {
- *     mapRef.current = map; // Store to control map from parent anytime, google map itself is in charge of the re-rendering, not react state.
- * </MapView>
- *
- * ======
- * Available Libraries and Core Features:
- * -------------------------------
- * 📍 MARKER (from `marker` library)
- * - Attaches to map using { map, position }
- * new google.maps.marker.AdvancedMarkerElement({
- *   map,
- *   position: { lat: 37.7749, lng: -122.4194 },
- *   title: "San Francisco",
- * });
- *
- * -------------------------------
- * 🏢 PLACES (from `places` library)
- * - Does not attach directly to map; use data with your map manually.
- * const place = new google.maps.places.Place({ id: PLACE_ID });
- * await place.fetchFields({ fields: ["displayName", "location"] });
- * map.setCenter(place.location);
- * new google.maps.marker.AdvancedMarkerElement({ map, position: place.location });
- *
- * -------------------------------
- * 🧭 GEOCODER (from `geocoding` library)
- * - Standalone service; manually apply results to map.
- * const geocoder = new google.maps.Geocoder();
- * geocoder.geocode({ address: "New York" }, (results, status) => {
- *   if (status === "OK" && results[0]) {
- *     map.setCenter(results[0].geometry.location);
- *     new google.maps.marker.AdvancedMarkerElement({
- *       map,
- *       position: results[0].geometry.location,
- *     });
- *   }
- * });
- *
- * -------------------------------
- * 📐 GEOMETRY (from `geometry` library)
- * - Pure utility functions; not attached to map.
- * const dist = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
- *
- * -------------------------------
- * 🛣️ ROUTES (from `routes` library)
- * - Combines DirectionsService (standalone) + DirectionsRenderer (map-attached)
- * const directionsService = new google.maps.DirectionsService();
- * const directionsRenderer = new google.maps.DirectionsRenderer({ map });
- * directionsService.route(
- *   { origin, destination, travelMode: "DRIVING" },
- *   (res, status) => status === "OK" && directionsRenderer.setDirections(res)
- * );
- *
- * -------------------------------
- * 🌦️ MAP LAYERS (attach directly to map)
- * - new google.maps.TrafficLayer().setMap(map);
- * - new google.maps.TransitLayer().setMap(map);
- * - new google.maps.BicyclingLayer().setMap(map);
- *
- * -------------------------------
- * ✅ SUMMARY
- * - “map-attached” → AdvancedMarkerElement, DirectionsRenderer, Layers.
- * - “standalone” → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
- * - “data-only” → Place, Geometry utilities.
- */
-
-/// <reference types="@types/google.maps" />
-
 import { useEffect, useRef } from "react";
-import { usePersistFn } from "@/hooks/usePersistFn";
+import L from "leaflet";
 import { cn } from "@/lib/utils";
 
-declare global {
-  interface Window {
-    google?: typeof google;
-  }
-}
-
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const GOOGLE_MAPS_BASE_URL =
-  import.meta.env.VITE_GOOGLE_MAPS_API_URL || "https://maps.googleapis.com";
-
-function loadMapScript() {
-  return new Promise(resolve => {
-    if (window.google?.maps) {
-      resolve(null);
-      return;
-    }
-    if (!API_KEY) {
-      console.warn("Google Maps API key is not configured");
-      resolve(null);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `${GOOGLE_MAPS_BASE_URL.replace(/\/+$/, "")}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
-    };
-    script.onerror = () => {
-      console.error("Failed to load Google Maps script");
-    };
-    document.head.appendChild(script);
-  });
-}
+export type MapPoint = {
+  id: string | number;
+  lat: number;
+  lng: number;
+  label: string;
+  color?: string;
+  subtitle?: string;
+  meta?: string;
+};
 
 interface MapViewProps {
   className?: string;
-  initialCenter?: google.maps.LatLngLiteral;
+  initialCenter?: { lat: number; lng: number };
   initialZoom?: number;
-  onMapReady?: (map: google.maps.Map) => void;
+  points?: MapPoint[];
+  onMapReady?: (map: L.Map) => void;
+}
+
+const DEFAULT_CENTER = { lat: 22.3193, lng: 114.1694 };
+const DEFAULT_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const DEFAULT_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+function markerHtml(point: MapPoint) {
+  const color = point.color || "#ff1744";
+  return `
+    <div style="
+      background:${color};
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.95);
+      box-shadow:0 0 0 3px rgba(255,23,68,.18),0 0 12px rgba(255,23,68,.75);
+    "></div>
+  `;
+}
+
+function popupHtml(point: MapPoint) {
+  return `
+    <div style="font-size:12px;line-height:1.5;min-width:120px">
+      <strong>${point.label}</strong>
+    </div>
+  `;
 }
 
 export function MapView({
   className,
-  initialCenter = { lat: 37.7749, lng: -122.4194 },
-  initialZoom = 12,
+  initialCenter = DEFAULT_CENTER,
+  initialZoom = 11,
+  points = [],
   onMapReady,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<google.maps.Map | null>(null);
-
-  const init = usePersistFn(async () => {
-    await loadMapScript();
-    if (!mapContainer.current) {
-      console.error("Map container not found");
-      return;
-    }
-    if (!window.google?.maps) {
-      return;
-    }
-    map.current = new window.google.maps.Map(mapContainer.current, {
-      zoom: initialZoom,
-      center: initialCenter,
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-      streetViewControl: true,
-      mapId: "DEMO_MAP_ID",
-    });
-    if (onMapReady) {
-      onMapReady(map.current);
-    }
-  });
+  const mapRef = useRef<L.Map | null>(null);
+  const markerLayerRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
-    init();
-  }, [init]);
+    if (!mapContainer.current || mapRef.current) return;
+
+    const map = L.map(mapContainer.current, {
+      center: [initialCenter.lat, initialCenter.lng],
+      zoom: initialZoom,
+      zoomControl: true,
+    });
+
+    L.tileLayer(import.meta.env.VITE_OSM_TILE_URL || DEFAULT_TILE_URL, {
+      attribution: import.meta.env.VITE_OSM_ATTRIBUTION || DEFAULT_ATTRIBUTION,
+      maxZoom: 19,
+    }).addTo(map);
+
+    markerLayerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+    onMapReady?.(map);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerLayerRef.current = null;
+    };
+  }, [initialCenter.lat, initialCenter.lng, initialZoom, onMapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const layer = markerLayerRef.current;
+    if (!map || !layer) return;
+
+    layer.clearLayers();
+    const validPoints = points.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+    const bounds: L.LatLngTuple[] = [];
+
+    validPoints.forEach((point) => {
+      const icon = L.divIcon({
+        html: markerHtml(point),
+        className: "hkeiu-map-marker",
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+      L.marker([point.lat, point.lng], { icon })
+        .bindPopup(popupHtml(point), { closeButton: false })
+        .addTo(layer);
+      bounds.push([point.lat, point.lng]);
+    });
+
+    if (bounds.length === 1) {
+      map.setView(bounds[0], Math.max(initialZoom, 13));
+    } else if (bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
+    }
+  }, [points, initialZoom]);
 
   return (
-    <div ref={mapContainer} className={cn("w-full h-[500px] bg-slate-100", className)}>
-      {!API_KEY && (
-        <div className="flex h-full items-center justify-center text-sm text-slate-500">
-          Google Maps API Key 尚未配置
+    <div className={cn("relative h-[500px] w-full overflow-hidden bg-slate-100", className)}>
+      <div ref={mapContainer} className="absolute inset-0" />
+      {points.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-50/70 text-sm text-slate-500">
+          暫無可顯示坐標
         </div>
       )}
     </div>

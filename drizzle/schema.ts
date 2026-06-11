@@ -508,6 +508,23 @@ export const notifications = mysqlTable("notifications", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/**
+ * 地點坐標緩存表 - 用於免 Google Key 地圖顯示行程點
+ */
+export const placeCoordinates = mysqlTable("placeCoordinates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address"),
+  category: mysqlEnum("category", ["attraction", "restaurant", "school", "hotel", "transport", "other"]).default("other").notNull(),
+  latitude: varchar("latitude", { length: 32 }).notNull(),
+  longitude: varchar("longitude", { length: 32 }).notNull(),
+  source: mysqlEnum("source", ["manual", "resource", "geocoded", "seed"]).default("manual").notNull(),
+  confidence: int("confidence").default(80).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Group = typeof groups.$inferSelect;
@@ -532,6 +549,8 @@ export type File = typeof files.$inferSelect;
 export type InsertFile = typeof files.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+export type PlaceCoordinate = typeof placeCoordinates.$inferSelect;
+export type InsertPlaceCoordinate = typeof placeCoordinates.$inferInsert;
 export type Attraction = typeof attractions.$inferSelect;
 export type InsertAttraction = typeof attractions.$inferInsert;
 export type Guide = typeof guides.$inferSelect;

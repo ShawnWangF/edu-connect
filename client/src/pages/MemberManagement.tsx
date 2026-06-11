@@ -50,6 +50,8 @@ import {
   X,
   Shield,
   Navigation,
+  KeyRound,
+  Copy,
 } from "lucide-react";
 
 // ===== 類型定義 =====
@@ -100,6 +102,9 @@ type FormData = {
   role: StaffRole;
   customRole: string;
   userId: string;
+  createLogin: boolean;
+  loginUsername: string;
+  loginPassword: string;
   phone: string;
   email: string;
   wechat: string;
@@ -164,6 +169,9 @@ const defaultForm: FormData = {
   role: "staff",
   customRole: "",
   userId: "",
+  createLogin: true,
+  loginUsername: "",
+  loginPassword: "",
   phone: "",
   email: "",
   wechat: "",
@@ -183,6 +191,7 @@ export default function MemberManagement() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [generatedLogin, setGeneratedLogin] = useState<{ username: string; password: string; staffName?: string } | null>(null);
 
   // 表單狀態
   const [formData, setFormData] = useState<FormData>(defaultForm);
@@ -215,13 +224,33 @@ export default function MemberManagement() {
 
   // ===== Mutations =====
   const createStaff = trpc.staff.create.useMutation({
-    onSuccess: () => {
-      toast.success("工作人員已添加");
+    onSuccess: (data) => {
+      toast.success(data.generatedLogin ? "工作人員及登入帳號已添加" : "工作人員已添加");
+      if (data.generatedLogin) {
+        setGeneratedLogin({
+          staffName: formData.name,
+          username: data.generatedLogin.username,
+          password: data.generatedLogin.password,
+        });
+      }
       setShowAddDialog(false);
       setFormData(defaultForm);
       refetchStaff();
     },
     onError: (err) => toast.error(`添加失敗：${err.message}`),
+  });
+
+  const createLogin = trpc.staff.createLogin.useMutation({
+    onSuccess: (data) => {
+      toast.success("登入帳號已生成");
+      setGeneratedLogin({
+        staffName: selectedStaff?.name,
+        username: data.generatedLogin.username,
+        password: data.generatedLogin.password,
+      });
+      refetchStaff();
+    },
+    onError: (err) => toast.error(`生成失敗：${err.message}`),
   });
 
   const updateStaff = trpc.staff.update.useMutation({
@@ -301,6 +330,9 @@ export default function MemberManagement() {
       role: staff.role,
       customRole: staff.customRole ?? "",
       userId: staff.userId ? String(staff.userId) : "",
+      createLogin: false,
+      loginUsername: "",
+      loginPassword: "",
       phone: staff.phone ?? "",
       email: staff.email ?? "",
       wechat: staff.wechat ?? "",
@@ -326,6 +358,9 @@ export default function MemberManagement() {
       role: formData.role,
       customRole: formData.role === "other" ? formData.customRole || undefined : undefined,
       userId: formData.userId ? Number(formData.userId) : undefined,
+      createLogin: !formData.userId && formData.createLogin,
+      loginUsername: formData.loginUsername || undefined,
+      loginPassword: formData.loginPassword || undefined,
       phone: formData.phone || undefined,
       email: formData.email || undefined,
       wechat: formData.wechat || undefined,
@@ -485,7 +520,13 @@ export default function MemberManagement() {
                 <TableBody>
                   {filteredStaff.map((staff) => (
                     <TableRow key={staff.id}>
-                      <TableCell className="font-medium">{staff.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{staff.name}</div>
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <KeyRound className="w-3 h-3" />
+                          {staff.userId ? "已綁定登入帳號" : "尚未生成帳號"}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={`${roleColor[staff.role]} border-0`}>
                           <span className="flex items-center gap-1">
@@ -544,6 +585,20 @@ export default function MemberManagement() {
                           >
                             <CalendarDays className="w-4 h-4" />
                           </Button>
+                          {!staff.userId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedStaff(staff);
+                                createLogin.mutate({ staffId: staff.id });
+                              }}
+                              title="生成登入帳號"
+                              disabled={createLogin.isPending}
+                            >
+                              <KeyRound className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -888,6 +943,41 @@ export default function MemberManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!generatedLogin} onOpenChange={(open) => !open && setGeneratedLogin(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-blue-600" />
+              工作人員登入帳號
+            </DialogTitle>
+          </DialogHeader>
+          {generatedLogin && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                請把以下帳號和臨時密碼發給 {generatedLogin.staffName || "工作人員"}。對方登入後可在「我的任務」查看指派並開啟位置共享。
+              </div>
+              <div className="rounded-lg border bg-slate-50 p-3 space-y-2 font-mono text-sm">
+                <div>帳號：{generatedLogin.username}</div>
+                <div>密碼：{generatedLogin.password}</div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`帳號：${generatedLogin.username}\n密碼：${generatedLogin.password}`);
+                    toast.success("已複製帳密");
+                  }}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  複製帳密
+                </Button>
+                <Button onClick={() => setGeneratedLogin(null)}>完成</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -952,7 +1042,7 @@ function StaffForm({
         <Label>綁定登入帳號</Label>
         <Select
           value={formData.userId || "none"}
-          onValueChange={(v) => setFormData((f) => ({ ...f, userId: v === "none" ? "" : v }))}
+          onValueChange={(v) => setFormData((f) => ({ ...f, userId: v === "none" ? "" : v, createLogin: v === "none" ? f.createLogin : false }))}
         >
           <SelectTrigger>
             <SelectValue placeholder="可選，用於工作人員登入後查看任務/上報位置" />
@@ -967,6 +1057,43 @@ function StaffForm({
           </SelectContent>
         </Select>
       </div>
+
+      {!formData.userId && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 space-y-3">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={formData.createLogin}
+              onChange={(e) => setFormData((f) => ({ ...f, createLogin: e.target.checked }))}
+            />
+            <span>
+              <span className="font-medium text-blue-900">同時創建工作人員登入帳號</span>
+              <span className="block text-xs text-blue-700">生成後此人可登入系統，在「我的任務」查看指派並開啟位置共享。</span>
+            </span>
+          </label>
+          {formData.createLogin && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">自定義帳號</Label>
+                <Input
+                  placeholder="留空自動生成"
+                  value={formData.loginUsername}
+                  onChange={(e) => setFormData((f) => ({ ...f, loginUsername: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">臨時密碼</Label>
+                <Input
+                  placeholder="留空自動生成"
+                  value={formData.loginPassword}
+                  onChange={(e) => setFormData((f) => ({ ...f, loginPassword: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

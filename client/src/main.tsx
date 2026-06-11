@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import "leaflet/dist/leaflet.css";
 import "./index.css";
 
 const queryClient = new QueryClient();

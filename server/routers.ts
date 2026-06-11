@@ -103,6 +103,102 @@ const urgentAdjustScopeSchema = z.object({
 
 type UrgentAdjustScopeInput = z.infer<typeof urgentAdjustScopeSchema>;
 
+const seedPlaceCoordinates: Array<{
+  name: string;
+  address?: string;
+  category: 'attraction' | 'restaurant' | 'school' | 'hotel' | 'transport' | 'other';
+  latitude: string;
+  longitude: string;
+}> = [
+  { name: '香港大學', address: '香港薄扶林香港大學', category: 'attraction', latitude: '22.2830', longitude: '114.1370' },
+  { name: '香港太空館', address: '尖沙咀梳士巴利道10號', category: 'attraction', latitude: '22.2941', longitude: '114.1718' },
+  { name: '尖沙咀星光大道', address: '尖沙咀星光大道', category: 'attraction', latitude: '22.2930', longitude: '114.1757' },
+  { name: '維港遊', address: '香港維多利亞港', category: 'attraction', latitude: '22.2939', longitude: '114.1699' },
+  { name: '香港海洋公園', address: '香港島南區黃竹坑道180號', category: 'attraction', latitude: '22.2467', longitude: '114.1751' },
+  { name: '金紫荊廣場', address: '灣仔博覽道1號', category: 'attraction', latitude: '22.2840', longitude: '114.1737' },
+  { name: '香港文化博物館', address: '沙田文林路1號', category: 'attraction', latitude: '22.3760', longitude: '114.1857' },
+  { name: '嘉道理農場暨植物園', address: '香港新界大埔林錦公路', category: 'attraction', latitude: '22.4316', longitude: '114.1150' },
+  { name: '蓮花山公園', address: '廣東省深圳市福田區紅荔路6030號', category: 'attraction', latitude: '22.5532', longitude: '114.0540' },
+  { name: '華大基因時空中心', address: '深圳市鹽田區梅沙街道濱海社區雲華路9號', category: 'attraction', latitude: '22.6069', longitude: '114.3043' },
+  { name: '深圳國家基因庫', address: '廣東省深圳市龍崗區觀音山公園內', category: 'attraction', latitude: '22.6028', longitude: '114.4850' },
+  { name: '比亞迪雲巴', address: '坪山雲巴一號線綜合車場', category: 'attraction', latitude: '22.6938', longitude: '114.3460' },
+  { name: '南方科技大學校園', address: '廣東省深圳市南山區學苑大道1088號', category: 'attraction', latitude: '22.6006', longitude: '113.9997' },
+  { name: '香港諾富特世紀酒店宴會廳', address: '香港灣仔謝斐道238號', category: 'hotel', latitude: '22.2790', longitude: '114.1764' },
+  { name: '香港國際機場', address: '香港國際機場', category: 'transport', latitude: '22.3080', longitude: '113.9185' },
+  { name: '深圳宝安国际机场', address: '深圳寶安國際機場', category: 'transport', latitude: '22.6393', longitude: '113.8107' },
+  { name: '深圳寶安國際機場', address: '深圳寶安國際機場', category: 'transport', latitude: '22.6393', longitude: '113.8107' },
+  { name: '茗悅軒', address: '沙田小瀝源路68號廣源商場', category: 'restaurant', latitude: '22.3820', longitude: '114.2150' },
+  { name: '逸月軒（荃新天地）', address: '荃灣楊屋道18號荃新天地', category: 'restaurant', latitude: '22.3699', longitude: '114.1168' },
+];
+
+function inferPlaceCategory(name: string): 'attraction' | 'restaurant' | 'school' | 'hotel' | 'transport' | 'other' {
+  if (/餐|午餐|晚餐|早餐|軒|餐廳|餐厅/.test(name)) return 'restaurant';
+  if (/學校|学校|中學|中学|小學|小学|書院|书院|大學|大学|交流/.test(name)) return 'school';
+  if (/酒店|房間|房间|入住/.test(name)) return 'hotel';
+  if (/机场|機場|过关|過關|出境|口岸|巴士|車|车|雲巴/.test(name)) return 'transport';
+  return 'attraction';
+}
+
+function colorForMapCategory(category: string, batchCode?: string | null) {
+  if (batchCode) {
+    const palette = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2', '#be123c', '#4f46e5'];
+    const index = Array.from(batchCode).reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length;
+    return palette[index];
+  }
+  const colors: Record<string, string> = {
+    attraction: '#2563eb',
+    restaurant: '#f97316',
+    school: '#16a34a',
+    hotel: '#7c3aed',
+    transport: '#0f766e',
+    other: '#64748b',
+  };
+  return colors[category] || colors.other;
+}
+
+function slugifyUsername(input: string) {
+  const ascii = input
+    .normalize('NFKD')
+    .replace(/[^\w\s.-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_.-]+/g, '.')
+    .replace(/^\.+|\.+$/g, '');
+  return ascii || `staff.${nanoid(6).toLowerCase()}`;
+}
+
+function generateTempPassword() {
+  return `Hk${nanoid(8).replace(/[-_]/g, '7')}!`;
+}
+
+async function createStaffLoginAccount(dbConn: any, staffName: string, email?: string | null) {
+  const { users } = await import('../drizzle/schema');
+  const base = slugifyUsername(staffName);
+  let username = base;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const [existingRows] = await dbConn.execute(sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`);
+    if (((existingRows as unknown) as any[]).length === 0) break;
+    username = `${base}.${attempt + 2}`;
+  }
+  const [finalCheck] = await dbConn.execute(sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`);
+  if (((finalCheck as unknown) as any[]).length > 0) {
+    username = `${base}.${nanoid(5).toLowerCase()}`;
+  }
+
+  const password = generateTempPassword();
+  const result = await dbConn.insert(users).values({
+    openId: `local-${nanoid()}`,
+    username,
+    password: db.hashPassword(password),
+    name: staffName,
+    email: email || null,
+    role: 'viewer',
+    loginMethod: 'local',
+    isOnline: false,
+  });
+  return { userId: Number(result[0].insertId), username, password };
+}
+
 async function findUrgentAdjustTargets(dbConn: any, input: UrgentAdjustScopeInput) {
   if (input.scopeType === 'single') {
     if (!input.itineraryId) {
@@ -2889,6 +2985,9 @@ export const appRouter = router({
         role: staffRoleSchema,
         customRole: z.string().optional().nullable(),
         userId: z.number().optional().nullable(),
+        createLogin: z.boolean().optional().default(false),
+        loginUsername: z.string().optional(),
+        loginPassword: z.string().optional(),
         phone: z.string().optional(),
         email: z.string().optional(),
         wechat: z.string().optional(),
@@ -2900,8 +2999,80 @@ export const appRouter = router({
         const dbConn = await db.getDb();
         if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         const { staff } = await import('../drizzle/schema');
-        const result = await dbConn.insert(staff).values(input);
-        return { id: Number(result[0].insertId), ...input };
+        const { createLogin, loginUsername, loginPassword, ...staffInput } = input;
+        let generatedLogin: { userId: number; username: string; password: string } | null = null;
+        let userId = staffInput.userId ?? null;
+        if (createLogin && !userId) {
+          if (loginUsername?.trim() && loginPassword?.trim()) {
+            const { users } = await import('../drizzle/schema');
+            const [existingRows] = await dbConn.execute(sql`SELECT id FROM users WHERE username = ${loginUsername.trim()} LIMIT 1`);
+            if (((existingRows as unknown) as any[]).length > 0) {
+              throw new TRPCError({ code: 'CONFLICT', message: '登入帳號已存在' });
+            }
+            const result = await dbConn.insert(users).values({
+              openId: `local-${nanoid()}`,
+              username: loginUsername.trim(),
+              password: db.hashPassword(loginPassword.trim()),
+              name: staffInput.name,
+              email: staffInput.email || null,
+              role: 'viewer',
+              loginMethod: 'local',
+              isOnline: false,
+            });
+            userId = Number(result[0].insertId);
+            generatedLogin = { userId, username: loginUsername.trim(), password: loginPassword.trim() };
+          } else {
+            generatedLogin = await createStaffLoginAccount(dbConn, staffInput.name, staffInput.email);
+            userId = generatedLogin.userId;
+          }
+        }
+        const result = await dbConn.insert(staff).values({ ...staffInput, userId });
+        return { id: Number(result[0].insertId), ...staffInput, userId, generatedLogin };
+      }),
+
+    createLogin: editorProcedure
+      .input(z.object({
+        staffId: z.number(),
+        username: z.string().optional(),
+        password: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+        const { staff, users } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const rows = await dbConn.select({
+          id: staff.id,
+          name: staff.name,
+          email: staff.email,
+          userId: staff.userId,
+        }).from(staff).where(eq(staff.id, input.staffId)).limit(1);
+        const profile = rows[0];
+        if (!profile) throw new TRPCError({ code: 'NOT_FOUND', message: '工作人員不存在' });
+        if (profile.userId) throw new TRPCError({ code: 'BAD_REQUEST', message: '此工作人員已綁定登入帳號' });
+
+        let login: { userId: number; username: string; password: string };
+        if (input.username?.trim() && input.password?.trim()) {
+          const [existingRows] = await dbConn.execute(sql`SELECT id FROM users WHERE username = ${input.username.trim()} LIMIT 1`);
+          if (((existingRows as unknown) as any[]).length > 0) {
+            throw new TRPCError({ code: 'CONFLICT', message: '登入帳號已存在' });
+          }
+          const result = await dbConn.insert(users).values({
+            openId: `local-${nanoid()}`,
+            username: input.username.trim(),
+            password: db.hashPassword(input.password.trim()),
+            name: profile.name,
+            email: profile.email || null,
+            role: 'viewer',
+            loginMethod: 'local',
+            isOnline: false,
+          });
+          login = { userId: Number(result[0].insertId), username: input.username.trim(), password: input.password.trim() };
+        } else {
+          login = await createStaffLoginAccount(dbConn, profile.name, profile.email);
+        }
+        await dbConn.update(staff).set({ userId: login.userId }).where(eq(staff.id, input.staffId));
+        return { success: true, generatedLogin: login };
       }),
 
     update: editorProcedure
@@ -3382,6 +3553,135 @@ export const appRouter = router({
           groups: groupRows as unknown as any[],
           batches: batchRows as unknown as any[],
           itineraries: itineraryRows as unknown as any[],
+        };
+      }),
+
+    syncPlaceCoordinates: editorProcedure.mutation(async () => {
+      const dbConn = await db.getDb();
+      if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      const { placeCoordinates } = await import('../drizzle/schema');
+
+      const insertOrIgnore = async (item: typeof seedPlaceCoordinates[number]) => {
+        const [existingRows] = await dbConn.execute(sql`
+          SELECT id FROM placeCoordinates WHERE name = ${item.name} LIMIT 1
+        `);
+        if (((existingRows as unknown) as any[]).length > 0) return false;
+        await dbConn.insert(placeCoordinates).values({
+          name: item.name,
+          address: item.address ?? null,
+          category: item.category,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          source: 'seed',
+          confidence: 90,
+        });
+        return true;
+      };
+
+      let inserted = 0;
+      for (const item of seedPlaceCoordinates) {
+        if (await insertOrIgnore(item)) inserted++;
+      }
+
+      return { success: true, inserted };
+    }),
+
+    itineraryMapPoints: protectedProcedure
+      .input(z.object({ projectId: z.number().optional() }).optional())
+      .query(async ({ input }) => {
+        const dbConn = await db.getDb();
+        if (!dbConn) return { project: null, points: [], missing: [] };
+        let projectId = input?.projectId;
+        let project: any = null;
+        if (!projectId) {
+          const [projectRows] = await dbConn.execute(sql`
+            SELECT id, name, code
+            FROM projects
+            ORDER BY
+              CASE status WHEN 'ongoing' THEN 0 WHEN 'preparing' THEN 1 ELSE 2 END,
+              startDate DESC,
+              id DESC
+            LIMIT 1
+          `);
+          project = ((projectRows as unknown) as any[])[0] ?? null;
+          projectId = project?.id;
+        } else {
+          const [projectRows] = await dbConn.execute(sql`SELECT id, name, code FROM projects WHERE id = ${projectId} LIMIT 1`);
+          project = ((projectRows as unknown) as any[])[0] ?? null;
+        }
+        if (!projectId) return { project: null, points: [], missing: [] };
+
+        const [rows] = await dbConn.execute(sql`
+          SELECT
+            i.id AS itineraryId,
+            i.locationName,
+            i.description,
+            i.startTime,
+            i.endTime,
+            DATE_FORMAT(i.date, '%Y-%m-%d') AS date,
+            g.id AS groupId,
+            g.code AS groupCode,
+            g.name AS groupName,
+            g.batch_code AS batchCode,
+            pc.name AS placeName,
+            pc.category,
+            pc.latitude,
+            pc.longitude,
+            pc.source
+          FROM itineraries i
+          JOIN \`groups\` g ON g.id = i.groupId
+          LEFT JOIN placeCoordinates pc
+            ON pc.name = i.locationName
+            OR (i.locationName IS NULL AND pc.name = i.description)
+            OR (i.locationName IS NOT NULL AND i.locationName LIKE CONCAT('%', pc.name, '%'))
+            OR (i.description IS NOT NULL AND i.description LIKE CONCAT('%', pc.name, '%'))
+          WHERE g.projectId = ${projectId}
+            AND COALESCE(i.locationName, i.description) IS NOT NULL
+            AND COALESCE(i.locationName, i.description) <> ''
+          ORDER BY g.batch_code ASC, g.code ASC, i.date ASC, COALESCE(i.startTime, '00:00') ASC
+        `);
+
+        const pointMap = new Map<string, any>();
+        const missingMap = new Map<string, any>();
+        for (const row of (rows as unknown) as any[]) {
+          const rawName = (row.locationName || row.description || '').trim();
+          const displayName = row.placeName || rawName;
+          if (!row.latitude || !row.longitude) {
+            if (!missingMap.has(rawName)) {
+              missingMap.set(rawName, {
+                name: rawName,
+                category: inferPlaceCategory(rawName),
+                count: 0,
+              });
+            }
+            missingMap.get(rawName).count++;
+            continue;
+          }
+          const key = `${displayName}|${row.groupCode}|${row.date}|${row.startTime || ''}`;
+          pointMap.set(key, {
+            id: `${row.itineraryId}-${row.groupCode}`,
+            itineraryId: row.itineraryId,
+            lat: Number(row.latitude),
+            lng: Number(row.longitude),
+            label: displayName,
+            subtitle: `${row.groupCode} ${row.groupName || ''}`,
+            meta: `${row.date}${row.startTime ? ` ${row.startTime}` : ''}${row.endTime ? `-${row.endTime}` : ''}`,
+            color: colorForMapCategory(row.category || inferPlaceCategory(displayName), row.batchCode),
+            category: row.category || inferPlaceCategory(displayName),
+            groupCode: row.groupCode,
+            groupName: row.groupName,
+            batchCode: row.batchCode,
+            date: row.date,
+            startTime: row.startTime,
+            endTime: row.endTime,
+            source: row.source,
+          });
+        }
+
+        return {
+          project,
+          points: Array.from(pointMap.values()),
+          missing: Array.from(missingMap.values()).sort((a, b) => b.count - a.count).slice(0, 30),
         };
       }),
 
