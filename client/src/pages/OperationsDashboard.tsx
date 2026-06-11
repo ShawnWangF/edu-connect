@@ -465,6 +465,10 @@ function EmergencyCommandButton({
   const [noticeForm, setNoticeForm] = useState({
     title: "",
     content: "",
+    level: "urgent" as "critical" | "urgent" | "info",
+    audience: "all" as "all" | "group" | "staff",
+    actionRequired: "",
+    requireAck: true,
     relatedGroupId: "all",
   });
   const [impactPreview, setImpactPreview] = useState<any>(null);
@@ -491,10 +495,10 @@ function EmergencyCommandButton({
   const broadcastMutation = trpc.dashboard.emergencyBroadcast.useMutation({
     onSuccess: (data) => {
       toast.success("緊急通知已發布", {
-        description: `已寫入 ${data.recipients} 位用戶通知中心${data.pushed ? `，推送 ${data.pushed} 個端點` : ""}`,
+        description: `已送達 ${data.recipients} 位用戶通知中心${data.pushed ? `，推送 ${data.pushed} 個端點` : "，暫無可推送設備"}`,
       });
       utils.notifications.list.invalidate();
-      setNoticeForm({ title: "", content: "", relatedGroupId: "all" });
+      setNoticeForm({ title: "", content: "", level: "urgent", audience: "all", actionRequired: "", requireAck: true, relatedGroupId: "all" });
       setOpen(false);
     },
     onError: (e) => toast.error("發布失敗", { description: e.message }),
@@ -584,10 +588,18 @@ function EmergencyCommandButton({
       toast.error("請填寫通知標題和內容");
       return;
     }
+    if (noticeForm.audience === "group" && noticeForm.relatedGroupId === "all") {
+      toast.error("請選擇需要通知的團組");
+      return;
+    }
     broadcastMutation.mutate({
       title: noticeForm.title.trim(),
       content: noticeForm.content.trim(),
-      relatedGroupId: noticeForm.relatedGroupId === "all" ? undefined : Number(noticeForm.relatedGroupId),
+      level: noticeForm.level,
+      audience: noticeForm.audience,
+      actionRequired: noticeForm.actionRequired.trim() || undefined,
+      requireAck: noticeForm.requireAck,
+      relatedGroupId: noticeForm.audience === "group" ? Number(noticeForm.relatedGroupId) : undefined,
     });
   };
   const missingLocations = staffLocations?.missing || [];
@@ -652,7 +664,41 @@ function EmergencyCommandButton({
           {activeCommand === 'notice' && (
             <div className="space-y-4 py-2">
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-                用於突發天氣、交通延誤、集合點變更等需要所有系統用戶立即看到的事項。發布後會寫入通知中心，並嘗試推送到已訂閱設備。
+                用於突發天氣、交通延誤、集合點變更等需要立即同步的事項。發布後會寫入接收人的通知中心，並嘗試推送到已訂閱設備。
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>緊急級別</Label>
+                  <Select
+                    value={noticeForm.level}
+                    onValueChange={(value: "critical" | "urgent" | "info") => setNoticeForm((f) => ({ ...f, level: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="critical">最高緊急：立即處理</SelectItem>
+                      <SelectItem value="urgent">緊急：今日必看</SelectItem>
+                      <SelectItem value="info">一般提醒：同步資訊</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>通知範圍</Label>
+                  <Select
+                    value={noticeForm.audience}
+                    onValueChange={(value: "all" | "group" | "staff") => setNoticeForm((f) => ({ ...f, audience: value, relatedGroupId: value === "group" ? f.relatedGroupId : "all" }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全平台用戶</SelectItem>
+                      <SelectItem value="staff">已綁定工作人員</SelectItem>
+                      <SelectItem value="group">指定團組相關人員</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>通知標題 *</Label>
@@ -662,8 +708,9 @@ function EmergencyCommandButton({
                   onChange={(e) => setNoticeForm((f) => ({ ...f, title: e.target.value }))}
                 />
               </div>
+              {noticeForm.audience === "group" && (
               <div className="space-y-1.5">
-                <Label>關聯團組</Label>
+                <Label>指定團組 *</Label>
                 <Select
                   value={noticeForm.relatedGroupId}
                   onValueChange={(value) => setNoticeForm((f) => ({ ...f, relatedGroupId: value }))}
@@ -679,14 +726,39 @@ function EmergencyCommandButton({
                   </SelectContent>
                 </Select>
               </div>
+              )}
               <div className="space-y-1.5">
                 <Label>通知內容 *</Label>
                 <Textarea
                   rows={4}
-                  placeholder="請寫明處理指令、集合時間、負責人和下一步安排..."
+                  placeholder="請寫明發生了什麼、涉及哪些團組、集合時間、負責人和下一步安排..."
                   value={noticeForm.content}
                   onChange={(e) => setNoticeForm((f) => ({ ...f, content: e.target.value }))}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>行動要求</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="如：各團導立即清點人數，司機原地待命，負責人 10 分鐘內回報。"
+                  value={noticeForm.actionRequired}
+                  onChange={(e) => setNoticeForm((f) => ({ ...f, actionRequired: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <div>
+                  <div className="text-sm font-medium text-amber-900">要求接收人確認知悉</div>
+                  <div className="text-xs text-amber-700">通知中心會顯示「我已知悉」，便於現場人員完成閉環。</div>
+                </div>
+                <Switch
+                  checked={noticeForm.requireAck}
+                  onCheckedChange={(value) => setNoticeForm((f) => ({ ...f, requireAck: value }))}
+                />
+              </div>
+              <div className="rounded-lg border bg-slate-50 p-3 text-xs text-muted-foreground">
+                發送摘要：{noticeForm.audience === "staff" ? "已綁定工作人員" : noticeForm.audience === "group" ? "指定團組相關人員" : "全平台用戶"}
+                {" · "}{noticeForm.level === "critical" ? "最高緊急" : noticeForm.level === "urgent" ? "緊急" : "一般提醒"}
+                {" · "}{noticeForm.requireAck ? "需要確認" : "不要求確認"}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>

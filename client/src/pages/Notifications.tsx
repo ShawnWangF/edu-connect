@@ -76,6 +76,17 @@ export default function Notifications() {
     }
   };
 
+  const getEmergencyLevel = (title: string) => {
+    if (title.includes("最高緊急")) return "critical";
+    if (title.includes("緊急")) return "urgent";
+    return "normal";
+  };
+
+  const formatContentLines = (content?: string | null) => {
+    if (!content) return [];
+    return content.split("\n").map((line) => line.trim()).filter(Boolean);
+  };
+
   const getNotificationColor = (type: string) => {
     switch (type) {
       case "reminder": return "bg-blue-100 text-blue-700 border-blue-300";
@@ -260,10 +271,31 @@ export default function Notifications() {
           {notifications && notifications.length > 0 ? (
             <div className="space-y-3">
               {notifications.map((notification) => (
+                (() => {
+                  const emergencyLevel = getEmergencyLevel(notification.title);
+                  const isEmergency = emergencyLevel !== "normal";
+                  const contentLines = formatContentLines(notification.content);
+                  const mainLines = contentLines.filter((line) =>
+                    !line.startsWith("行動要求：") &&
+                    !line.startsWith("通知範圍：") &&
+                    !line.startsWith("需要確認：") &&
+                    !line.startsWith("發布人：")
+                  );
+                  const metaLines = contentLines.filter((line) =>
+                    line.startsWith("行動要求：") ||
+                    line.startsWith("通知範圍：") ||
+                    line.startsWith("需要確認：") ||
+                    line.startsWith("發布人：")
+                  );
+                  return (
                 <div
                   key={notification.id}
                   className={`p-4 border rounded-lg transition-colors ${
-                    notification.isRead ? "bg-muted/30" : "bg-background"
+                    emergencyLevel === "critical"
+                      ? "border-red-300 bg-red-50"
+                      : emergencyLevel === "urgent"
+                        ? "border-amber-300 bg-amber-50"
+                        : notification.isRead ? "bg-muted/30" : "bg-background"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -276,6 +308,11 @@ export default function Notifications() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-medium">{notification.title}</h3>
+                          {isEmergency && (
+                            <Badge variant={emergencyLevel === "critical" ? "destructive" : "secondary"} className="text-xs">
+                              {emergencyLevel === "critical" ? "最高緊急" : "緊急"}
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">
                             {getNotificationTypeLabel(notification.type)}
                           </Badge>
@@ -286,9 +323,22 @@ export default function Notifications() {
                           )}
                         </div>
                         {notification.content && (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {notification.content}
-                          </p>
+                          <div className="mb-2 space-y-2">
+                            {mainLines.length > 0 && (
+                              <p className="whitespace-pre-wrap text-sm text-slate-700">
+                                {mainLines.join("\n")}
+                              </p>
+                            )}
+                            {metaLines.length > 0 && (
+                              <div className="rounded-md border bg-white/70 p-2 text-xs text-slate-700">
+                                {metaLines.map((line) => (
+                                  <div key={line} className={line.startsWith("行動要求：") ? "font-medium text-red-700" : ""}>
+                                    {line}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                         <p className="text-xs text-muted-foreground">
                           {format(
@@ -302,15 +352,18 @@ export default function Notifications() {
                     {!notification.isRead && (
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant={isEmergency ? "default" : "outline"}
+                        className={isEmergency ? "bg-red-600 hover:bg-red-700" : ""}
                         onClick={() => markAsRead.mutate({ id: notification.id })}
                       >
                         <Check className="h-4 w-4 mr-1" />
-                        標記已讀
+                        {isEmergency ? "我已知悉" : "標記已讀"}
                       </Button>
                     )}
                   </div>
                 </div>
+                  );
+                })()
               ))}
             </div>
           ) : (

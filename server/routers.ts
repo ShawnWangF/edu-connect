@@ -4425,24 +4425,61 @@ export const appRouter = router({
       .input(z.object({
         title: z.string().min(1),
         content: z.string().min(1),
+        level: z.enum(['critical', 'urgent', 'info']).default('urgent'),
+        audience: z.enum(['all', 'group', 'staff']).default('all'),
+        actionRequired: z.string().optional().nullable(),
+        requireAck: z.boolean().default(true),
         relatedGroupId: z.number().optional().nullable(),
       }))
       .mutation(async ({ input, ctx }) => {
         const dbConn = await db.getDb();
         if (!dbConn) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         const { sql } = await import('drizzle-orm');
-        const [allUsers] = await dbConn.execute(sql`SELECT id FROM users`);
-        const userList = (allUsers as unknown) as any[];
-        const title = `【緊急通知】${input.title}`;
-        const content = `${input.content}\n\n發布人：${ctx.user.name || ctx.user.username || '指揮中心'}`;
+        const levelLabel = input.level === 'critical' ? '最高緊急' : input.level === 'urgent' ? '緊急' : '一般提醒';
+        const notificationType = input.level === 'critical' ? 'deadline' : input.level === 'urgent' ? 'change' : 'reminder';
+        let userList: any[] = [];
+        if (input.audience === 'staff') {
+          const [staffUsers] = await dbConn.execute(sql`
+            SELECT DISTINCT u.id
+            FROM users u
+            JOIN staff s ON s.userId = u.id
+            WHERE s.isActive = true
+          `);
+          userList = staffUsers as unknown as any[];
+        } else if (input.audience === 'group' && input.relatedGroupId) {
+          const [groupUsers] = await dbConn.execute(sql`
+            SELECT DISTINCT u.id
+            FROM users u
+            LEFT JOIN staff s ON s.userId = u.id AND s.isActive = true
+            LEFT JOIN batchStaff bs ON bs.staffId = s.id
+            WHERE u.role IN ('admin', 'editor') OR bs.groupId = ${input.relatedGroupId}
+          `);
+          userList = groupUsers as unknown as any[];
+        } else {
+          const [allUsers] = await dbConn.execute(sql`SELECT id FROM users`);
+          userList = allUsers as unknown as any[];
+        }
+        if (userList.length === 0) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: '沒有找到可接收通知的用戶' });
+        }
+        const title = `【${levelLabel}】${input.title}`;
+        const audienceLabel = input.audience === 'staff' ? '已綁定工作人員' : input.audience === 'group' ? '指定團組相關人員' : '全平台用戶';
+        const content = [
+          input.content.trim(),
+          '',
+          `行動要求：${input.actionRequired?.trim() || '請立即查看並按現場負責人指示處理。'}`,
+          `通知範圍：${audienceLabel}`,
+          `需要確認：${input.requireAck ? '是，請在通知中心點擊「我已知悉」' : '否'}`,
+          `發布人：${ctx.user.name || ctx.user.username || '指揮中心'}`,
+        ].join('\n');
         for (const u of userList) {
           await dbConn.execute(sql`
             INSERT INTO notifications (userId, type, title, content, relatedGroupId, isRead, createdAt)
-            VALUES (${u.id}, 'reminder', ${title}, ${content}, ${input.relatedGroupId ?? null}, false, NOW())
+            VALUES (${u.id}, ${notificationType}, ${title}, ${content}, ${input.relatedGroupId ?? null}, false, NOW())
           `);
         }
         const sent = await sendWebPushToAll({ title, body: input.content, url: input.relatedGroupId ? `/groups/${input.relatedGroupId}` : '/' });
-        return { success: true, recipients: userList.length, pushed: sent };
+        return { success: true, recipients: userList.length, pushed: sent, level: input.level, audience: input.audience, requireAck: input.requireAck };
       }),
 
     // 获取最近调整记录
